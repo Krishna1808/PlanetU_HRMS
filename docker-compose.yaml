@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: planetu_postgres
+    environment:
+      POSTGRES_USER: planetu
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: planetu_hrms
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    container_name: planetu_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  pg_data:

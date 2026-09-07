@@ -1,0 +1,316 @@
+// PlanetU HRMS - Prisma Schema
+// Foundation + Employee Management Module (Strictly scoped)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  CLIENT_SUPER_ADMIN
+  HR_ADMIN
+  MANAGER
+  FINANCE
+  EMPLOYEE
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  PROBATION
+  NOTICE_PERIOD
+  TERMINATED
+  RESIGNED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum DocumentType {
+  RESUME
+  ID_PROOF
+  OFFER_LETTER
+  EXPERIENCE_LETTER
+  EDUCATION_CERTIFICATE
+  OTHER
+}
+
+// ---------------------------------------------------------------------------
+// 1. Organization (Tenant)
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String   @unique
+  planTier  String   @default("internal") @map("plan_tier")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  users                 User[]
+  departments           Department[]
+  designations          Designation[]
+  grades                Grade[]
+  locations             Location[]
+  employeeCodeSequences EmployeeCodeSequence[]
+  employees             Employee[]
+  employeeJobHistories  EmployeeJobHistory[]
+  employeeDocuments     EmployeeDocument[]
+
+  @@map("organizations")
+}
+
+// ---------------------------------------------------------------------------
+// 2. User (Authentication & RBAC Identity)
+// ---------------------------------------------------------------------------
+
+model User {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  email          String
+  passwordHash   String    @map("password_hash")
+  role           Role      @default(EMPLOYEE)
+  employeeId     String?   @unique @map("employee_id") @db.Uuid
+  isActive       Boolean   @default(true) @map("is_active")
+  lastLoginAt    DateTime? @map("last_login_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee?    @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, email])
+  @@index([organizationId, role])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// 3. Master Lookup Tables (Tenant-Scoped)
+// ---------------------------------------------------------------------------
+
+model Department {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  codePrefix     String   @map("code_prefix") // e.g., 'ENG', 'HR', 'SLS'
+  description    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees             Employee[]
+  jobHistories          EmployeeJobHistory[]
+  employeeCodeSequences EmployeeCodeSequence[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, codePrefix])
+  @@map("departments")
+}
+
+model Designation {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  description    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees    Employee[]
+  jobHistories EmployeeJobHistory[]
+
+  @@unique([organizationId, name])
+  @@map("designations")
+}
+
+model Grade {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   // e.g., 'L1', 'L2', 'M1'
+  level          Int?
+  description    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees    Employee[]
+  jobHistories EmployeeJobHistory[]
+
+  @@unique([organizationId, name])
+  @@map("grades")
+}
+
+model Location {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   // e.g., 'Mumbai HQ', 'Bengaluru Branch'
+  address        String?
+  city           String?
+  country        String?  @default("India")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees    Employee[]
+
+  @@unique([organizationId, name])
+  @@map("locations")
+}
+
+// ---------------------------------------------------------------------------
+// 4. Atomic Employee Code Sequence (Concurrency Safe)
+// ---------------------------------------------------------------------------
+
+model EmployeeCodeSequence {
+  organizationId String   @map("organization_id") @db.Uuid
+  departmentId   String   @map("department_id") @db.Uuid
+  lastNumber     Int      @default(0) @map("last_number")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, departmentId])
+  @@map("employee_code_sequences")
+}
+
+// ---------------------------------------------------------------------------
+// 5. Employee Core Record
+// ---------------------------------------------------------------------------
+
+model Employee {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  employeeCode   String @map("employee_code") // e.g. ENG-0001
+
+  // Personal Info
+  firstName                String    @map("first_name")
+  lastName                 String    @map("last_name")
+  personalEmail            String?   @map("personal_email")
+  phone                    String?
+  dateOfBirth              DateTime? @map("date_of_birth")
+  gender                   Gender?
+  currentAddress           String?   @map("current_address")
+  permanentAddress         String?   @map("permanent_address")
+  emergencyContactName     String?   @map("emergency_contact_name")
+  emergencyContactPhone    String?   @map("emergency_contact_phone")
+  emergencyContactRelation String?   @map("emergency_contact_relation")
+
+  // Employment Details
+  departmentId       String           @map("department_id") @db.Uuid
+  designationId      String           @map("designation_id") @db.Uuid
+  gradeId            String?          @map("grade_id") @db.Uuid
+  locationId         String?          @map("location_id") @db.Uuid
+  reportingManagerId String?          @map("reporting_manager_id") @db.Uuid
+  employmentType     EmploymentType   @default(FULL_TIME) @map("employment_type")
+  employmentStatus   EmploymentStatus @default(ACTIVE) @map("employment_status")
+  dateOfJoining      DateTime         @map("date_of_joining")
+  dateOfExit         DateTime?        @map("date_of_exit")
+  probationEndDate   DateTime?        @map("probation_end_date")
+
+  // Compensation & Bank Details (RBAC Restricted)
+  currency      String?  @default("INR")
+  baseSalary    Decimal? @map("base_salary") @db.Decimal(12, 2)
+  bankName      String?  @map("bank_name")
+  accountNumber String?  @map("account_number")
+  ifscOrRouting String?  @map("ifsc_or_routing")
+  panNumber     String?  @map("pan_number")
+  uanNumber     String?  @map("uan_number")
+
+  // Soft Deletion & Audit Timestamps
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user             User?
+  department       Department           @relation(fields: [departmentId], references: [id])
+  designation      Designation          @relation(fields: [designationId], references: [id])
+  grade            Grade?               @relation(fields: [gradeId], references: [id])
+  location         Location?            @relation(fields: [locationId], references: [id])
+  reportingManager Employee?            @relation("ManagerSubordinates", fields: [reportingManagerId], references: [id])
+  directReports    Employee[]           @relation("ManagerSubordinates")
+  jobHistories     EmployeeJobHistory[] @relation("EmployeeJobHistories")
+  jobHistoriesManaged EmployeeJobHistory[] @relation("JobHistoryManager")
+  documents        EmployeeDocument[]
+
+  @@unique([organizationId, employeeCode])
+  @@index([organizationId, deletedAt])
+  @@index([organizationId, departmentId])
+  @@index([reportingManagerId])
+  @@map("employees")
+}
+
+// ---------------------------------------------------------------------------
+// 6. Append-Only Employee Job History Ledger
+// ---------------------------------------------------------------------------
+
+model EmployeeJobHistory {
+  id                 String    @id @default(uuid()) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  employeeId         String    @map("employee_id") @db.Uuid
+  departmentId       String    @map("department_id") @db.Uuid
+  designationId      String    @map("designation_id") @db.Uuid
+  gradeId            String?   @map("grade_id") @db.Uuid
+  reportingManagerId String?   @map("reporting_manager_id") @db.Uuid
+  effectiveFrom      DateTime  @map("effective_from")
+  effectiveTo        DateTime? @map("effective_to") // null means current active state
+  reason             String?
+  changedByUserId    String?   @map("changed_by_user_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee         Employee     @relation("EmployeeJobHistories", fields: [employeeId], references: [id], onDelete: Cascade)
+  department       Department   @relation(fields: [departmentId], references: [id])
+  designation      Designation  @relation(fields: [designationId], references: [id])
+  grade            Grade?       @relation(fields: [gradeId], references: [id])
+  reportingManager Employee?    @relation("JobHistoryManager", fields: [reportingManagerId], references: [id])
+
+  @@index([organizationId, employeeId])
+  @@map("employee_job_histories")
+}
+
+// ---------------------------------------------------------------------------
+// 7. Employee Documents Metadata
+// ---------------------------------------------------------------------------
+
+model EmployeeDocument {
+  id               String       @id @default(uuid()) @db.Uuid
+  organizationId   String       @map("organization_id") @db.Uuid
+  employeeId       String       @map("employee_id") @db.Uuid
+  documentType     DocumentType @map("document_type")
+  fileName         String       @map("file_name")
+  fileUrl          String       @map("file_url")
+  fileSize         Int?         @map("file_size") // in bytes
+  uploadedByUserId String?      @map("uploaded_by_user_id") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, employeeId])
+  @@map("employee_documents")
+}
