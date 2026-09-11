@@ -183,7 +183,21 @@ GET    /api/v1/employees/org-chart      → hierarchy view
 
 ---
 
-## 11. If Anything Is Ambiguous
+## 11. Learning Mode — Standing Rule (Applies to Every Module From Now On)
+
+The developer is a **rookie, learning backend/full-stack development live through this project.** This is a constraint on *how* you work, not just what you build. Apply all of the following for every module going forward, not just when reminded:
+
+1. **Before writing code for a pattern not yet used in this project** (e.g., the first Guard, Interceptor, a new Prisma pattern, a queue/job, a new auth mechanism), give a short plain-language explanation of what it does and why it's needed here — **before** the code, not buried in a comment likely to be skimmed past.
+2. **Flag any decision that deviates from what's already been agreed** (schema fields, architecture rules in Section 5, prior module patterns) **before** writing it, with reasoning — do not wait to be caught after the fact. (Precedent: the `firstName`/`lastName` vs. `full_name` deviation, which should have been flagged proactively.)
+3. **When generating a file, briefly summarize what each significant piece does** in the response — enough for the developer to decide whether to read closely or trust it as-is.
+4. **When there are two reasonable implementation approaches, present both with a recommendation** — do not silently pick one, especially for anything architectural.
+5. **Code comments should explain "why," not just "what,"** for anything non-obvious — consistent with the `DECISIONS.md`-style reasoning already expected elsewhere in this document.
+
+**The goal:** the developer should finish this project able to explain how it works and maintain it themselves — not just end up with a working app they can't extend or debug independently. If asked, retroactively flag anything already built that the developer should go back and deliberately understand, rather than assuming prior acceptance means full understanding.
+
+---
+
+## 12. If Anything Is Ambiguous
 
 Stop and ask the developer rather than guessing — especially for:
 - Anything touching money (Payroll) or statutory compliance rules (geography not yet confirmed)

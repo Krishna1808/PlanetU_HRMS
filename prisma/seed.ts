@@ -144,6 +144,32 @@ async function main() {
   });
 
   console.log(`✅ Seeded Super Admin: ${adminUser.email} (default password: ${defaultPassword})`);
+
+  // 7. Seed Default General Shift (Module 3)
+  const defaultShift = await prisma.shift.upsert({
+    where: {
+      organizationId_code: {
+        organizationId: organization.id,
+        code: 'GEN',
+      },
+    },
+    update: {},
+    create: {
+      organizationId: organization.id,
+      name: 'General Day Shift',
+      code: 'GEN',
+      startTime: '09:00',
+      endTime: '18:00',
+      isOvernight: false,
+      gracePeriodMinutes: 15,
+      breakDurationMinutes: 60,
+      halfDayThresholdMinutes: 240, // 4 hours
+      fullDayThresholdMinutes: 480, // 8 hours
+      isDefault: true,
+      isActive: true,
+    },
+  });
+  console.log(`✅ Seeded default shift: ${defaultShift.name} (${defaultShift.code}: 09:00 - 18:00)`);
   console.log('🌱 Seeding completed successfully!');
 }
 
