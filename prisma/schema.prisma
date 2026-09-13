@@ -63,6 +63,33 @@ enum DayOfWeek {
   SUNDAY
 }
 
+enum LeaveAccrualFrequency {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  NONE
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum LeaveTransactionType {
+  ACCRUAL
+  DEBIT_APPLICATION
+  CREDIT_ADJUSTMENT
+  DEBIT_ADJUSTMENT
+  CARRY_FORWARD
+}
+
+enum LeaveHalfDaySession {
+  FIRST_HALF
+  SECOND_HALF
+}
+
 // ---------------------------------------------------------------------------
 // 1. Organization (Tenant)
 // ---------------------------------------------------------------------------
@@ -88,6 +115,9 @@ model Organization {
   employeeDocuments     EmployeeDocument[]
   shifts                Shift[]
   shiftAssignments      EmployeeShiftAssignment[]
+  leaveTypes            LeaveType[]
+  leaveRequests         LeaveRequest[]
+  leaveTransactions     LeaveTransaction[]
 
   @@map("organizations")
 }
@@ -268,6 +298,8 @@ model Employee {
   jobHistoriesManaged EmployeeJobHistory[] @relation("JobHistoryManager")
   documents        EmployeeDocument[]
   shiftAssignments EmployeeShiftAssignment[]
+  leaveRequests    LeaveRequest[]
+  leaveTransactions LeaveTransaction[]
 
   @@unique([organizationId, employeeCode])
   @@index([organizationId, deletedAt])
@@ -377,5 +409,86 @@ model EmployeeShiftAssignment {
 
   @@index([organizationId, employeeId, effectiveTo])
   @@map("employee_shift_assignments")
+}
+
+// ---------------------------------------------------------------------------
+// 9. Leave Management (Module 5)
+// ---------------------------------------------------------------------------
+
+model LeaveType {
+  id                 String                @id @default(uuid()) @db.Uuid
+  organizationId     String                @map("organization_id") @db.Uuid
+  name               String
+  code               String                // e.g. 'CL', 'SL', 'PL', 'LWP'
+  description        String?
+  isPaid             Boolean               @default(true) @map("is_paid")
+  daysAllowedPerYear Decimal               @default(0.00) @map("days_allowed_per_year") @db.Decimal(5, 2)
+  accrualFrequency   LeaveAccrualFrequency @default(MONTHLY) @map("accrual_frequency")
+  carryForwardLimit  Decimal               @default(0.00) @map("carry_forward_limit") @db.Decimal(5, 2)
+  requiresApproval   Boolean               @default(true) @map("requires_approval")
+  isActive           Boolean               @default(true) @map("is_active")
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requests     LeaveRequest[]
+  transactions LeaveTransaction[]
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@map("leave_types")
+}
+
+model LeaveRequest {
+  id               String               @id @default(uuid()) @db.Uuid
+  organizationId   String               @map("organization_id") @db.Uuid
+  employeeId       String               @map("employee_id") @db.Uuid
+  leaveTypeId      String               @map("leave_type_id") @db.Uuid
+  startDate        DateTime             @map("start_date")
+  endDate          DateTime             @map("end_date")
+  isHalfDay        Boolean              @default(false) @map("is_half_day")
+  halfDaySession   LeaveHalfDaySession? @map("half_day_session")
+  totalDays        Decimal              @map("total_days") @db.Decimal(5, 2)
+  reason           String
+  status           LeaveRequestStatus   @default(PENDING)
+  appliedAt        DateTime             @default(now()) @map("applied_at")
+  actionedByUserId String?              @map("actioned_by_user_id") @db.Uuid
+  actionedAt       DateTime?            @map("actioned_at")
+  rejectionReason  String?              @map("rejection_reason")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType    LeaveType          @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+  transactions LeaveTransaction[]
+
+  @@index([organizationId, employeeId, status])
+  @@index([organizationId, startDate, endDate])
+  @@map("leave_requests")
+}
+
+model LeaveTransaction {
+  id              String               @id @default(uuid()) @db.Uuid
+  organizationId  String               @map("organization_id") @db.Uuid
+  employeeId      String               @map("employee_id") @db.Uuid
+  leaveTypeId     String               @map("leave_type_id") @db.Uuid
+  transactionType LeaveTransactionType @map("transaction_type")
+  days            Decimal              @db.Decimal(5, 2) // positive for credit/accrual, negative for debit/application
+  balanceAfter    Decimal              @map("balance_after") @db.Decimal(5, 2)
+  leaveRequestId  String?              @map("leave_request_id") @db.Uuid
+  effectiveDate   DateTime             @default(now()) @map("effective_date")
+  notes           String?
+  createdByUserId String?              @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime             @default(now()) @map("created_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType    LeaveType     @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+  leaveRequest LeaveRequest? @relation(fields: [leaveRequestId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, employeeId, leaveTypeId])
+  @@map("leave_transactions")
 }
 

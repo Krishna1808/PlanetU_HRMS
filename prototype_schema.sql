@@ -295,3 +295,75 @@ CREATE TABLE "employee_shift_assignments" (
 CREATE INDEX "idx_shifts_org_active" ON "shifts"("organization_id", "is_active");
 CREATE INDEX "idx_shift_assignments_org_emp" ON "employee_shift_assignments"("organization_id", "employee_id", "effective_to");
 
+-- -----------------------------------------------------------------------------
+-- 10. leave_types (Module 5: Leave Management)
+-- -----------------------------------------------------------------------------
+CREATE TYPE "LeaveAccrualFrequency" AS ENUM ('MONTHLY', 'QUARTERLY', 'YEARLY', 'NONE');
+CREATE TYPE "LeaveRequestStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED');
+CREATE TYPE "LeaveTransactionType" AS ENUM ('ACCRUAL', 'DEBIT_APPLICATION', 'CREDIT_ADJUSTMENT', 'DEBIT_ADJUSTMENT', 'CARRY_FORWARD');
+CREATE TYPE "LeaveHalfDaySession" AS ENUM ('FIRST_HALF', 'SECOND_HALF');
+
+CREATE TABLE "leave_types" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "organization_id" UUID NOT NULL REFERENCES "organizations"("id") ON DELETE CASCADE,
+    "name" VARCHAR(150) NOT NULL,
+    "code" VARCHAR(50) NOT NULL, -- e.g. 'CL', 'SL', 'PL', 'LWP'
+    "description" TEXT,
+    "is_paid" BOOLEAN NOT NULL DEFAULT true,
+    "days_allowed_per_year" DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+    "accrual_frequency" "LeaveAccrualFrequency" NOT NULL DEFAULT 'MONTHLY',
+    "carry_forward_limit" DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+    "requires_approval" BOOLEAN NOT NULL DEFAULT true,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "leave_types_org_code_unique" UNIQUE ("organization_id", "code"),
+    CONSTRAINT "leave_types_org_name_unique" UNIQUE ("organization_id", "name")
+);
+
+-- -----------------------------------------------------------------------------
+-- 11. leave_requests (Leave Applications Workflow)
+-- -----------------------------------------------------------------------------
+CREATE TABLE "leave_requests" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "organization_id" UUID NOT NULL REFERENCES "organizations"("id") ON DELETE CASCADE,
+    "employee_id" UUID NOT NULL REFERENCES "employees"("id") ON DELETE CASCADE,
+    "leave_type_id" UUID NOT NULL REFERENCES "leave_types"("id") ON DELETE RESTRICT,
+    "start_date" TIMESTAMP(3) NOT NULL,
+    "end_date" TIMESTAMP(3) NOT NULL,
+    "is_half_day" BOOLEAN NOT NULL DEFAULT false,
+    "half_day_session" "LeaveHalfDaySession",
+    "total_days" DECIMAL(5,2) NOT NULL,
+    "reason" TEXT NOT NULL,
+    "status" "LeaveRequestStatus" NOT NULL DEFAULT 'PENDING',
+    "applied_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "actioned_by_user_id" UUID,
+    "actioned_at" TIMESTAMP(3),
+    "rejection_reason" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- -----------------------------------------------------------------------------
+-- 12. leave_transactions (Append-Only Leave Balance Ledger per Rule #4)
+-- -----------------------------------------------------------------------------
+CREATE TABLE "leave_transactions" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "organization_id" UUID NOT NULL REFERENCES "organizations"("id") ON DELETE CASCADE,
+    "employee_id" UUID NOT NULL REFERENCES "employees"("id") ON DELETE CASCADE,
+    "leave_type_id" UUID NOT NULL REFERENCES "leave_types"("id") ON DELETE RESTRICT,
+    "transaction_type" "LeaveTransactionType" NOT NULL,
+    "days" DECIMAL(5,2) NOT NULL, -- positive for credits/accruals, negative for deductions
+    "balance_after" DECIMAL(5,2) NOT NULL,
+    "leave_request_id" UUID REFERENCES "leave_requests"("id") ON DELETE SET NULL,
+    "effective_date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "notes" TEXT,
+    "created_by_user_id" UUID,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX "idx_leave_types_org_active" ON "leave_types"("organization_id", "is_active");
+CREATE INDEX "idx_leave_requests_org_emp_status" ON "leave_requests"("organization_id", "employee_id", "status");
+CREATE INDEX "idx_leave_requests_dates" ON "leave_requests"("organization_id", "start_date", "end_date");
+CREATE INDEX "idx_leave_transactions_org_emp_type" ON "leave_transactions"("organization_id", "employee_id", "leave_type_id");
+

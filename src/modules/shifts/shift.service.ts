@@ -524,7 +524,13 @@ export class ShiftService {
     organizationId: string,
     employeeId: string,
     date: Date = new Date(),
-  ) {
+  ): Promise<{
+    isDefaultFallback: boolean;
+    shift: any;
+    weeklyOffDays: DayOfWeek[];
+    effectiveFrom: Date | null;
+    effectiveTo: Date | null;
+  }> {
     // 1. Look for explicit assignment covering the target date
     const assignment = await this.prisma.employeeShiftAssignment.findFirst({
       where: {

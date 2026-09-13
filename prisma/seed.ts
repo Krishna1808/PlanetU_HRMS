@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient, Role, LeaveAccrualFrequency } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -170,6 +170,75 @@ async function main() {
     },
   });
   console.log(`✅ Seeded default shift: ${defaultShift.name} (${defaultShift.code}: 09:00 - 18:00)`);
+
+  // 8. Seed Default Master Leave Types (Module 5)
+  const leaveTypesData = [
+    {
+      name: 'Casual Leave',
+      code: 'CL',
+      description: 'Casual leave for unforeseen personal matters',
+      isPaid: true,
+      daysAllowedPerYear: 12,
+      accrualFrequency: LeaveAccrualFrequency.MONTHLY,
+      carryForwardLimit: 0,
+      requiresApproval: true,
+    },
+    {
+      name: 'Sick Leave',
+      code: 'SL',
+      description: 'Medical and sick leave for health recovery',
+      isPaid: true,
+      daysAllowedPerYear: 12,
+      accrualFrequency: LeaveAccrualFrequency.MONTHLY,
+      carryForwardLimit: 5,
+      requiresApproval: true,
+    },
+    {
+      name: 'Paid Privilege Leave',
+      code: 'PL',
+      description: 'Annual earned leave for planned vacations',
+      isPaid: true,
+      daysAllowedPerYear: 15,
+      accrualFrequency: LeaveAccrualFrequency.MONTHLY,
+      carryForwardLimit: 10,
+      requiresApproval: true,
+    },
+    {
+      name: 'Leave Without Pay',
+      code: 'LWP',
+      description: 'Unpaid absence that directly deducts from payroll payable days',
+      isPaid: false,
+      daysAllowedPerYear: 0,
+      accrualFrequency: LeaveAccrualFrequency.NONE,
+      carryForwardLimit: 0,
+      requiresApproval: true,
+    },
+  ];
+
+  for (const lt of leaveTypesData) {
+    await prisma.leaveType.upsert({
+      where: {
+        organizationId_code: {
+          organizationId: organization.id,
+          code: lt.code,
+        },
+      },
+      update: {},
+      create: {
+        organizationId: organization.id,
+        name: lt.name,
+        code: lt.code,
+        description: lt.description,
+        isPaid: lt.isPaid,
+        daysAllowedPerYear: lt.daysAllowedPerYear,
+        accrualFrequency: lt.accrualFrequency,
+        carryForwardLimit: lt.carryForwardLimit,
+        requiresApproval: lt.requiresApproval,
+        isActive: true,
+      },
+    });
+  }
+  console.log(`✅ Seeded ${leaveTypesData.length} master leave types (CL, SL, PL, LWP)`);
   console.log('🌱 Seeding completed successfully!');
 }
 
