@@ -7,6 +7,7 @@ import { ShiftsModule } from './modules/shifts/shifts.module';
 import { LeavesModule } from './modules/leaves/leaves.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
+import { EssModule } from './modules/ess/ess.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -20,6 +21,7 @@ import { AppService } from './app.service';
     LeavesModule,
     AttendanceModule,
     PayrollModule,
+    EssModule,
   ],
   controllers: [AppController],
   providers: [AppService],
