@@ -3,7 +3,6 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
-  NotFoundException,
 } from '@nestjs/common';
 import {
   DayOfWeek,
@@ -58,7 +57,7 @@ describe('LeaveService (Module 5: Leave Management & Architecture Rule 4)', () =
     };
 
     mockShiftService = {
-      getEmployeeShiftForDate: jest.fn().mockImplementation(async (_orgId: string, _empId: string, date: Date) => {
+      getEmployeeShiftForDate: jest.fn().mockImplementation(async (_orgId: string, _empId: string, _date: Date) => {
         // Standard weekend: Saturday & Sunday
         return {
           isDefaultFallback: true,

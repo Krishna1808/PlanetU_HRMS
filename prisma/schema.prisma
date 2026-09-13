@@ -90,6 +90,20 @@ enum LeaveHalfDaySession {
   SECOND_HALF
 }
 
+enum AttendanceStatus {
+  PRESENT
+  HALF_DAY
+  ABSENT
+  ON_LEAVE
+  WEEKLY_OFF
+  HOLIDAY
+}
+
+enum PunchSource {
+  WEB
+  MANUAL_OVERRIDE
+}
+
 // ---------------------------------------------------------------------------
 // 1. Organization (Tenant)
 // ---------------------------------------------------------------------------
@@ -118,6 +132,7 @@ model Organization {
   leaveTypes            LeaveType[]
   leaveRequests         LeaveRequest[]
   leaveTransactions     LeaveTransaction[]
+  attendanceRecords     AttendanceRecord[]
 
   @@map("organizations")
 }
@@ -300,6 +315,7 @@ model Employee {
   shiftAssignments EmployeeShiftAssignment[]
   leaveRequests    LeaveRequest[]
   leaveTransactions LeaveTransaction[]
+  attendanceRecords AttendanceRecord[]
 
   @@unique([organizationId, employeeCode])
   @@index([organizationId, deletedAt])
@@ -381,8 +397,9 @@ model Shift {
   createdAt               DateTime @default(now()) @map("created_at")
   updatedAt               DateTime @updatedAt @map("updated_at")
 
-  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assignments  EmployeeShiftAssignment[]
+  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignments       EmployeeShiftAssignment[]
+  attendanceRecords AttendanceRecord[]
 
   @@unique([organizationId, code])
   @@unique([organizationId, name])
@@ -459,10 +476,11 @@ model LeaveRequest {
   createdAt        DateTime             @default(now()) @map("created_at")
   updatedAt        DateTime             @updatedAt @map("updated_at")
 
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  employee     Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  leaveType    LeaveType          @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
-  transactions LeaveTransaction[]
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee          Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType         LeaveType          @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+  transactions      LeaveTransaction[]
+  attendanceRecords AttendanceRecord[]
 
   @@index([organizationId, employeeId, status])
   @@index([organizationId, startDate, endDate])
@@ -490,5 +508,42 @@ model LeaveTransaction {
 
   @@index([organizationId, employeeId, leaveTypeId])
   @@map("leave_transactions")
+}
+
+// ---------------------------------------------------------------------------
+// 10. Attendance Management (Module 4)
+// ---------------------------------------------------------------------------
+
+model AttendanceRecord {
+  id                  String           @id @default(uuid()) @db.Uuid
+  organizationId      String           @map("organization_id") @db.Uuid
+  employeeId          String           @map("employee_id") @db.Uuid
+  date                DateTime         @map("date")
+  status              AttendanceStatus @default(ABSENT)
+  shiftId             String?          @map("shift_id") @db.Uuid
+  checkInTime         DateTime?        @map("check_in_time")
+  checkOutTime        DateTime?        @map("check_out_time")
+  totalActiveMinutes  Int?             @map("total_active_minutes")
+  isLate              Boolean          @default(false) @map("is_late")
+  lateMinutes         Int?             @map("late_minutes")
+  isHalfDay           Boolean          @default(false) @map("is_half_day")
+  leaveRequestId      String?          @map("leave_request_id") @db.Uuid
+  isPaid              Boolean          @default(true) @map("is_paid")
+  punchSource         PunchSource      @default(WEB) @map("punch_source")
+  remarks             String?
+  regularizedByUserId String?          @map("regularized_by_user_id") @db.Uuid
+  regularizedAt       DateTime?        @map("regularized_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  shift        Shift?        @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  leaveRequest LeaveRequest? @relation(fields: [leaveRequestId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, employeeId, date])
+  @@index([organizationId, date, status])
+  @@index([organizationId, employeeId, status])
+  @@map("attendance_records")
 }
 

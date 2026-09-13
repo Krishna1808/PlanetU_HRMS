@@ -367,3 +367,37 @@ CREATE INDEX "idx_leave_requests_org_emp_status" ON "leave_requests"("organizati
 CREATE INDEX "idx_leave_requests_dates" ON "leave_requests"("organization_id", "start_date", "end_date");
 CREATE INDEX "idx_leave_transactions_org_emp_type" ON "leave_transactions"("organization_id", "employee_id", "leave_type_id");
 
+-- -----------------------------------------------------------------------------
+-- 13. attendance_records (Module 4: Attendance Management)
+-- -----------------------------------------------------------------------------
+CREATE TYPE "AttendanceStatus" AS ENUM ('PRESENT', 'HALF_DAY', 'ABSENT', 'ON_LEAVE', 'WEEKLY_OFF', 'HOLIDAY');
+CREATE TYPE "PunchSource" AS ENUM ('WEB', 'MANUAL_OVERRIDE');
+
+CREATE TABLE "attendance_records" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "organization_id" UUID NOT NULL REFERENCES "organizations"("id") ON DELETE CASCADE,
+    "employee_id" UUID NOT NULL REFERENCES "employees"("id") ON DELETE CASCADE,
+    "date" TIMESTAMP(3) NOT NULL,
+    "status" "AttendanceStatus" NOT NULL DEFAULT 'ABSENT',
+    "shift_id" UUID REFERENCES "shifts"("id") ON DELETE SET NULL,
+    "check_in_time" TIMESTAMP(3),
+    "check_out_time" TIMESTAMP(3),
+    "total_active_minutes" INTEGER,
+    "is_late" BOOLEAN NOT NULL DEFAULT false,
+    "late_minutes" INTEGER,
+    "is_half_day" BOOLEAN NOT NULL DEFAULT false,
+    "leave_request_id" UUID REFERENCES "leave_requests"("id") ON DELETE SET NULL,
+    "is_paid" BOOLEAN NOT NULL DEFAULT true,
+    "punch_source" "PunchSource" NOT NULL DEFAULT 'WEB',
+    "remarks" TEXT,
+    "regularized_by_user_id" UUID,
+    "regularized_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "attendance_records_org_emp_date_unique" UNIQUE ("organization_id", "employee_id", "date")
+);
+
+CREATE INDEX "idx_attendance_records_org_date_status" ON "attendance_records"("organization_id", "date", "status");
+CREATE INDEX "idx_attendance_records_org_emp_status" ON "attendance_records"("organization_id", "employee_id", "status");
+
+

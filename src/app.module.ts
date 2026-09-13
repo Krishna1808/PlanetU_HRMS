@@ -5,6 +5,7 @@ import { MastersModule } from './modules/masters/masters.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
 import { LeavesModule } from './modules/leaves/leaves.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -16,6 +17,7 @@ import { AppService } from './app.service';
     EmployeesModule,
     ShiftsModule,
     LeavesModule,
+    AttendanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

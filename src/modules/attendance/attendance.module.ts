@@ -1,0 +1,13 @@
+import { Module } from '@nestjs/common';
+import { PrismaModule } from '../../prisma/prisma.module';
+import { ShiftsModule } from '../shifts/shifts.module';
+import { AttendanceService } from './attendance.service';
+import { AttendanceController } from './attendance.controller';
+
+@Module({
+  imports: [PrismaModule, ShiftsModule],
+  controllers: [AttendanceController],
+  providers: [AttendanceService],
+  exports: [AttendanceService],
+})
+export class AttendanceModule {}
