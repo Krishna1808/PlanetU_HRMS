@@ -104,6 +104,12 @@ enum PunchSource {
   MANUAL_OVERRIDE
 }
 
+enum PayrollBatchStatus {
+  DRAFT
+  LOCKED
+  DISBURSED
+}
+
 // ---------------------------------------------------------------------------
 // 1. Organization (Tenant)
 // ---------------------------------------------------------------------------
@@ -133,6 +139,10 @@ model Organization {
   leaveRequests         LeaveRequest[]
   leaveTransactions     LeaveTransaction[]
   attendanceRecords     AttendanceRecord[]
+  payrollConfiguration  PayrollConfiguration?
+  salaryStructures      SalaryStructure[]
+  payrollBatches        PayrollBatch[]
+  payslips              Payslip[]
 
   @@map("organizations")
 }
@@ -316,6 +326,8 @@ model Employee {
   leaveRequests    LeaveRequest[]
   leaveTransactions LeaveTransaction[]
   attendanceRecords AttendanceRecord[]
+  salaryStructures  SalaryStructure[]
+  payslips          Payslip[]
 
   @@unique([organizationId, employeeCode])
   @@index([organizationId, deletedAt])
@@ -545,5 +557,121 @@ model AttendanceRecord {
   @@index([organizationId, date, status])
   @@index([organizationId, employeeId, status])
   @@map("attendance_records")
+}
+
+// ---------------------------------------------------------------------------
+// 11. Payroll Management (Module 6)
+// ---------------------------------------------------------------------------
+
+model PayrollConfiguration {
+  id                         String   @id @default(uuid()) @db.Uuid
+  organizationId             String   @unique @map("organization_id") @db.Uuid
+  pfCeilingAmount            Decimal  @default(15000.00) @map("pf_ceiling_amount") @db.Decimal(12, 2)
+  applyPfCeiling             Boolean  @default(true) @map("apply_pf_ceiling")
+  pfEmployeeRate             Decimal  @default(12.00) @map("pf_employee_rate") @db.Decimal(5, 2)
+  pfEmployerRate             Decimal  @default(12.00) @map("pf_employer_rate") @db.Decimal(5, 2)
+  ptAmount                   Decimal  @default(200.00) @map("pt_amount") @db.Decimal(12, 2)
+  ptSalaryThreshold          Decimal  @default(10000.00) @map("pt_salary_threshold") @db.Decimal(12, 2)
+  roundToWholeRupee          Boolean  @default(true) @map("round_to_whole_rupee")
+  basicPercentage            Decimal  @default(50.00) @map("basic_percentage") @db.Decimal(5, 2)
+  hraPercentage              Decimal  @default(25.00) @map("hra_percentage") @db.Decimal(5, 2)
+  specialAllowancePercentage Decimal  @default(25.00) @map("special_allowance_percentage") @db.Decimal(5, 2)
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("payroll_configurations")
+}
+
+model SalaryStructure {
+  id               String    @id @default(uuid()) @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  employeeId       String    @map("employee_id") @db.Uuid
+  annualCtc        Decimal   @map("annual_ctc") @db.Decimal(12, 2)
+  monthlyGross     Decimal   @map("monthly_gross") @db.Decimal(12, 2)
+  basicSalary      Decimal   @map("basic_salary") @db.Decimal(12, 2)
+  hra              Decimal   @map("hra") @db.Decimal(12, 2)
+  specialAllowance Decimal   @map("special_allowance") @db.Decimal(12, 2)
+  effectiveFrom    DateTime  @map("effective_from")
+  effectiveTo      DateTime? @map("effective_to") // null means current active structure
+  revisionReason   String?   @map("revision_reason")
+  revisedByUserId  String?   @map("revised_by_user_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  payslips     Payslip[]
+
+  @@index([organizationId, employeeId, effectiveTo])
+  @@map("salary_structures")
+}
+
+model PayrollBatch {
+  id                String             @id @default(uuid()) @db.Uuid
+  organizationId    String             @map("organization_id") @db.Uuid
+  year              Int
+  month             Int                // 1 - 12
+  status            PayrollBatchStatus @default(DRAFT)
+  totalEmployees    Int                @default(0) @map("total_employees")
+  totalGrossPay     Decimal            @default(0.00) @map("total_gross_pay") @db.Decimal(12, 2)
+  totalDeductions   Decimal            @default(0.00) @map("total_deductions") @db.Decimal(12, 2)
+  totalNetPay       Decimal            @default(0.00) @map("total_net_pay") @db.Decimal(12, 2)
+  totalEmployerPf   Decimal            @default(0.00) @map("total_employer_pf") @db.Decimal(12, 2)
+  lockedAt          DateTime?          @map("locked_at")
+  lockedByUserId    String?            @map("locked_by_user_id") @db.Uuid
+  disbursedAt       DateTime?          @map("disbursed_at")
+  disbursedByUserId String?            @map("disbursed_by_user_id") @db.Uuid
+  paymentReference  String?            @map("payment_reference")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payslips     Payslip[]
+
+  @@unique([organizationId, year, month])
+  @@index([organizationId, status])
+  @@map("payroll_batches")
+}
+
+model Payslip {
+  id                      String   @id @default(uuid()) @db.Uuid
+  organizationId          String   @map("organization_id") @db.Uuid
+  payrollBatchId          String   @map("payroll_batch_id") @db.Uuid
+  employeeId              String   @map("employee_id") @db.Uuid
+  salaryStructureId       String   @map("salary_structure_id") @db.Uuid
+  totalMonthDays          Int      @map("total_month_days")
+  payableDays             Decimal  @map("payable_days") @db.Decimal(5, 2)
+  lwpDays                 Decimal  @map("lwp_days") @db.Decimal(5, 2)
+  unexcusedAbsenceDays    Decimal  @map("unexcused_absence_days") @db.Decimal(5, 2)
+
+  nominalGross            Decimal  @map("nominal_gross") @db.Decimal(12, 2)
+  nominalBasic            Decimal  @map("nominal_basic") @db.Decimal(12, 2)
+  nominalHra              Decimal  @map("nominal_hra") @db.Decimal(12, 2)
+  nominalSpecialAllowance Decimal  @map("nominal_special_allowance") @db.Decimal(12, 2)
+
+  earnedBasic             Decimal  @map("earned_basic") @db.Decimal(12, 2)
+  earnedHra               Decimal  @map("earned_hra") @db.Decimal(12, 2)
+  earnedSpecialAllowance  Decimal  @map("earned_special_allowance") @db.Decimal(12, 2)
+  earnedGross             Decimal  @map("earned_gross") @db.Decimal(12, 2)
+
+  employeePf              Decimal  @map("employee_pf") @db.Decimal(12, 2)
+  professionalTax         Decimal  @map("professional_tax") @db.Decimal(12, 2)
+  totalDeductions         Decimal  @map("total_deductions") @db.Decimal(12, 2)
+  netPay                  Decimal  @map("net_pay") @db.Decimal(12, 2)
+  employerPf              Decimal  @map("employer_pf") @db.Decimal(12, 2)
+
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payrollBatch    PayrollBatch    @relation(fields: [payrollBatchId], references: [id], onDelete: Cascade)
+  employee        Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  salaryStructure SalaryStructure @relation(fields: [salaryStructureId], references: [id], onDelete: Restrict)
+
+  @@unique([payrollBatchId, employeeId])
+  @@index([organizationId, employeeId])
+  @@map("payslips")
 }
 

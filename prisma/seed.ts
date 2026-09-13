@@ -239,6 +239,47 @@ async function main() {
     });
   }
   console.log(`✅ Seeded ${leaveTypesData.length} master leave types (CL, SL, PL, LWP)`);
+
+  // 9. Seed Default Payroll Configuration (Module 6)
+  const payrollConfig = await prisma.payrollConfiguration.upsert({
+    where: { organizationId: organization.id },
+    update: {},
+    create: {
+      organizationId: organization.id,
+      pfCeilingAmount: 15000.0,
+      applyPfCeiling: true,
+      pfEmployeeRate: 12.0,
+      pfEmployerRate: 12.0,
+      ptAmount: 200.0,
+      ptSalaryThreshold: 10000.0,
+      roundToWholeRupee: true,
+      basicPercentage: 50.0,
+      hraPercentage: 25.0,
+      specialAllowancePercentage: 25.0,
+    },
+  });
+  console.log(`✅ Seeded default PayrollConfiguration: PF ceiling ₹${payrollConfig.pfCeilingAmount}, PT ₹${payrollConfig.ptAmount}`);
+
+  // 10. Seed Finance User for RBAC testing
+  const financeEmail = 'finance@planetu.com';
+  const financeUser = await prisma.user.upsert({
+    where: {
+      organizationId_email: {
+        organizationId: organization.id,
+        email: financeEmail,
+      },
+    },
+    update: {},
+    create: {
+      organizationId: organization.id,
+      email: financeEmail,
+      passwordHash: passwordHash,
+      role: Role.FINANCE,
+      isActive: true,
+    },
+  });
+  console.log(`✅ Seeded Finance User: ${financeUser.email} (Role: ${financeUser.role})`);
+
   console.log('🌱 Seeding completed successfully!');
 }
 

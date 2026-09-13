@@ -400,4 +400,98 @@ CREATE TABLE "attendance_records" (
 CREATE INDEX "idx_attendance_records_org_date_status" ON "attendance_records"("organization_id", "date", "status");
 CREATE INDEX "idx_attendance_records_org_emp_status" ON "attendance_records"("organization_id", "employee_id", "status");
 
+-- ---------------------------------------------------------------------------
+-- 11. Module 6: Payroll Management Engine
+-- ---------------------------------------------------------------------------
 
+CREATE TYPE "PayrollBatchStatus" AS ENUM ('DRAFT', 'LOCKED', 'DISBURSED');
+
+CREATE TABLE "payroll_configurations" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "organization_id" UUID NOT NULL REFERENCES "organizations"("id") ON DELETE CASCADE,
+    "pf_ceiling_amount" DECIMAL(12,2) NOT NULL DEFAULT 15000.00,
+    "apply_pf_ceiling" BOOLEAN NOT NULL DEFAULT true,
+    "pf_employee_rate" DECIMAL(5,2) NOT NULL DEFAULT 12.00,
+    "pf_employer_rate" DECIMAL(5,2) NOT NULL DEFAULT 12.00,
+    "pt_amount" DECIMAL(12,2) NOT NULL DEFAULT 200.00,
+    "pt_salary_threshold" DECIMAL(12,2) NOT NULL DEFAULT 10000.00,
+    "round_to_whole_rupee" BOOLEAN NOT NULL DEFAULT true,
+    "basic_percentage" DECIMAL(5,2) NOT NULL DEFAULT 50.00,
+    "hra_percentage" DECIMAL(5,2) NOT NULL DEFAULT 25.00,
+    "special_allowance_percentage" DECIMAL(5,2) NOT NULL DEFAULT 25.00,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "payroll_configurations_org_unique" UNIQUE ("organization_id")
+);
+
+CREATE TABLE "salary_structures" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "organization_id" UUID NOT NULL REFERENCES "organizations"("id") ON DELETE CASCADE,
+    "employee_id" UUID NOT NULL REFERENCES "employees"("id") ON DELETE CASCADE,
+    "annual_ctc" DECIMAL(12,2) NOT NULL,
+    "monthly_gross" DECIMAL(12,2) NOT NULL,
+    "basic_salary" DECIMAL(12,2) NOT NULL,
+    "hra" DECIMAL(12,2) NOT NULL,
+    "special_allowance" DECIMAL(12,2) NOT NULL,
+    "effective_from" TIMESTAMP(3) NOT NULL,
+    "effective_to" TIMESTAMP(3),
+    "revision_reason" TEXT,
+    "revised_by_user_id" UUID,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX "idx_salary_structures_org_emp_effective" ON "salary_structures"("organization_id", "employee_id", "effective_to");
+
+CREATE TABLE "payroll_batches" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "organization_id" UUID NOT NULL REFERENCES "organizations"("id") ON DELETE CASCADE,
+    "year" INTEGER NOT NULL,
+    "month" INTEGER NOT NULL,
+    "status" "PayrollBatchStatus" NOT NULL DEFAULT 'DRAFT',
+    "total_employees" INTEGER NOT NULL DEFAULT 0,
+    "total_gross_pay" DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    "total_deductions" DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    "total_net_pay" DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    "total_employer_pf" DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    "locked_at" TIMESTAMP(3),
+    "locked_by_user_id" UUID,
+    "disbursed_at" TIMESTAMP(3),
+    "disbursed_by_user_id" UUID,
+    "payment_reference" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "payroll_batches_org_year_month_unique" UNIQUE ("organization_id", "year", "month")
+);
+
+CREATE INDEX "idx_payroll_batches_org_status" ON "payroll_batches"("organization_id", "status");
+
+CREATE TABLE "payslips" (
+    "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "organization_id" UUID NOT NULL REFERENCES "organizations"("id") ON DELETE CASCADE,
+    "payroll_batch_id" UUID NOT NULL REFERENCES "payroll_batches"("id") ON DELETE CASCADE,
+    "employee_id" UUID NOT NULL REFERENCES "employees"("id") ON DELETE CASCADE,
+    "salary_structure_id" UUID NOT NULL REFERENCES "salary_structures"("id") ON DELETE RESTRICT,
+    "total_month_days" INTEGER NOT NULL,
+    "payable_days" DECIMAL(5,2) NOT NULL,
+    "lwp_days" DECIMAL(5,2) NOT NULL,
+    "unexcused_absence_days" DECIMAL(5,2) NOT NULL,
+    "nominal_gross" DECIMAL(12,2) NOT NULL,
+    "nominal_basic" DECIMAL(12,2) NOT NULL,
+    "nominal_hra" DECIMAL(12,2) NOT NULL,
+    "nominal_special_allowance" DECIMAL(12,2) NOT NULL,
+    "earned_basic" DECIMAL(12,2) NOT NULL,
+    "earned_hra" DECIMAL(12,2) NOT NULL,
+    "earned_special_allowance" DECIMAL(12,2) NOT NULL,
+    "earned_gross" DECIMAL(12,2) NOT NULL,
+    "employee_pf" DECIMAL(12,2) NOT NULL,
+    "professional_tax" DECIMAL(12,2) NOT NULL,
+    "total_deductions" DECIMAL(12,2) NOT NULL,
+    "net_pay" DECIMAL(12,2) NOT NULL,
+    "employer_pf" DECIMAL(12,2) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "payslips_batch_emp_unique" UNIQUE ("payroll_batch_id", "employee_id")
+);
+
+CREATE INDEX "idx_payslips_org_emp" ON "payslips"("organization_id", "employee_id");
