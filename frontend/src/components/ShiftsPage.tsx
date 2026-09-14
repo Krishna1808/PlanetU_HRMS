@@ -40,11 +40,19 @@ export function ShiftsPage() {
 
   const handleAssign = async (e: React.FormEvent) => {
     e.preventDefault();
+    const empId = selectedEmpId || (employees.length > 0 ? employees[0].id : '');
+    const sId = selectedShiftId || (shifts.length > 0 ? shifts[0].id : '');
+
+    if (!empId || !sId) {
+      alert('Please select both an employee and a shift template.');
+      return;
+    }
+
     try {
       setSubmitting(true);
       await api.assignShift({
-        employeeId: selectedEmpId,
-        shiftId: selectedShiftId,
+        employeeId: empId,
+        shiftId: sId,
         effectiveFrom: new Date(effectiveFrom).toISOString(),
         weeklyOffDays: weeklyOffs,
       });
@@ -75,7 +83,14 @@ export function ShiftsPage() {
               Defines working hours, cross-midnight overnight shifts, grace periods, and append-only employee roster assignments.
             </p>
           </div>
-          <button className="btn btn-primary" onClick={() => setShowAssignModal(true)}>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              if (shifts.length > 0 && !selectedShiftId) setSelectedShiftId(shifts[0].id);
+              if (employees.length > 0 && !selectedEmpId) setSelectedEmpId(employees[0].id);
+              setShowAssignModal(true);
+            }}
+          >
             ➕ Assign Shift to Employee
           </button>
         </div>

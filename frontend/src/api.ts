@@ -67,7 +67,7 @@ export const api = {
   // 4. Module 3: Shifts
   getShifts: () => fetchJson<any[]>('/shifts'),
   assignShift: (data: { employeeId: string; shiftId: string; effectiveFrom: string; weeklyOffDays?: string[] }) =>
-    fetchJson<any>('/shifts/assign', {
+    fetchJson<any>('/shifts/assignments', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
