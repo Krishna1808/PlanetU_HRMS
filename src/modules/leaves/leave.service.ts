@@ -6,6 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import {
+  AttendanceStatus,
   DayOfWeek,
   LeaveRequestStatus,
   LeaveTransactionType,
@@ -681,6 +682,47 @@ export class LeaveService {
         },
       });
 
+      // Upsert attendance_records for covered working days with status ON_LEAVE (FR-ATT-006 display sync)
+      const { details: dayDetails } = await this.calculateWorkingDays(
+        organizationId,
+        leaveRequest.employeeId,
+        leaveRequest.startDate,
+        leaveRequest.endDate,
+        leaveRequest.isHalfDay,
+      );
+
+      for (const day of dayDetails) {
+        if (day.isWorkingDay) {
+          const recordDate = new Date(day.date + 'T00:00:00.000Z');
+          await tx.attendanceRecord.upsert({
+            where: {
+              organizationId_employeeId_date: {
+                organizationId,
+                employeeId: leaveRequest.employeeId,
+                date: recordDate,
+              },
+            },
+            update: {
+              status: AttendanceStatus.ON_LEAVE,
+              isHalfDay: leaveRequest.isHalfDay,
+              isPaid: leaveRequest.leaveType.isPaid,
+              leaveRequestId: leaveRequest.id,
+              remarks: `Approved leave: ${leaveRequest.leaveType.name}`,
+            },
+            create: {
+              organizationId,
+              employeeId: leaveRequest.employeeId,
+              date: recordDate,
+              status: AttendanceStatus.ON_LEAVE,
+              isHalfDay: leaveRequest.isHalfDay,
+              isPaid: leaveRequest.leaveType.isPaid,
+              leaveRequestId: leaveRequest.id,
+              remarks: `Approved leave: ${leaveRequest.leaveType.name}`,
+            },
+          });
+        }
+      }
+
       return updatedRequest;
     });
   }
@@ -762,6 +804,14 @@ export class LeaveService {
           effectiveDate: new Date(),
           notes: `Compensatory credit for cancelled approved leave (${leaveRequest.id})`,
           createdByUserId: currentUser.id,
+        },
+      });
+
+      // Remove attendance ON_LEAVE records that were created for this leave request
+      await tx.attendanceRecord.deleteMany({
+        where: {
+          organizationId,
+          leaveRequestId: leaveRequest.id,
         },
       });
 

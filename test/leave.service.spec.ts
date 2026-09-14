@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import {
+  AttendanceStatus,
   DayOfWeek,
   LeaveRequestStatus,
   LeaveTransactionType,
@@ -47,6 +48,10 @@ describe('LeaveService (Module 5: Leave Management & Architecture Rule 4)', () =
       },
       employee: {
         findFirst: jest.fn(),
+      },
+      attendanceRecord: {
+        upsert: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       $transaction: jest.fn().mockImplementation(async (cb: any) => {
         if (typeof cb === 'function') {
@@ -299,6 +304,17 @@ describe('LeaveService (Module 5: Leave Management & Architecture Rule 4)', () =
             transactionType: LeaveTransactionType.DEBIT_APPLICATION,
             days: -2.0,
             balanceAfter: 3.0,
+            leaveRequestId: 'req-100',
+          }),
+        }),
+      );
+
+      // Verify attendance_records upserted with ON_LEAVE for display calendar sync
+      expect(mockPrisma.attendanceRecord.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            status: AttendanceStatus.ON_LEAVE,
+            employeeId: empId,
             leaveRequestId: 'req-100',
           }),
         }),

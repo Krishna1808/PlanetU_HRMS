@@ -26,11 +26,6 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('User authentication or role missing');
     }
 
-    // CLIENT_SUPER_ADMIN has superuser access across their tenant
-    if (user.role === Role.CLIENT_SUPER_ADMIN) {
-      return true;
-    }
-
     const hasRole = requiredRoles.includes(user.role);
     if (!hasRole) {
       throw new ForbiddenException(
