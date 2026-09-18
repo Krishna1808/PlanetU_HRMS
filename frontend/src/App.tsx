@@ -9,8 +9,9 @@ import { ShiftsPage } from './components/ShiftsPage';
 import { AttendancePage } from './components/AttendancePage';
 import { LeavesPage } from './components/LeavesPage';
 import { PayrollPage } from './components/PayrollPage';
+import { OnboardingPage } from './components/OnboardingPage';
 
-type MainTab = 'ess' | 'employees' | 'shifts' | 'attendance' | 'leaves' | 'payroll';
+type MainTab = 'ess' | 'onboarding' | 'employees' | 'shifts' | 'attendance' | 'leaves' | 'payroll';
 type EmployeeSubView = 'list' | 'add' | 'profile';
 
 export default function App() {
@@ -58,6 +59,7 @@ export default function App() {
 
   const tabs: { key: MainTab; label: string; icon: string; minRole?: string }[] = [
     { key: 'ess', label: 'ESS Workspace (M7)', icon: '🏠' },
+    { key: 'onboarding', label: 'Onboarding (M8)', icon: '🚀' },
     { key: 'employees', label: 'Employees (M1)', icon: '👥' },
     { key: 'shifts', label: 'Shifts (M3)', icon: '⏱️' },
     { key: 'attendance', label: 'Attendance (M4)', icon: '📍' },
@@ -74,7 +76,7 @@ export default function App() {
             PlanetU HRMS
           </div>
           <span style={{ fontSize: '11px', background: '#1e293b', color: '#94a3b8', padding: '2px 8px', borderRadius: '4px' }}>
-            Prototype Viewing Layer (All 7 Modules)
+            Prototype Viewing Layer (All 8 Modules)
           </span>
         </div>
 
@@ -131,6 +133,8 @@ export default function App() {
       {/* Main Content Area */}
       <main className="container" style={{ maxWidth: '1100px', flex: 1, padding: '24px 16px' }}>
         {activeTab === 'ess' && <EssDashboardPage />}
+
+        {activeTab === 'onboarding' && <OnboardingPage user={user} />}
 
         {activeTab === 'employees' && (
           <div>

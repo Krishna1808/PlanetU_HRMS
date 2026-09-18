@@ -110,6 +110,22 @@ enum PayrollBatchStatus {
   DISBURSED
 }
 
+enum OnboardingStatus {
+  INVITED
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CONVERTED
+}
+
+enum OnboardingTaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
 // ---------------------------------------------------------------------------
 // 1. Organization (Tenant)
 // ---------------------------------------------------------------------------
@@ -143,6 +159,8 @@ model Organization {
   salaryStructures      SalaryStructure[]
   payrollBatches        PayrollBatch[]
   payslips              Payslip[]
+  onboardingCandidates  OnboardingCandidate[]
+  onboardingTasks       OnboardingTask[]
 
   @@map("organizations")
 }
@@ -189,6 +207,7 @@ model Department {
   employees             Employee[]
   jobHistories          EmployeeJobHistory[]
   employeeCodeSequences EmployeeCodeSequence[]
+  onboardingCandidates  OnboardingCandidate[]
 
   @@unique([organizationId, name])
   @@unique([organizationId, codePrefix])
@@ -203,9 +222,10 @@ model Designation {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  employees    Employee[]
-  jobHistories EmployeeJobHistory[]
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees            Employee[]
+  jobHistories         EmployeeJobHistory[]
+  onboardingCandidates OnboardingCandidate[]
 
   @@unique([organizationId, name])
   @@map("designations")
@@ -220,9 +240,10 @@ model Grade {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  employees    Employee[]
-  jobHistories EmployeeJobHistory[]
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees            Employee[]
+  jobHistories         EmployeeJobHistory[]
+  onboardingCandidates OnboardingCandidate[]
 
   @@unique([organizationId, name])
   @@map("grades")
@@ -238,8 +259,9 @@ model Location {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  employees    Employee[]
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees            Employee[]
+  onboardingCandidates OnboardingCandidate[]
 
   @@unique([organizationId, name])
   @@map("locations")
@@ -328,6 +350,8 @@ model Employee {
   attendanceRecords AttendanceRecord[]
   salaryStructures  SalaryStructure[]
   payslips          Payslip[]
+  onboardingCandidatesManaged OnboardingCandidate[] @relation("CandidateReportingManager")
+  convertedFromCandidate     OnboardingCandidate?  @relation("CandidateConvertedEmployee")
 
   @@unique([organizationId, employeeCode])
   @@index([organizationId, deletedAt])
@@ -673,5 +697,84 @@ model Payslip {
   @@unique([payrollBatchId, employeeId])
   @@index([organizationId, employeeId])
   @@map("payslips")
+}
+
+// ---------------------------------------------------------------------------
+// 12. Employee Onboarding (Module 8)
+// ---------------------------------------------------------------------------
+
+model OnboardingCandidate {
+  id                       String           @id @default(uuid()) @db.Uuid
+  organizationId           String           @map("organization_id") @db.Uuid
+  firstName                String           @map("first_name")
+  lastName                 String           @map("last_name")
+  personalEmail            String           @map("personal_email")
+  phone                    String?
+  dateOfBirth              DateTime?        @map("date_of_birth")
+  gender                   Gender?
+  currentAddress           String?          @map("current_address")
+  permanentAddress         String?          @map("permanent_address")
+  emergencyContactName     String?          @map("emergency_contact_name")
+  emergencyContactPhone    String?          @map("emergency_contact_phone")
+  emergencyContactRelation String?          @map("emergency_contact_relation")
+
+  // Target Employment Details
+  departmentId             String           @map("department_id") @db.Uuid
+  designationId            String           @map("designation_id") @db.Uuid
+  gradeId                  String?          @map("grade_id") @db.Uuid
+  locationId               String?          @map("location_id") @db.Uuid
+  reportingManagerId       String?          @map("reporting_manager_id") @db.Uuid
+  proposedJoiningDate      DateTime         @map("proposed_joining_date")
+  offeredCtc               Decimal?         @map("offered_ctc") @db.Decimal(12, 2)
+
+  // Banking & Statutory Info (Submitted during pre-boarding)
+  bankName                 String?          @map("bank_name")
+  accountNumber            String?          @map("account_number")
+  ifscOrRouting            String?          @map("ifsc_or_routing")
+  panNumber                String?          @map("pan_number")
+  uanNumber                String?          @map("uan_number")
+
+  // State Tracking
+  status                   OnboardingStatus @default(INVITED)
+  convertedEmployeeId      String?          @unique @map("converted_employee_id") @db.Uuid
+  notes                    String?
+  invitedByUserId          String?          @map("invited_by_user_id") @db.Uuid
+  convertedAt              DateTime?        @map("converted_at")
+  createdAt                DateTime         @default(now()) @map("created_at")
+  updatedAt                DateTime         @updatedAt @map("updated_at")
+
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department        Department       @relation(fields: [departmentId], references: [id])
+  designation       Designation      @relation(fields: [designationId], references: [id])
+  grade             Grade?           @relation(fields: [gradeId], references: [id])
+  location          Location?        @relation(fields: [locationId], references: [id])
+  reportingManager  Employee?        @relation("CandidateReportingManager", fields: [reportingManagerId], references: [id])
+  convertedEmployee Employee?        @relation("CandidateConvertedEmployee", fields: [convertedEmployeeId], references: [id])
+  tasks             OnboardingTask[]
+
+  @@unique([organizationId, personalEmail])
+  @@index([organizationId, status])
+  @@map("onboarding_candidates")
+}
+
+model OnboardingTask {
+  id                String               @id @default(uuid()) @db.Uuid
+  organizationId    String               @map("organization_id") @db.Uuid
+  candidateId       String               @map("candidate_id") @db.Uuid
+  title             String
+  description       String?
+  isMandatory       Boolean              @default(true) @map("is_mandatory")
+  status            OnboardingTaskStatus @default(PENDING)
+  completedByUserId String?              @map("completed_by_user_id") @db.Uuid
+  completedAt       DateTime?            @map("completed_at")
+  notes             String?
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  candidate    OnboardingCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, candidateId])
+  @@map("onboarding_tasks")
 }
 

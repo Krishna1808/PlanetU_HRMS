@@ -158,4 +158,34 @@ export const api = {
   getEssLeaves: () => fetchJson<any>('/ess/leaves'),
   getEssPayslips: () => fetchJson<any[]>('/ess/payslips'),
   getEssManagerPending: () => fetchJson<any[]>('/ess/manager/pending-actions'),
+
+  // 9. Module 8: Employee Onboarding
+  getOnboardingCandidates: (status?: string, search?: string) => {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (search) params.append('search', search);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return fetchJson<any[]>(`/onboarding/candidates${query}`);
+  },
+  getOnboardingCandidateById: (id: string) => fetchJson<any>(`/onboarding/candidates/${id}`),
+  inviteCandidate: (data: any) =>
+    fetchJson<any>('/onboarding/candidates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  submitPreBoardingForm: (id: string, data: any) =>
+    fetchJson<any>(`/onboarding/candidates/${id}/form`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  updateOnboardingTask: (taskId: string, data: { status: string; notes?: string }) =>
+    fetchJson<any>(`/onboarding/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  convertCandidateToEmployee: (id: string, data?: { initialPassword?: string; notes?: string }) =>
+    fetchJson<any>(`/onboarding/candidates/${id}/convert`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
 };
