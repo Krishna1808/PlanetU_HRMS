@@ -188,4 +188,47 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data || {}),
     }),
+
+  // 10. Module 9: Offboarding & Exit Management
+  applyResignation: (data: any) =>
+    fetchJson<any>('/offboarding/resignation', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getExitRequests: (status?: string, search?: string) => {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (search) params.append('search', search);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return fetchJson<any>(`/offboarding/requests${query}`);
+  },
+  getExitRequestById: (id: string) => fetchJson<any>(`/offboarding/requests/${id}`),
+  actionResignation: (id: string, data: { decision: string; approvedLastWorkingDay?: string; comments?: string }) =>
+    fetchJson<any>(`/offboarding/requests/${id}/action`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  updateClearanceTask: (taskId: string, data: { status: string; remarks?: string }) =>
+    fetchJson<any>(`/offboarding/tasks/${taskId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  submitExitInterview: (id: string, data: any) =>
+    fetchJson<any>(`/offboarding/requests/${id}/interview`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  calculateFnFSettlement: (id: string, data?: any) =>
+    fetchJson<any>(`/offboarding/requests/${id}/fnf/calculate`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
+  approveFnFSettlement: (id: string) =>
+    fetchJson<any>(`/offboarding/requests/${id}/fnf/approve`, {
+      method: 'PATCH',
+    }),
+  finalizeExit: (id: string) =>
+    fetchJson<any>(`/offboarding/requests/${id}/finalize`, {
+      method: 'POST',
+    }),
 };

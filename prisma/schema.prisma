@@ -126,6 +126,62 @@ enum OnboardingTaskStatus {
   SKIPPED
 }
 
+enum ExitType {
+  RESIGNATION
+  TERMINATION
+  RETIREMENT
+  CONTRACT_END
+}
+
+enum ExitStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  CLEARANCE_IN_PROGRESS
+  SETTLEMENT_PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ExitClearanceDepartment {
+  IT
+  FINANCE
+  ADMIN
+  MANAGER
+  HR
+}
+
+enum ClearanceStatus {
+  PENDING
+  CLEARED
+  WAIVED
+  REJECTED
+}
+
+enum ExitReasonCategory {
+  BETTER_OPPORTUNITY
+  CAREER_GROWTH
+  HIGHER_COMPENSATION
+  HEALTH_PERSONAL
+  RELOCATION
+  WORK_CULTURE
+  MANAGEMENT_ISSUES
+  OTHER
+}
+
+enum FnFStatus {
+  DRAFT
+  APPROVED
+  PROCESSED
+}
+
 // ---------------------------------------------------------------------------
 // 1. Organization (Tenant)
 // ---------------------------------------------------------------------------
@@ -161,6 +217,10 @@ model Organization {
   payslips              Payslip[]
   onboardingCandidates  OnboardingCandidate[]
   onboardingTasks       OnboardingTask[]
+  exitRequests          ExitRequest[]
+  exitClearanceTasks    ExitClearanceTask[]
+  exitInterviews        ExitInterview[]
+  fnfSettlements        FnFSettlement[]
 
   @@map("organizations")
 }
@@ -352,6 +412,8 @@ model Employee {
   payslips          Payslip[]
   onboardingCandidatesManaged OnboardingCandidate[] @relation("CandidateReportingManager")
   convertedFromCandidate     OnboardingCandidate?  @relation("CandidateConvertedEmployee")
+  exitRequests               ExitRequest[]
+  fnfSettlements             FnFSettlement[]
 
   @@unique([organizationId, employeeCode])
   @@index([organizationId, deletedAt])
@@ -776,5 +838,136 @@ model OnboardingTask {
 
   @@index([organizationId, candidateId])
   @@map("onboarding_tasks")
+}
+
+// ---------------------------------------------------------------------------
+// 13. Offboarding & Exit Management (Module 9)
+// ---------------------------------------------------------------------------
+
+model ExitRequest {
+  id                     String           @id @default(uuid()) @db.Uuid
+  organizationId         String           @map("organization_id") @db.Uuid
+  employeeId             String           @map("employee_id") @db.Uuid
+  exitType               ExitType         @default(RESIGNATION) @map("exit_type")
+  resignationDate        DateTime         @default(now()) @map("resignation_date")
+  reason                 String
+  noticePeriodDays       Int              @default(30) @map("notice_period_days")
+  proposedLastWorkingDay DateTime         @map("proposed_last_working_day")
+  approvedLastWorkingDay DateTime?        @map("approved_last_working_day")
+  status                 ExitStatus       @default(PENDING_APPROVAL)
+
+  // Dual Approval (Manager & HR)
+  managerApprovalStatus  ApprovalStatus   @default(PENDING) @map("manager_approval_status")
+  managerComments        String?          @map("manager_comments")
+  managerApprovedAt      DateTime?        @map("manager_approved_at")
+  hrApprovalStatus       ApprovalStatus   @default(PENDING) @map("hr_approval_status")
+  hrComments             String?          @map("hr_comments")
+  hrApprovedAt           DateTime?        @map("hr_approved_at")
+
+  finalizedAt            DateTime?        @map("finalized_at")
+  finalizedByUserId      String?          @map("finalized_by_user_id") @db.Uuid
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
+
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee       Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  clearanceTasks ExitClearanceTask[]
+  exitInterview  ExitInterview?
+  fnfSettlement  FnFSettlement?
+
+  @@index([organizationId, status])
+  @@index([organizationId, employeeId])
+  @@map("exit_requests")
+}
+
+model ExitClearanceTask {
+  id              String                  @id @default(uuid()) @db.Uuid
+  organizationId  String                  @map("organization_id") @db.Uuid
+  exitRequestId   String                  @map("exit_request_id") @db.Uuid
+  departmentType  ExitClearanceDepartment @map("department_type")
+  title           String
+  description     String?
+  isMandatory     Boolean                 @default(true) @map("is_mandatory")
+  status          ClearanceStatus         @default(PENDING)
+  remarks         String?
+  clearedByUserId String?                 @map("cleared_by_user_id") @db.Uuid
+  clearedAt       DateTime?               @map("cleared_at")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  exitRequest  ExitRequest  @relation(fields: [exitRequestId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, exitRequestId])
+  @@map("exit_clearance_tasks")
+}
+
+model ExitInterview {
+  id                    String             @id @default(uuid()) @db.Uuid
+  organizationId        String             @map("organization_id") @db.Uuid
+  exitRequestId         String             @unique @map("exit_request_id") @db.Uuid
+  reasonCategory        ExitReasonCategory @map("reason_category")
+  companyCultureRating  Int                @map("company_culture_rating") // 1-5
+  managementRating      Int                @map("management_rating") // 1-5
+  workLifeBalanceRating Int                @map("work_life_balance_rating") // 1-5
+  compensationRating    Int                @map("compensation_rating") // 1-5
+  wouldRecommendCompany Boolean            @map("would_recommend_company")
+  feedback              String?
+  submittedAt           DateTime           @default(now()) @map("submitted_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  exitRequest  ExitRequest  @relation(fields: [exitRequestId], references: [id], onDelete: Cascade)
+
+  @@map("exit_interviews")
+}
+
+model FnFSettlement {
+  id                     String    @id @default(uuid()) @db.Uuid
+  organizationId         String    @map("organization_id") @db.Uuid
+  exitRequestId          String    @unique @map("exit_request_id") @db.Uuid
+  employeeId             String    @map("employee_id") @db.Uuid
+  settlementDate         DateTime  @default(now()) @map("settlement_date")
+  lastWorkingDay         DateTime  @map("last_working_day")
+
+  // Earnings in Final Wage Period
+  payableDays            Decimal   @map("payable_days") @db.Decimal(5, 2)
+  earnedBasic            Decimal   @map("earned_basic") @db.Decimal(12, 2)
+  earnedHra              Decimal   @map("earned_hra") @db.Decimal(12, 2)
+  earnedSpecialAllowance Decimal   @map("earned_special_allowance") @db.Decimal(12, 2)
+  earnedGross            Decimal   @map("earned_gross") @db.Decimal(12, 2)
+
+  // Leave Encashment
+  encashableLeaveDays    Decimal   @map("encashable_leave_days") @db.Decimal(5, 2)
+  dailyBasicRate         Decimal   @map("daily_basic_rate") @db.Decimal(12, 2)
+  leaveEncashmentAmount  Decimal   @map("leave_encashment_amount") @db.Decimal(12, 2)
+
+  // Additional Additions
+  gratuityAmount         Decimal   @default(0) @map("gratuity_amount") @db.Decimal(12, 2)
+  bonusAmount            Decimal   @default(0) @map("bonus_amount") @db.Decimal(12, 2)
+  totalAdditions         Decimal   @map("total_additions") @db.Decimal(12, 2)
+
+  // Deductions
+  noticeShortfallDays    Int       @default(0) @map("notice_shortfall_days")
+  noticeDeductionAmount  Decimal   @default(0) @map("notice_deduction_amount") @db.Decimal(12, 2)
+  employeePf             Decimal   @default(0) @map("employee_pf") @db.Decimal(12, 2)
+  professionalTax        Decimal   @default(0) @map("professional_tax") @db.Decimal(12, 2)
+  otherDeductions        Decimal   @default(0) @map("other_deductions") @db.Decimal(12, 2)
+  otherDeductionsRemarks String?   @map("other_deductions_remarks")
+  totalDeductions        Decimal   @map("total_deductions") @db.Decimal(12, 2)
+
+  // Final Net Settlement
+  netSettlementAmount    Decimal   @map("net_settlement_amount") @db.Decimal(12, 2)
+  status                 FnFStatus @default(DRAFT)
+  approvedByUserId       String?   @map("approved_by_user_id") @db.Uuid
+  approvedAt             DateTime? @map("approved_at")
+  remarks                String?
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  exitRequest  ExitRequest  @relation(fields: [exitRequestId], references: [id], onDelete: Cascade)
+  employee     Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("fnf_settlements")
 }
 

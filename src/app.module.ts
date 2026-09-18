@@ -9,6 +9,7 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { EssModule } from './modules/ess/ess.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { OffboardingModule } from './modules/offboarding/offboarding.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -24,6 +25,7 @@ import { AppService } from './app.service';
     PayrollModule,
     EssModule,
     OnboardingModule,
+    OffboardingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
