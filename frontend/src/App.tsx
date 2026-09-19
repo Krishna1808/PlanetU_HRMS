@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { api } from './api';
 import { LoginPage } from './components/LoginPage';
 import { EssDashboardPage } from './components/EssDashboardPage';
@@ -14,13 +14,103 @@ import { OffboardingPage } from './components/OffboardingPage';
 import { ReportsPage } from './components/ReportsPage';
 import { NotificationBell } from './components/NotificationBell';
 
-type MainTab = 'ess' | 'onboarding' | 'employees' | 'shifts' | 'attendance' | 'leaves' | 'payroll' | 'offboarding' | 'reports';
+type MainTab =
+  | 'ess'
+  | 'employees'
+  | 'onboarding'
+  | 'offboarding'
+  | 'shifts'
+  | 'attendance'
+  | 'leaves'
+  | 'payroll'
+  | 'reports';
+
 type EmployeeSubView = 'list' | 'add' | 'profile';
+
+interface NavTabItem {
+  key: MainTab;
+  label: string;
+  icon: string;
+  section: string;
+  allowedRoles: string[];
+}
+
+const ALL_TABS: NavTabItem[] = [
+  // 1. Self Service Workspace
+  {
+    key: 'ess',
+    label: 'Employee Self-Service',
+    icon: '🏠',
+    section: 'WORKSPACE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'FINANCE', 'MANAGER', 'EMPLOYEE'],
+  },
+  // 2. Workforce Management
+  {
+    key: 'employees',
+    label: 'Employees',
+    icon: '👥',
+    section: 'WORKFORCE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'],
+  },
+  {
+    key: 'onboarding',
+    label: 'Onboarding',
+    icon: '🚀',
+    section: 'WORKFORCE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN'],
+  },
+  {
+    key: 'offboarding',
+    label: 'Offboarding & Exit',
+    icon: '🚪',
+    section: 'WORKFORCE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'FINANCE', 'MANAGER'],
+  },
+  // 3. Time & Attendance
+  {
+    key: 'shifts',
+    label: 'Shift Scheduling',
+    icon: '⏱️',
+    section: 'TIME & ATTENDANCE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'],
+  },
+  {
+    key: 'attendance',
+    label: 'Attendance',
+    icon: '📍',
+    section: 'TIME & ATTENDANCE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER', 'FINANCE'],
+  },
+  {
+    key: 'leaves',
+    label: 'Leave Management',
+    icon: '🌴',
+    section: 'TIME & ATTENDANCE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'],
+  },
+  // 4. Finance & Statutory
+  {
+    key: 'payroll',
+    label: 'Payroll & Compliance',
+    icon: '💰',
+    section: 'FINANCE & COMPLIANCE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'FINANCE'],
+  },
+  // 5. Intelligence & Analytics
+  {
+    key: 'reports',
+    label: 'Reports & Analytics',
+    icon: '📊',
+    section: 'INTELLIGENCE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'FINANCE', 'MANAGER'],
+  },
+];
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState<MainTab>('ess');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [employeeSubView, setEmployeeSubView] = useState<EmployeeSubView>('list');
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null);
 
@@ -32,6 +122,21 @@ export default function App() {
       .catch(() => setUser(null))
       .finally(() => setCheckingAuth(false));
   }, []);
+
+  // Compute visible tabs based on user role (Super Admin gets access to all)
+  const isSuperAdmin = user?.role === 'CLIENT_SUPER_ADMIN';
+  const visibleTabs = useMemo(() => {
+    if (!user) return [];
+    if (isSuperAdmin) return ALL_TABS;
+    return ALL_TABS.filter((t) => t.allowedRoles.includes(user.role));
+  }, [user, isSuperAdmin]);
+
+  // If current activeTab is not accessible by the logged-in role, auto-switch to first available tab
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.some((t) => t.key === activeTab)) {
+      setActiveTab(visibleTabs[0].key);
+    }
+  }, [visibleTabs, activeTab]);
 
   const handleLogout = async () => {
     try {
@@ -60,131 +165,401 @@ export default function App() {
     );
   }
 
-  const tabs: { key: MainTab; label: string; icon: string; minRole?: string }[] = [
-    { key: 'ess', label: 'ESS Workspace (M7)', icon: '🏠' },
-    { key: 'reports', label: 'Reports (M10)', icon: '📊' },
-    { key: 'onboarding', label: 'Onboarding (M8)', icon: '🚀' },
-    { key: 'employees', label: 'Employees (M1)', icon: '👥' },
-    { key: 'shifts', label: 'Shifts (M3)', icon: '⏱️' },
-    { key: 'attendance', label: 'Attendance (M4)', icon: '📍' },
-    { key: 'leaves', label: 'Leaves (M5)', icon: '🌴' },
-    { key: 'payroll', label: 'Payroll (M6)', icon: '💰' },
-    { key: 'offboarding', label: 'Offboarding (M9)', icon: '🚪' },
-  ];
+  // Group visible tabs by section for clean rendering
+  const sections = Array.from(new Set(visibleTabs.map((t) => t.section)));
+  const currentTabItem = ALL_TABS.find((t) => t.key === activeTab);
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Top Header */}
-      <header className="top-header" style={{ background: '#0f172a', color: 'white', borderBottom: '1px solid #1e293b' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ fontWeight: 900, fontSize: '18px', letterSpacing: '-0.02em', color: '#38bdf8' }}>
-            PlanetU HRMS
-          </div>
-          <span style={{ fontSize: '11px', background: '#1e293b', color: '#94a3b8', padding: '2px 8px', borderRadius: '4px' }}>
-            Prototype Viewing Layer (All 11 Modules)
-          </span>
-        </div>
+    <div style={{ minHeight: '100vh', display: 'flex', background: '#f8fafc', color: '#1e293b' }}>
+      {/* --------------------------------------------------------------------- */}
+      {/* Left Navigation Sidebar Drawer                                        */}
+      {/* --------------------------------------------------------------------- */}
+      <aside
+        style={{
+          width: sidebarCollapsed ? '68px' : '250px',
+          background: '#0f172a',
+          color: '#f8fafc',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'width 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          borderRight: '1px solid #1e293b',
+          zIndex: 40,
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          flexShrink: 0,
+          userSelect: 'none',
+        }}
+      >
+        {/* Brand & Toggle Header */}
+        <div
+          style={{
+            padding: sidebarCollapsed ? '16px 0' : '16px 18px',
+            borderBottom: '1px solid #1e293b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+            height: '60px',
+            boxSizing: 'border-box',
+          }}
+        >
+          {!sidebarCollapsed ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '20px' }}>🪐</span>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '15px', color: '#38bdf8', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                  PlanetU HRMS
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Enterprise Suite
+                </div>
+              </div>
+            </div>
+          ) : (
+            <span style={{ fontSize: '22px' }} title="PlanetU HRMS">🪐</span>
+          )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <NotificationBell user={user} onNavigateTab={(tab) => setActiveTab(tab as MainTab)} />
-          <span style={{ fontSize: '13px', color: '#cbd5e1' }}>{user.email}</span>
-          <span className="badge badge-role" style={{ background: '#3b82f6', color: 'white' }}>
-            {user.role}
-          </span>
           <button
-            className="btn btn-secondary"
-            style={{ padding: '4px 10px', fontSize: '12px', background: '#334155', color: '#f8fafc', borderColor: '#475569' }}
-            onClick={handleLogout}
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title={sidebarCollapsed ? 'Expand Navigation' : 'Collapse Navigation'}
+            style={{
+              background: 'transparent',
+              border: '1px solid #334155',
+              borderRadius: '6px',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              padding: '5px 7px',
+              fontSize: '12px',
+              display: sidebarCollapsed ? 'none' : 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            Sign Out
+            ◀
           </button>
         </div>
-      </header>
 
-      {/* Navigation Tab Bar */}
-      <nav style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '0 16px' }}>
-        <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', gap: '8px', overflowX: 'auto' }}>
-          {tabs.map((t) => (
+        {/* Navigation Modules List */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 8px' }}>
+          {sections.map((secName) => {
+            const tabsInSection = visibleTabs.filter((t) => t.section === secName);
+            return (
+              <div key={secName} style={{ marginBottom: '14px' }}>
+                {!sidebarCollapsed && (
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      color: '#64748b',
+                      padding: '4px 10px',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {secName}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  {tabsInSection.map((t) => {
+                    const isActive = activeTab === t.key;
+                    return (
+                      <button
+                        key={t.key}
+                        onClick={() => {
+                          setActiveTab(t.key);
+                          if (t.key === 'employees') {
+                            setEmployeeSubView('list');
+                            setSelectedEmpId(null);
+                          }
+                        }}
+                        title={sidebarCollapsed ? t.label : undefined}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: sidebarCollapsed ? '0' : '10px',
+                          justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                          padding: sidebarCollapsed ? '10px 0' : '9px 12px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: isActive ? '#2563eb' : 'transparent',
+                          color: isActive ? '#ffffff' : '#cbd5e1',
+                          fontWeight: isActive ? 600 : 500,
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          textAlign: 'left',
+                          width: '100%',
+                          position: 'relative',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) e.currentTarget.style.background = '#1e293b';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) e.currentTarget.style.background = 'transparent';
+                        }}
+                      >
+                        <span style={{ fontSize: '16px', flexShrink: 0 }}>{t.icon}</span>
+                        {!sidebarCollapsed && (
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {t.label}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Sidebar Footer / User Profile Card */}
+        <div
+          style={{
+            padding: sidebarCollapsed ? '12px 0' : '12px 14px',
+            borderTop: '1px solid #1e293b',
+            background: '#090d16',
+            display: 'flex',
+            flexDirection: sidebarCollapsed ? 'column' : 'row',
+            alignItems: 'center',
+            justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+            gap: '8px',
+          }}
+        >
+          {sidebarCollapsed ? (
             <button
-              key={t.key}
-              onClick={() => {
-                setActiveTab(t.key);
-                if (t.key === 'employees') {
-                  setEmployeeSubView('list');
-                  setSelectedEmpId(null);
-                }
-              }}
+              onClick={() => setSidebarCollapsed(false)}
+              title="Expand Sidebar"
               style={{
-                padding: '12px 16px',
-                border: 'none',
                 background: 'none',
-                borderBottom: activeTab === t.key ? '3px solid #2563eb' : '3px solid transparent',
-                color: activeTab === t.key ? '#2563eb' : '#64748b',
-                fontWeight: activeTab === t.key ? 700 : 500,
-                fontSize: '13px',
+                border: 'none',
+                color: '#94a3b8',
+                fontSize: '14px',
                 cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                whiteSpace: 'nowrap',
+                padding: '4px',
               }}
             >
-              <span>{t.icon}</span>
-              <span>{t.label}</span>
+              ▶
             </button>
-          ))}
+          ) : (
+            <div style={{ overflow: 'hidden', minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#f8fafc',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+                title={user.email}
+              >
+                {user.email}
+              </div>
+              <div style={{ marginTop: '2px' }}>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    padding: '1px 6px',
+                    borderRadius: '4px',
+                    background:
+                      user.role === 'CLIENT_SUPER_ADMIN'
+                        ? '#7c3aed'
+                        : user.role === 'HR_ADMIN'
+                        ? '#059669'
+                        : user.role === 'FINANCE'
+                        ? '#d97706'
+                        : '#3b82f6',
+                    color: '#ffffff',
+                    display: 'inline-block',
+                  }}
+                >
+                  {user.role}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {!sidebarCollapsed && (
+            <button
+              onClick={handleLogout}
+              title="Sign Out"
+              style={{
+                background: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '6px',
+                color: '#94a3b8',
+                padding: '5px 8px',
+                fontSize: '11px',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              Logout
+            </button>
+          )}
         </div>
-      </nav>
+      </aside>
 
-      {/* Main Content Area */}
-      <main className="container" style={{ maxWidth: '1100px', flex: 1, padding: '24px 16px' }}>
-        {activeTab === 'ess' && <EssDashboardPage />}
+      {/* --------------------------------------------------------------------- */}
+      {/* Right Area: Top Header + Main Content Area                            */}
+      {/* --------------------------------------------------------------------- */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* Top Header */}
+        <header
+          style={{
+            height: '60px',
+            background: '#0f172a',
+            borderBottom: '1px solid #1e293b',
+            color: '#f8fafc',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 24px',
+            position: 'sticky',
+            top: 0,
+            zIndex: 30,
+            boxSizing: 'border-box',
+          }}
+        >
+          {/* Breadcrumb & Module Indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title="Toggle sidebar drawer"
+              style={{
+                background: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '6px',
+                color: '#f8fafc',
+                cursor: 'pointer',
+                padding: '6px 9px',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              ☰
+            </button>
 
-        {activeTab === 'onboarding' && <OnboardingPage user={user} />}
-
-        {activeTab === 'employees' && (
-          <div>
-            {employeeSubView === 'list' && (
-              <EmployeeListPage
-                onSelectEmployee={(id) => {
-                  setSelectedEmpId(id);
-                  setEmployeeSubView('profile');
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '18px' }}>{currentTabItem?.icon}</span>
+              <span style={{ fontWeight: 700, fontSize: '15px', color: '#f8fafc' }}>
+                {currentTabItem?.label || 'PlanetU HRMS'}
+              </span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  background: '#1e293b',
+                  color: '#94a3b8',
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  marginLeft: '4px',
                 }}
-                onNavigateAdd={() => setEmployeeSubView('add')}
-              />
-            )}
-
-            {employeeSubView === 'add' && (
-              <AddEmployeeForm
-                onSuccess={() => setEmployeeSubView('list')}
-                onCancel={() => setEmployeeSubView('list')}
-              />
-            )}
-
-            {employeeSubView === 'profile' && selectedEmpId && (
-              <EmployeeProfileView
-                employeeId={selectedEmpId}
-                onBack={() => {
-                  setSelectedEmpId(null);
-                  setEmployeeSubView('list');
-                }}
-              />
-            )}
+              >
+                {currentTabItem?.section}
+              </span>
+            </div>
           </div>
-        )}
 
-        {activeTab === 'shifts' && <ShiftsPage />}
+          {/* Right Header Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            {/* Module 11 Notification Bell with Live Unread Counter */}
+            <NotificationBell user={user} onNavigateTab={(tab) => setActiveTab(tab as MainTab)} />
 
-        {activeTab === 'attendance' && <AttendancePage />}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid #334155', paddingLeft: '14px' }}>
+              <span style={{ fontSize: '13px', color: '#cbd5e1' }}>{user.email}</span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  background:
+                    user.role === 'CLIENT_SUPER_ADMIN'
+                      ? '#7c3aed'
+                      : user.role === 'HR_ADMIN'
+                      ? '#059669'
+                      : user.role === 'FINANCE'
+                      ? '#d97706'
+                      : '#2563eb',
+                  color: '#ffffff',
+                }}
+              >
+                {user.role}
+              </span>
+              <button
+                className="btn btn-secondary"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '12px',
+                  background: '#334155',
+                  color: '#f8fafc',
+                  borderColor: '#475569',
+                }}
+                onClick={handleLogout}
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </header>
 
-        {activeTab === 'leaves' && <LeavesPage user={user} />}
+        {/* Main Content Area */}
+        <main style={{ flex: 1, padding: '24px 28px', overflowY: 'auto' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+            {activeTab === 'ess' && <EssDashboardPage />}
 
-        {activeTab === 'payroll' && <PayrollPage user={user} />}
+            {activeTab === 'onboarding' && <OnboardingPage user={user} />}
 
-        {activeTab === 'offboarding' && <OffboardingPage user={user} />}
+            {activeTab === 'employees' && (
+              <div>
+                {employeeSubView === 'list' && (
+                  <EmployeeListPage
+                    onSelectEmployee={(id) => {
+                      setSelectedEmpId(id);
+                      setEmployeeSubView('profile');
+                    }}
+                    onNavigateAdd={() => setEmployeeSubView('add')}
+                  />
+                )}
 
-        {activeTab === 'reports' && <ReportsPage user={user} />}
-      </main>
+                {employeeSubView === 'add' && (
+                  <AddEmployeeForm
+                    onSuccess={() => setEmployeeSubView('list')}
+                    onCancel={() => setEmployeeSubView('list')}
+                  />
+                )}
+
+                {employeeSubView === 'profile' && selectedEmpId && (
+                  <EmployeeProfileView
+                    employeeId={selectedEmpId}
+                    onBack={() => {
+                      setSelectedEmpId(null);
+                      setEmployeeSubView('list');
+                    }}
+                  />
+                )}
+              </div>
+            )}
+
+            {activeTab === 'shifts' && <ShiftsPage />}
+
+            {activeTab === 'attendance' && <AttendancePage />}
+
+            {activeTab === 'leaves' && <LeavesPage user={user} />}
+
+            {activeTab === 'payroll' && <PayrollPage user={user} />}
+
+            {activeTab === 'offboarding' && <OffboardingPage user={user} />}
+
+            {activeTab === 'reports' && <ReportsPage user={user} />}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
