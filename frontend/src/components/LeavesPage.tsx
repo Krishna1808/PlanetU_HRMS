@@ -234,11 +234,15 @@ export function LeavesPage({ user }: { user: any }) {
   };
 
   const handleAction = async (id: string, action: 'APPROVE' | 'REJECT') => {
-    const reasonPrompt =
-      action === 'REJECT' ? prompt('Enter rejection reason:') || 'Administrative decision' : undefined;
+    let reasonPrompt: string | undefined;
+    if (action === 'REJECT') {
+      const promptRes = prompt('Enter rejection reason:');
+      if (promptRes === null) return; // User cancelled prompt dialog
+      reasonPrompt = promptRes.trim() || 'Administrative decision';
+    }
     try {
       await api.actionLeave(id, action, reasonPrompt);
-      alert(`Leave request ${action.toLowerCase()}d`);
+      alert(`Leave request successfully ${action === 'APPROVE' ? 'approved' : 'rejected'}!`);
       await loadLeaves();
     } catch (err: any) {
       alert(err.message || `Failed to ${action.toLowerCase()} leave`);

@@ -127,11 +127,13 @@ export const api = {
       method: 'POST',
     }),
   getPendingLeaves: () => fetchJson<any[]>('/leaves/pending'),
-  actionLeave: (id: string, action: 'APPROVE' | 'REJECT', rejectionReason?: string) =>
-    fetchJson<any>(`/leaves/${id}/action`, {
+  actionLeave: (id: string, action: 'APPROVE' | 'REJECT' | 'APPROVED' | 'REJECTED', rejectionReason?: string) => {
+    const status = action.startsWith('APPROV') ? 'APPROVED' : 'REJECTED';
+    return fetchJson<any>(`/leaves/${id}/action`, {
       method: 'PATCH',
-      body: JSON.stringify({ action, rejectionReason }),
-    }),
+      body: JSON.stringify({ status, rejectionReason }),
+    });
+  },
   createLeaveType: (data: {
     name: string;
     code: string;
