@@ -280,6 +280,76 @@ async function main() {
   });
   console.log(`✅ Seeded Finance User: ${financeUser.email} (Role: ${financeUser.role})`);
 
+  // 11. Seed HR Admin User
+  const hrEmail = 'hr@planetu.com';
+  const hrUser = await prisma.user.upsert({
+    where: {
+      organizationId_email: {
+        organizationId: organization.id,
+        email: hrEmail,
+      },
+    },
+    update: {},
+    create: {
+      organizationId: organization.id,
+      email: hrEmail,
+      passwordHash: passwordHash,
+      role: Role.HR_ADMIN,
+      isActive: true,
+    },
+  });
+  console.log(`✅ Seeded HR Admin User: ${hrUser.email} (Role: ${hrUser.role})`);
+
+  // 12. Seed Employee Profile and ESS User
+  const engDept = await prisma.department.findFirst({
+    where: { organizationId: organization.id, codePrefix: 'ENG' },
+  });
+  const devDesignation = await prisma.designation.findFirst({
+    where: { organizationId: organization.id, name: 'Senior Software Engineer' },
+  });
+
+  const empCode = 'ENG-0001';
+  let employee = await prisma.employee.findFirst({
+    where: { organizationId: organization.id, employeeCode: empCode },
+  });
+
+  if (!employee) {
+    employee = await prisma.employee.create({
+      data: {
+        organizationId: organization.id,
+        employeeCode: empCode,
+        firstName: 'Rahul',
+        lastName: 'Sharma',
+        personalEmail: 'rahul.sharma@example.com',
+        departmentId: engDept!.id,
+        designationId: devDesignation!.id,
+        dateOfJoining: new Date('2024-01-15'),
+        employmentStatus: 'ACTIVE',
+        employmentType: 'FULL_TIME',
+      },
+    });
+  }
+
+  const empEmail = 'employee@planetu.com';
+  const empUser = await prisma.user.upsert({
+    where: {
+      organizationId_email: {
+        organizationId: organization.id,
+        email: empEmail,
+      },
+    },
+    update: { employeeId: employee.id },
+    create: {
+      organizationId: organization.id,
+      email: empEmail,
+      passwordHash: passwordHash,
+      role: Role.EMPLOYEE,
+      employeeId: employee.id,
+      isActive: true,
+    },
+  });
+  console.log(`✅ Seeded Employee User: ${empUser.email} (${employee.employeeCode})`);
+
   console.log('🌱 Seeding completed successfully!');
 }
 
