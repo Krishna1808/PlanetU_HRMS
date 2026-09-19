@@ -10,6 +10,7 @@ import { PayrollModule } from './modules/payroll/payroll.module';
 import { EssModule } from './modules/ess/ess.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { OffboardingModule } from './modules/offboarding/offboarding.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -26,6 +27,7 @@ import { AppService } from './app.service';
     EssModule,
     OnboardingModule,
     OffboardingModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

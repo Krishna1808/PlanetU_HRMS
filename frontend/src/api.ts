@@ -231,4 +231,54 @@ export const api = {
     fetchJson<any>(`/offboarding/requests/${id}/finalize`, {
       method: 'POST',
     }),
+
+  // 11. Module 10: Reports & Dashboards Engine
+  getReportsOverview: () => fetchJson<any>('/reports/overview'),
+  getWorkforceReports: () => fetchJson<any>('/reports/workforce'),
+  getAttendanceReports: (params?: { year?: number; month?: number; departmentId?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.year) q.append('year', String(params.year));
+    if (params?.month) q.append('month', String(params.month));
+    if (params?.departmentId) q.append('departmentId', params.departmentId);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return fetchJson<any>(`/reports/attendance${queryStr}`);
+  },
+  getLeaveReports: (params?: { year?: number; departmentId?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.year) q.append('year', String(params.year));
+    if (params?.departmentId) q.append('departmentId', params.departmentId);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return fetchJson<any>(`/reports/leaves${queryStr}`);
+  },
+  getPayrollReports: (params?: { year?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.year) q.append('year', String(params.year));
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return fetchJson<any>(`/reports/payroll${queryStr}`);
+  },
+  getLifecycleReports: () => fetchJson<any>('/reports/lifecycle'),
+  downloadReportCsv: async (reportType: string, params?: any) => {
+    const q = new URLSearchParams();
+    if (params?.year) q.append('year', String(params.year));
+    if (params?.month) q.append('month', String(params.month));
+    if (params?.departmentId) q.append('departmentId', params.departmentId);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+
+    const res = await fetch(`/api/v1/reports/export/${reportType}${queryStr}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'Failed to download report' }));
+      throw new Error(err.message || 'Failed to download report');
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `planetu_${reportType}_report.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
 };
