@@ -21,6 +21,7 @@ import { UpdateLeaveTypeDto } from './dto/update-leave-type.dto';
 import { ApplyLeaveDto } from './dto/apply-leave.dto';
 import { ActionLeaveDto } from './dto/action-leave.dto';
 import { AdjustBalanceDto } from './dto/adjust-balance.dto';
+import { AllocateDepartmentLeavesDto } from './dto/allocate-department-leaves.dto';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.interface';
 
 @Injectable()
@@ -423,6 +424,61 @@ export class LeaveService {
         newBalance,
       };
     });
+  }
+
+  /**
+   * Bulk allocate or adjust leave balances for all active employees in a department (HR/Admin).
+   */
+  async allocateDepartmentLeaves(
+    organizationId: string,
+    dto: AllocateDepartmentLeavesDto,
+    actingUserId?: string,
+  ) {
+    const dept = await this.prisma.department.findFirst({
+      where: { id: dto.departmentId, organizationId },
+    });
+    if (!dept) {
+      throw new NotFoundException('Department not found in this organization');
+    }
+
+    const employees = await this.prisma.employee.findMany({
+      where: {
+        departmentId: dto.departmentId,
+        organizationId,
+        deletedAt: null,
+        employmentStatus: 'ACTIVE',
+      },
+      select: { id: true, employeeCode: true, firstName: true, lastName: true },
+    });
+
+    if (employees.length === 0) {
+      throw new BadRequestException(`No active employees found in department '${dept.name}'`);
+    }
+
+    const transactions = [];
+    for (const emp of employees) {
+      const tx = await this.adjustBalance(
+        organizationId,
+        {
+          employeeId: emp.id,
+          leaveTypeId: dto.leaveTypeId,
+          days: dto.days,
+          reason: `${dto.reason} [Department Allocation: ${dept.name}]`,
+        },
+        actingUserId,
+      );
+      transactions.push(tx);
+    }
+
+    return {
+      success: true,
+      departmentId: dept.id,
+      departmentName: dept.name,
+      allocatedCount: employees.length,
+      employees: employees.map((e) => `${e.employeeCode} - ${e.firstName} ${e.lastName}`),
+      daysPerEmployee: dto.days,
+      transactions,
+    };
   }
 
   // ---------------------------------------------------------------------------

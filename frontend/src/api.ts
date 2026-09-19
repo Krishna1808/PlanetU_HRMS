@@ -42,9 +42,32 @@ export const api = {
 
   // 2. Masters
   getDepartments: () => fetchJson<any[]>('/masters/departments'),
+  createDepartment: (data: { name: string; codePrefix: string; description?: string }) =>
+    fetchJson<any>('/masters/departments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   getDesignations: () => fetchJson<any[]>('/masters/designations'),
+  createDesignation: (data: { name: string; description?: string }) =>
+    fetchJson<any>('/masters/designations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   getGrades: () => fetchJson<any[]>('/masters/grades'),
+  createGrade: (data: { name: string; level?: number; description?: string }) =>
+    fetchJson<any>('/masters/grades', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   getLocations: () => fetchJson<any[]>('/masters/locations'),
+  createLocation: (data: { name: string; city?: string; country?: string; address?: string }) =>
+    fetchJson<any>('/masters/locations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // 3. Module 1: Employees
   getEmployees: () =>
@@ -108,6 +131,41 @@ export const api = {
     fetchJson<any>(`/leaves/${id}/action`, {
       method: 'PATCH',
       body: JSON.stringify({ action, rejectionReason }),
+    }),
+  createLeaveType: (data: {
+    name: string;
+    code: string;
+    description?: string;
+    isPaid?: boolean;
+    daysAllowedPerYear?: number;
+    accrualFrequency?: string;
+    carryForwardLimit?: number;
+    requiresApproval?: boolean;
+  }) =>
+    fetchJson<any>('/leaves/types', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  adjustLeaveBalance: (data: {
+    employeeId: string;
+    leaveTypeId: string;
+    days: number;
+    reason: string;
+    notes?: string;
+  }) =>
+    fetchJson<any>('/leaves/adjust-balance', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  allocateDepartmentLeaves: (data: {
+    departmentId: string;
+    leaveTypeId: string;
+    days: number;
+    reason: string;
+  }) =>
+    fetchJson<any>('/leaves/allocate-department', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 
   // 7. Module 6: Payroll

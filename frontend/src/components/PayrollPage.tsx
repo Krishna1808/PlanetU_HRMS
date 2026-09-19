@@ -174,7 +174,7 @@ export function PayrollPage({ user }: { user: any }) {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>💰 Payroll Management Engine (Module 6)</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>💰 Payroll Management Engine</h2>
             <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
               Option A (Indian Reference Model): Prorated-then-PF math, configurable PF ceiling, PT threshold, immutable batch lifecycle, and bank advice.
             </p>

@@ -12,11 +12,13 @@ import { PayrollPage } from './components/PayrollPage';
 import { OnboardingPage } from './components/OnboardingPage';
 import { OffboardingPage } from './components/OffboardingPage';
 import { ReportsPage } from './components/ReportsPage';
+import { OrganizationMastersPage } from './components/OrganizationMastersPage';
 import { NotificationBell } from './components/NotificationBell';
 
 type MainTab =
   | 'ess'
   | 'employees'
+  | 'organization'
   | 'onboarding'
   | 'offboarding'
   | 'shifts'
@@ -51,6 +53,13 @@ const ALL_TABS: NavTabItem[] = [
     icon: '👥',
     section: 'WORKFORCE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'],
+  },
+  {
+    key: 'organization',
+    label: 'Organization & Masters',
+    icon: '🏢',
+    section: 'WORKFORCE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN'],
   },
   {
     key: 'onboarding',
@@ -512,6 +521,8 @@ export default function App() {
         <main style={{ flex: 1, padding: '24px 28px', overflowY: 'auto' }}>
           <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
             {activeTab === 'ess' && <EssDashboardPage />}
+
+            {activeTab === 'organization' && <OrganizationMastersPage />}
 
             {activeTab === 'onboarding' && <OnboardingPage user={user} />}
 

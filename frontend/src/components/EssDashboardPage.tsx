@@ -171,7 +171,7 @@ export function EssDashboardPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <div style={{ fontSize: '12px', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em' }}>
-              Employee Self-Service (Module 7)
+              Employee Self-Service
             </div>
             <h2 style={{ fontSize: '22px', fontWeight: 700, margin: '4px 0', color: 'white' }}>
               Welcome back, {profile.firstName} {profile.lastName} 👋

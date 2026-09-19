@@ -78,7 +78,7 @@ export function ShiftsPage() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>⏱️ Shift Management (Module 3)</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>⏱️ Shift Management</h2>
             <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
               Defines working hours, cross-midnight overnight shifts, grace periods, and append-only employee roster assignments.
             </p>

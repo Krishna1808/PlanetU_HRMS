@@ -18,6 +18,7 @@ import { UpdateLeaveTypeDto } from './dto/update-leave-type.dto';
 import { ApplyLeaveDto } from './dto/apply-leave.dto';
 import { ActionLeaveDto } from './dto/action-leave.dto';
 import { AdjustBalanceDto } from './dto/adjust-balance.dto';
+import { AllocateDepartmentLeavesDto } from './dto/allocate-department-leaves.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -195,6 +196,19 @@ export class LeaveController {
     @Body() dto: AdjustBalanceDto,
   ) {
     return this.leaveService.adjustBalance(user.organizationId, dto, user.id);
+  }
+
+  /**
+   * POST /api/v1/leaves/allocate-department
+   * Bulk credit or adjust leave balances for an entire department (HR/Admin)
+   */
+  @Post('allocate-department')
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  async allocateDepartmentLeaves(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AllocateDepartmentLeavesDto,
+  ) {
+    return this.leaveService.allocateDepartmentLeaves(user.organizationId, dto, user.id);
   }
 
   /**

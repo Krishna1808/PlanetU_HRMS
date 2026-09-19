@@ -75,7 +75,7 @@ export function AttendancePage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Module 4 Header */}
       <div className="card">
-        <h2 style={{ fontSize: '18px', fontWeight: 700 }}>📍 Attendance Management (Module 4)</h2>
+        <h2 style={{ fontSize: '18px', fontWeight: 700 }}>📍 Attendance Management</h2>
         <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
           Web check-in/out, grace period detection, active duration thresholds, unexcused absence tracking, and the authoritative <strong>single source of truth</strong> for payroll payable days.
         </p>

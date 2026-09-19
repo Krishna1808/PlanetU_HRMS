@@ -243,7 +243,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>🚀 Employee Onboarding (Module 8)</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>🚀 Employee Onboarding</h2>
             <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
               Manages candidate pre-boarding forms, verification checklists, and atomic conversion into official Employee profiles & User logins.
             </p>
