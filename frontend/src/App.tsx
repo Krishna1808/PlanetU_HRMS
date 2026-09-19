@@ -86,7 +86,7 @@ const ALL_TABS: NavTabItem[] = [
     label: 'Leave Management',
     icon: '🌴',
     section: 'TIME & ATTENDANCE',
-    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'],
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'FINANCE', 'MANAGER', 'EMPLOYEE'],
   },
   // 4. Finance & Statutory
   {

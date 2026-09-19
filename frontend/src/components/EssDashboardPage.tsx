@@ -18,6 +18,61 @@ export function EssDashboardPage() {
   const [editEmergencyRelation, setEditEmergencyRelation] = useState('');
   const [editMessage, setEditMessage] = useState('');
 
+  // Leave apply modal state
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
+  const [applyTypeId, setApplyTypeId] = useState('');
+  const [applyStartDate, setApplyStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [applyEndDate, setApplyEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [applyHalfDay, setApplyHalfDay] = useState(false);
+  const [applyHalfDaySession, setApplyHalfDaySession] = useState('FIRST_HALF');
+  const [applyReason, setApplyReason] = useState('');
+  const [applyingLeave, setApplyingLeave] = useState(false);
+
+  const openApplyLeaveModal = async () => {
+    setShowApplyModal(true);
+    if (leaveTypes.length === 0) {
+      try {
+        const types = await api.getLeaveTypes();
+        setLeaveTypes(types || []);
+        if (types && types.length > 0) {
+          setApplyTypeId(types[0].id);
+        }
+      } catch {
+        // ignore
+      }
+    } else if (!applyTypeId && leaveTypes.length > 0) {
+      setApplyTypeId(leaveTypes[0].id);
+    }
+  };
+
+  const handleApplyLeaveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!applyTypeId) {
+      alert('Please select a leave type');
+      return;
+    }
+    try {
+      setApplyingLeave(true);
+      await api.applyLeave({
+        leaveTypeId: applyTypeId,
+        startDate: new Date(applyStartDate).toISOString(),
+        endDate: new Date(applyEndDate).toISOString(),
+        isHalfDay: applyHalfDay,
+        halfDaySession: applyHalfDay ? applyHalfDaySession : undefined,
+        reason: applyReason,
+      });
+      alert('Leave application submitted successfully!');
+      setShowApplyModal(false);
+      setApplyReason('');
+      await loadDashboard();
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit leave application');
+    } finally {
+      setApplyingLeave(false);
+    }
+  };
+
   const loadDashboard = async () => {
     try {
       setLoading(true);
@@ -291,7 +346,17 @@ export function EssDashboardPage() {
 
       {/* 4. Leave Balances Grid */}
       <div className="card">
-        <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>🌴 My Leave Balances</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 600 }}>🌴 My Leave Balances</h3>
+          <button
+            className="btn btn-primary"
+            onClick={openApplyLeaveModal}
+            style={{ padding: '6px 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <span>➕</span>
+            <span>Apply for Leave</span>
+          </button>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
           {leaveBalances.map((b: any) => (
             <div
@@ -456,6 +521,138 @@ export function EssDashboardPage() {
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={actionLoading}>
                   {actionLoading ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Apply Leave Modal */}
+      {showApplyModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(2px)',
+          }}
+        >
+          <div className="card" style={{ width: '480px', maxWidth: '92vw' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 700 }}>🌴 Apply for Leave</h3>
+              <button
+                onClick={() => setShowApplyModal(false)}
+                style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#64748b' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleApplyLeaveSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                  Leave Type *
+                </label>
+                <select
+                  value={applyTypeId}
+                  onChange={(e) => setApplyTypeId(e.target.value)}
+                  required
+                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px' }}
+                >
+                  {leaveTypes.length === 0 ? (
+                    <option value="">Loading leave types...</option>
+                  ) : (
+                    leaveTypes.map((lt) => (
+                      <option key={lt.id} value={lt.id}>
+                        {lt.name} ({lt.code}) {lt.isPaid ? '— Paid' : '— Unpaid (LWP)'}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Start Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={applyStartDate}
+                    onChange={(e) => setApplyStartDate(e.target.value)}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    End Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={applyEndDate}
+                    onChange={(e) => setApplyEndDate(e.target.value)}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: '#f8fafc', padding: '10px', borderRadius: '6px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={applyHalfDay}
+                    onChange={(e) => setApplyHalfDay(e.target.checked)}
+                  />
+                  <span>Half Day</span>
+                </label>
+
+                {applyHalfDay && (
+                  <select
+                    value={applyHalfDaySession}
+                    onChange={(e) => setApplyHalfDaySession(e.target.value)}
+                    style={{ padding: '4px 8px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                  >
+                    <option value="FIRST_HALF">First Half (Morning)</option>
+                    <option value="SECOND_HALF">Second Half (Afternoon)</option>
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                  Reason / Notes *
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="State the reason for leave..."
+                  value={applyReason}
+                  onChange={(e) => setApplyReason(e.target.value)}
+                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowApplyModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={applyingLeave}
+                >
+                  {applyingLeave ? 'Submitting...' : 'Submit Application'}
                 </button>
               </div>
             </form>
