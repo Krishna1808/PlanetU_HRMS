@@ -11,6 +11,7 @@ import { EssModule } from './modules/ess/ess.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { OffboardingModule } from './modules/offboarding/offboarding.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { NotificationModule } from './modules/notifications/notification.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -28,6 +29,7 @@ import { AppService } from './app.service';
     OnboardingModule,
     OffboardingModule,
     ReportsModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

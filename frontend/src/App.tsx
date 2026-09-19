@@ -12,6 +12,7 @@ import { PayrollPage } from './components/PayrollPage';
 import { OnboardingPage } from './components/OnboardingPage';
 import { OffboardingPage } from './components/OffboardingPage';
 import { ReportsPage } from './components/ReportsPage';
+import { NotificationBell } from './components/NotificationBell';
 
 type MainTab = 'ess' | 'onboarding' | 'employees' | 'shifts' | 'attendance' | 'leaves' | 'payroll' | 'offboarding' | 'reports';
 type EmployeeSubView = 'list' | 'add' | 'profile';
@@ -80,11 +81,12 @@ export default function App() {
             PlanetU HRMS
           </div>
           <span style={{ fontSize: '11px', background: '#1e293b', color: '#94a3b8', padding: '2px 8px', borderRadius: '4px' }}>
-            Prototype Viewing Layer (All 10 Modules)
+            Prototype Viewing Layer (All 11 Modules)
           </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <NotificationBell user={user} onNavigateTab={(tab) => setActiveTab(tab as MainTab)} />
           <span style={{ fontSize: '13px', color: '#cbd5e1' }}>{user.email}</span>
           <span className="badge badge-role" style={{ background: '#3b82f6', color: 'white' }}>
             {user.role}

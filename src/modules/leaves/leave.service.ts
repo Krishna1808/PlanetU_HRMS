@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import {
   AttendanceStatus,
@@ -14,6 +15,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShiftService } from '../shifts/shift.service';
+import { NotificationEventBusService } from '../notifications/notification-event-bus.service';
 import { CreateLeaveTypeDto } from './dto/create-leave-type.dto';
 import { UpdateLeaveTypeDto } from './dto/update-leave-type.dto';
 import { ApplyLeaveDto } from './dto/apply-leave.dto';
@@ -26,6 +28,7 @@ export class LeaveService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly shiftService: ShiftService,
+    @Optional() private readonly eventBus?: NotificationEventBusService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -607,7 +610,7 @@ export class LeaveService {
 
     // 1. Handling Rejection
     if (dto.status === LeaveRequestStatus.REJECTED) {
-      return this.prisma.leaveRequest.update({
+      const rejected = await this.prisma.leaveRequest.update({
         where: { id: requestId },
         data: {
           status: LeaveRequestStatus.REJECTED,
@@ -617,10 +620,34 @@ export class LeaveService {
         },
         include: { leaveType: true },
       });
+
+      if (this.eventBus) {
+        try {
+          const empUser = await this.prisma.user.findFirst({
+            where: { employeeId: leaveRequest.employeeId, organizationId },
+            select: { id: true },
+          });
+          if (empUser) {
+            this.eventBus.emitLeaveStatus({
+              organizationId,
+              recipientUserId: empUser.id,
+              leaveRequestId: leaveRequest.id,
+              status: LeaveRequestStatus.REJECTED,
+              leaveTypeName: leaveRequest.leaveType.name,
+              startDate: leaveRequest.startDate.toISOString().split('T')[0],
+              endDate: leaveRequest.endDate.toISOString().split('T')[0],
+            });
+          }
+        } catch {
+          // ignore notification errors
+        }
+      }
+
+      return rejected;
     }
 
     // 2. Handling Approval (Atomic transaction with append-only ledger debit)
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // Double-check balance if paid leave
       if (leaveRequest.leaveType.isPaid) {
         const aggregate = await tx.leaveTransaction.aggregate({
@@ -725,6 +752,30 @@ export class LeaveService {
 
       return updatedRequest;
     });
+
+    if (this.eventBus) {
+      try {
+        const empUser = await this.prisma.user.findFirst({
+          where: { employeeId: leaveRequest.employeeId, organizationId },
+          select: { id: true },
+        });
+        if (empUser) {
+          this.eventBus.emitLeaveStatus({
+            organizationId,
+            recipientUserId: empUser.id,
+            leaveRequestId: leaveRequest.id,
+            status: LeaveRequestStatus.APPROVED,
+            leaveTypeName: leaveRequest.leaveType.name,
+            startDate: leaveRequest.startDate.toISOString().split('T')[0],
+            endDate: leaveRequest.endDate.toISOString().split('T')[0],
+          });
+        }
+      } catch {
+        // ignore notification errors
+      }
+    }
+
+    return result;
   }
 
   /**

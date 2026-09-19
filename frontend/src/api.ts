@@ -281,4 +281,52 @@ export const api = {
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   },
+
+  // 12. Module 11: Notification Engine & Announcements
+  getNotifications: (params?: { isRead?: boolean; type?: string; limit?: number; offset?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.isRead !== undefined) q.append('isRead', String(params.isRead));
+    if (params?.type) q.append('type', params.type);
+    if (params?.limit) q.append('limit', String(params.limit));
+    if (params?.offset) q.append('offset', String(params.offset));
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return fetchJson<{ data: any[]; total: number; unreadCount: number }>(`/notifications${queryStr}`);
+  },
+
+  getUnreadNotificationCount: () =>
+    fetchJson<{ unreadCount: number }>('/notifications/unread-count'),
+
+  markNotificationRead: (id: string) =>
+    fetchJson<any>(`/notifications/${id}/read`, { method: 'PATCH' }),
+
+  markAllNotificationsRead: () =>
+    fetchJson<{ success: boolean; updatedCount: number }>('/notifications/mark-all-read', {
+      method: 'PATCH',
+    }),
+
+  getAnnouncements: (params?: { isActive?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.isActive !== undefined) q.append('isActive', String(params.isActive));
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return fetchJson<any[]>(`/notifications/announcements${queryStr}`);
+  },
+
+  createAnnouncement: (data: {
+    title: string;
+    content: string;
+    priority?: string;
+    targetDepartmentId?: string;
+    expiresAt?: string;
+    fanOutNotifications?: boolean;
+  }) =>
+    fetchJson<any>('/notifications/announcements', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deactivateAnnouncement: (id: string) =>
+    fetchJson<any>(`/notifications/announcements/${id}/deactivate`, {
+      method: 'PATCH',
+    }),
 };
+

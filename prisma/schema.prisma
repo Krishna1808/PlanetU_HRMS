@@ -182,6 +182,23 @@ enum FnFStatus {
   PROCESSED
 }
 
+enum NotificationType {
+  LEAVE_STATUS
+  ATTENDANCE_ALERT
+  PAYSLIP_RELEASED
+  SHIFT_ASSIGNED
+  CLEARANCE_TASK
+  ANNOUNCEMENT
+  SYSTEM
+}
+
+enum AnnouncementPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 // ---------------------------------------------------------------------------
 // 1. Organization (Tenant)
 // ---------------------------------------------------------------------------
@@ -221,6 +238,8 @@ model Organization {
   exitClearanceTasks    ExitClearanceTask[]
   exitInterviews        ExitInterview[]
   fnfSettlements        FnFSettlement[]
+  notifications         Notification[]
+  announcements         Announcement[]
 
   @@map("organizations")
 }
@@ -242,8 +261,11 @@ model User {
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  employee     Employee?    @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  organization          Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee              Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  receivedNotifications Notification[] @relation("ReceivedNotifications")
+  sentNotifications     Notification[] @relation("SentNotifications")
+  createdAnnouncements  Announcement[] @relation("CreatedAnnouncements")
 
   @@unique([organizationId, email])
   @@index([organizationId, role])
@@ -268,6 +290,7 @@ model Department {
   jobHistories          EmployeeJobHistory[]
   employeeCodeSequences EmployeeCodeSequence[]
   onboardingCandidates  OnboardingCandidate[]
+  announcements         Announcement[]
 
   @@unique([organizationId, name])
   @@unique([organizationId, codePrefix])
@@ -294,7 +317,7 @@ model Designation {
 model Grade {
   id             String   @id @default(uuid()) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
-  name           String   // e.g., 'L1', 'L2', 'M1'
+  name           String // e.g., 'L1', 'L2', 'M1'
   level          Int?
   description    String?
   createdAt      DateTime @default(now()) @map("created_at")
@@ -312,7 +335,7 @@ model Grade {
 model Location {
   id             String   @id @default(uuid()) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
-  name           String   // e.g., 'Mumbai HQ', 'Bengaluru Branch'
+  name           String // e.g., 'Mumbai HQ', 'Bengaluru Branch'
   address        String?
   city           String?
   country        String?  @default("India")
@@ -393,27 +416,27 @@ model Employee {
   updatedAt DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user             User?
-  department       Department           @relation(fields: [departmentId], references: [id])
-  designation      Designation          @relation(fields: [designationId], references: [id])
-  grade            Grade?               @relation(fields: [gradeId], references: [id])
-  location         Location?            @relation(fields: [locationId], references: [id])
-  reportingManager Employee?            @relation("ManagerSubordinates", fields: [reportingManagerId], references: [id])
-  directReports    Employee[]           @relation("ManagerSubordinates")
-  jobHistories     EmployeeJobHistory[] @relation("EmployeeJobHistories")
-  jobHistoriesManaged EmployeeJobHistory[] @relation("JobHistoryManager")
-  documents        EmployeeDocument[]
-  shiftAssignments EmployeeShiftAssignment[]
-  leaveRequests    LeaveRequest[]
-  leaveTransactions LeaveTransaction[]
-  attendanceRecords AttendanceRecord[]
-  salaryStructures  SalaryStructure[]
-  payslips          Payslip[]
-  onboardingCandidatesManaged OnboardingCandidate[] @relation("CandidateReportingManager")
-  convertedFromCandidate     OnboardingCandidate?  @relation("CandidateConvertedEmployee")
-  exitRequests               ExitRequest[]
-  fnfSettlements             FnFSettlement[]
+  organization                Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                        User?
+  department                  Department                @relation(fields: [departmentId], references: [id])
+  designation                 Designation               @relation(fields: [designationId], references: [id])
+  grade                       Grade?                    @relation(fields: [gradeId], references: [id])
+  location                    Location?                 @relation(fields: [locationId], references: [id])
+  reportingManager            Employee?                 @relation("ManagerSubordinates", fields: [reportingManagerId], references: [id])
+  directReports               Employee[]                @relation("ManagerSubordinates")
+  jobHistories                EmployeeJobHistory[]      @relation("EmployeeJobHistories")
+  jobHistoriesManaged         EmployeeJobHistory[]      @relation("JobHistoryManager")
+  documents                   EmployeeDocument[]
+  shiftAssignments            EmployeeShiftAssignment[]
+  leaveRequests               LeaveRequest[]
+  leaveTransactions           LeaveTransaction[]
+  attendanceRecords           AttendanceRecord[]
+  salaryStructures            SalaryStructure[]
+  payslips                    Payslip[]
+  onboardingCandidatesManaged OnboardingCandidate[]     @relation("CandidateReportingManager")
+  convertedFromCandidate      OnboardingCandidate?      @relation("CandidateConvertedEmployee")
+  exitRequests                ExitRequest[]
+  fnfSettlements              FnFSettlement[]
 
   @@unique([organizationId, employeeCode])
   @@index([organizationId, deletedAt])
@@ -482,9 +505,9 @@ model Shift {
   id                      String   @id @default(uuid()) @db.Uuid
   organizationId          String   @map("organization_id") @db.Uuid
   name                    String
-  code                    String   // e.g. 'GEN', 'MORN', 'NGT'
+  code                    String // e.g. 'GEN', 'MORN', 'NGT'
   startTime               String   @map("start_time") // 'HH:mm' 24h format, e.g. '09:00'
-  endTime                 String   @map("end_time")   // 'HH:mm' 24h format, e.g. '18:00'
+  endTime                 String   @map("end_time") // 'HH:mm' 24h format, e.g. '18:00'
   isOvernight             Boolean  @default(false) @map("is_overnight")
   gracePeriodMinutes      Int      @default(15) @map("grace_period_minutes")
   breakDurationMinutes    Int      @default(60) @map("break_duration_minutes")
@@ -534,7 +557,7 @@ model LeaveType {
   id                 String                @id @default(uuid()) @db.Uuid
   organizationId     String                @map("organization_id") @db.Uuid
   name               String
-  code               String                // e.g. 'CL', 'SL', 'PL', 'LWP'
+  code               String // e.g. 'CL', 'SL', 'PL', 'LWP'
   description        String?
   isPaid             Boolean               @default(true) @map("is_paid")
   daysAllowedPerYear Decimal               @default(0.00) @map("days_allowed_per_year") @db.Decimal(5, 2)
@@ -698,7 +721,7 @@ model PayrollBatch {
   id                String             @id @default(uuid()) @db.Uuid
   organizationId    String             @map("organization_id") @db.Uuid
   year              Int
-  month             Int                // 1 - 12
+  month             Int // 1 - 12
   status            PayrollBatchStatus @default(DRAFT)
   totalEmployees    Int                @default(0) @map("total_employees")
   totalGrossPay     Decimal            @default(0.00) @map("total_gross_pay") @db.Decimal(12, 2)
@@ -722,34 +745,34 @@ model PayrollBatch {
 }
 
 model Payslip {
-  id                      String   @id @default(uuid()) @db.Uuid
-  organizationId          String   @map("organization_id") @db.Uuid
-  payrollBatchId          String   @map("payroll_batch_id") @db.Uuid
-  employeeId              String   @map("employee_id") @db.Uuid
-  salaryStructureId       String   @map("salary_structure_id") @db.Uuid
-  totalMonthDays          Int      @map("total_month_days")
-  payableDays             Decimal  @map("payable_days") @db.Decimal(5, 2)
-  lwpDays                 Decimal  @map("lwp_days") @db.Decimal(5, 2)
-  unexcusedAbsenceDays    Decimal  @map("unexcused_absence_days") @db.Decimal(5, 2)
+  id                   String  @id @default(uuid()) @db.Uuid
+  organizationId       String  @map("organization_id") @db.Uuid
+  payrollBatchId       String  @map("payroll_batch_id") @db.Uuid
+  employeeId           String  @map("employee_id") @db.Uuid
+  salaryStructureId    String  @map("salary_structure_id") @db.Uuid
+  totalMonthDays       Int     @map("total_month_days")
+  payableDays          Decimal @map("payable_days") @db.Decimal(5, 2)
+  lwpDays              Decimal @map("lwp_days") @db.Decimal(5, 2)
+  unexcusedAbsenceDays Decimal @map("unexcused_absence_days") @db.Decimal(5, 2)
 
-  nominalGross            Decimal  @map("nominal_gross") @db.Decimal(12, 2)
-  nominalBasic            Decimal  @map("nominal_basic") @db.Decimal(12, 2)
-  nominalHra              Decimal  @map("nominal_hra") @db.Decimal(12, 2)
-  nominalSpecialAllowance Decimal  @map("nominal_special_allowance") @db.Decimal(12, 2)
+  nominalGross            Decimal @map("nominal_gross") @db.Decimal(12, 2)
+  nominalBasic            Decimal @map("nominal_basic") @db.Decimal(12, 2)
+  nominalHra              Decimal @map("nominal_hra") @db.Decimal(12, 2)
+  nominalSpecialAllowance Decimal @map("nominal_special_allowance") @db.Decimal(12, 2)
 
-  earnedBasic             Decimal  @map("earned_basic") @db.Decimal(12, 2)
-  earnedHra               Decimal  @map("earned_hra") @db.Decimal(12, 2)
-  earnedSpecialAllowance  Decimal  @map("earned_special_allowance") @db.Decimal(12, 2)
-  earnedGross             Decimal  @map("earned_gross") @db.Decimal(12, 2)
+  earnedBasic            Decimal @map("earned_basic") @db.Decimal(12, 2)
+  earnedHra              Decimal @map("earned_hra") @db.Decimal(12, 2)
+  earnedSpecialAllowance Decimal @map("earned_special_allowance") @db.Decimal(12, 2)
+  earnedGross            Decimal @map("earned_gross") @db.Decimal(12, 2)
 
-  employeePf              Decimal  @map("employee_pf") @db.Decimal(12, 2)
-  professionalTax         Decimal  @map("professional_tax") @db.Decimal(12, 2)
-  totalDeductions         Decimal  @map("total_deductions") @db.Decimal(12, 2)
-  netPay                  Decimal  @map("net_pay") @db.Decimal(12, 2)
-  employerPf              Decimal  @map("employer_pf") @db.Decimal(12, 2)
+  employeePf      Decimal @map("employee_pf") @db.Decimal(12, 2)
+  professionalTax Decimal @map("professional_tax") @db.Decimal(12, 2)
+  totalDeductions Decimal @map("total_deductions") @db.Decimal(12, 2)
+  netPay          Decimal @map("net_pay") @db.Decimal(12, 2)
+  employerPf      Decimal @map("employer_pf") @db.Decimal(12, 2)
 
-  createdAt               DateTime @default(now()) @map("created_at")
-  updatedAt               DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   payrollBatch    PayrollBatch    @relation(fields: [payrollBatchId], references: [id], onDelete: Cascade)
@@ -766,44 +789,44 @@ model Payslip {
 // ---------------------------------------------------------------------------
 
 model OnboardingCandidate {
-  id                       String           @id @default(uuid()) @db.Uuid
-  organizationId           String           @map("organization_id") @db.Uuid
-  firstName                String           @map("first_name")
-  lastName                 String           @map("last_name")
-  personalEmail            String           @map("personal_email")
+  id                       String    @id @default(uuid()) @db.Uuid
+  organizationId           String    @map("organization_id") @db.Uuid
+  firstName                String    @map("first_name")
+  lastName                 String    @map("last_name")
+  personalEmail            String    @map("personal_email")
   phone                    String?
-  dateOfBirth              DateTime?        @map("date_of_birth")
+  dateOfBirth              DateTime? @map("date_of_birth")
   gender                   Gender?
-  currentAddress           String?          @map("current_address")
-  permanentAddress         String?          @map("permanent_address")
-  emergencyContactName     String?          @map("emergency_contact_name")
-  emergencyContactPhone    String?          @map("emergency_contact_phone")
-  emergencyContactRelation String?          @map("emergency_contact_relation")
+  currentAddress           String?   @map("current_address")
+  permanentAddress         String?   @map("permanent_address")
+  emergencyContactName     String?   @map("emergency_contact_name")
+  emergencyContactPhone    String?   @map("emergency_contact_phone")
+  emergencyContactRelation String?   @map("emergency_contact_relation")
 
   // Target Employment Details
-  departmentId             String           @map("department_id") @db.Uuid
-  designationId            String           @map("designation_id") @db.Uuid
-  gradeId                  String?          @map("grade_id") @db.Uuid
-  locationId               String?          @map("location_id") @db.Uuid
-  reportingManagerId       String?          @map("reporting_manager_id") @db.Uuid
-  proposedJoiningDate      DateTime         @map("proposed_joining_date")
-  offeredCtc               Decimal?         @map("offered_ctc") @db.Decimal(12, 2)
+  departmentId        String   @map("department_id") @db.Uuid
+  designationId       String   @map("designation_id") @db.Uuid
+  gradeId             String?  @map("grade_id") @db.Uuid
+  locationId          String?  @map("location_id") @db.Uuid
+  reportingManagerId  String?  @map("reporting_manager_id") @db.Uuid
+  proposedJoiningDate DateTime @map("proposed_joining_date")
+  offeredCtc          Decimal? @map("offered_ctc") @db.Decimal(12, 2)
 
   // Banking & Statutory Info (Submitted during pre-boarding)
-  bankName                 String?          @map("bank_name")
-  accountNumber            String?          @map("account_number")
-  ifscOrRouting            String?          @map("ifsc_or_routing")
-  panNumber                String?          @map("pan_number")
-  uanNumber                String?          @map("uan_number")
+  bankName      String? @map("bank_name")
+  accountNumber String? @map("account_number")
+  ifscOrRouting String? @map("ifsc_or_routing")
+  panNumber     String? @map("pan_number")
+  uanNumber     String? @map("uan_number")
 
   // State Tracking
-  status                   OnboardingStatus @default(INVITED)
-  convertedEmployeeId      String?          @unique @map("converted_employee_id") @db.Uuid
-  notes                    String?
-  invitedByUserId          String?          @map("invited_by_user_id") @db.Uuid
-  convertedAt              DateTime?        @map("converted_at")
-  createdAt                DateTime         @default(now()) @map("created_at")
-  updatedAt                DateTime         @updatedAt @map("updated_at")
+  status              OnboardingStatus @default(INVITED)
+  convertedEmployeeId String?          @unique @map("converted_employee_id") @db.Uuid
+  notes               String?
+  invitedByUserId     String?          @map("invited_by_user_id") @db.Uuid
+  convertedAt         DateTime?        @map("converted_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
 
   organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   department        Department       @relation(fields: [departmentId], references: [id])
@@ -845,29 +868,29 @@ model OnboardingTask {
 // ---------------------------------------------------------------------------
 
 model ExitRequest {
-  id                     String           @id @default(uuid()) @db.Uuid
-  organizationId         String           @map("organization_id") @db.Uuid
-  employeeId             String           @map("employee_id") @db.Uuid
-  exitType               ExitType         @default(RESIGNATION) @map("exit_type")
-  resignationDate        DateTime         @default(now()) @map("resignation_date")
+  id                     String     @id @default(uuid()) @db.Uuid
+  organizationId         String     @map("organization_id") @db.Uuid
+  employeeId             String     @map("employee_id") @db.Uuid
+  exitType               ExitType   @default(RESIGNATION) @map("exit_type")
+  resignationDate        DateTime   @default(now()) @map("resignation_date")
   reason                 String
-  noticePeriodDays       Int              @default(30) @map("notice_period_days")
-  proposedLastWorkingDay DateTime         @map("proposed_last_working_day")
-  approvedLastWorkingDay DateTime?        @map("approved_last_working_day")
-  status                 ExitStatus       @default(PENDING_APPROVAL)
+  noticePeriodDays       Int        @default(30) @map("notice_period_days")
+  proposedLastWorkingDay DateTime   @map("proposed_last_working_day")
+  approvedLastWorkingDay DateTime?  @map("approved_last_working_day")
+  status                 ExitStatus @default(PENDING_APPROVAL)
 
   // Dual Approval (Manager & HR)
-  managerApprovalStatus  ApprovalStatus   @default(PENDING) @map("manager_approval_status")
-  managerComments        String?          @map("manager_comments")
-  managerApprovedAt      DateTime?        @map("manager_approved_at")
-  hrApprovalStatus       ApprovalStatus   @default(PENDING) @map("hr_approval_status")
-  hrComments             String?          @map("hr_comments")
-  hrApprovedAt           DateTime?        @map("hr_approved_at")
+  managerApprovalStatus ApprovalStatus @default(PENDING) @map("manager_approval_status")
+  managerComments       String?        @map("manager_comments")
+  managerApprovedAt     DateTime?      @map("manager_approved_at")
+  hrApprovalStatus      ApprovalStatus @default(PENDING) @map("hr_approval_status")
+  hrComments            String?        @map("hr_comments")
+  hrApprovedAt          DateTime?      @map("hr_approved_at")
 
-  finalizedAt            DateTime?        @map("finalized_at")
-  finalizedByUserId      String?          @map("finalized_by_user_id") @db.Uuid
-  createdAt              DateTime         @default(now()) @map("created_at")
-  updatedAt              DateTime         @updatedAt @map("updated_at")
+  finalizedAt       DateTime? @map("finalized_at")
+  finalizedByUserId String?   @map("finalized_by_user_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   employee       Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -922,47 +945,47 @@ model ExitInterview {
 }
 
 model FnFSettlement {
-  id                     String    @id @default(uuid()) @db.Uuid
-  organizationId         String    @map("organization_id") @db.Uuid
-  exitRequestId          String    @unique @map("exit_request_id") @db.Uuid
-  employeeId             String    @map("employee_id") @db.Uuid
-  settlementDate         DateTime  @default(now()) @map("settlement_date")
-  lastWorkingDay         DateTime  @map("last_working_day")
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  exitRequestId  String   @unique @map("exit_request_id") @db.Uuid
+  employeeId     String   @map("employee_id") @db.Uuid
+  settlementDate DateTime @default(now()) @map("settlement_date")
+  lastWorkingDay DateTime @map("last_working_day")
 
   // Earnings in Final Wage Period
-  payableDays            Decimal   @map("payable_days") @db.Decimal(5, 2)
-  earnedBasic            Decimal   @map("earned_basic") @db.Decimal(12, 2)
-  earnedHra              Decimal   @map("earned_hra") @db.Decimal(12, 2)
-  earnedSpecialAllowance Decimal   @map("earned_special_allowance") @db.Decimal(12, 2)
-  earnedGross            Decimal   @map("earned_gross") @db.Decimal(12, 2)
+  payableDays            Decimal @map("payable_days") @db.Decimal(5, 2)
+  earnedBasic            Decimal @map("earned_basic") @db.Decimal(12, 2)
+  earnedHra              Decimal @map("earned_hra") @db.Decimal(12, 2)
+  earnedSpecialAllowance Decimal @map("earned_special_allowance") @db.Decimal(12, 2)
+  earnedGross            Decimal @map("earned_gross") @db.Decimal(12, 2)
 
   // Leave Encashment
-  encashableLeaveDays    Decimal   @map("encashable_leave_days") @db.Decimal(5, 2)
-  dailyBasicRate         Decimal   @map("daily_basic_rate") @db.Decimal(12, 2)
-  leaveEncashmentAmount  Decimal   @map("leave_encashment_amount") @db.Decimal(12, 2)
+  encashableLeaveDays   Decimal @map("encashable_leave_days") @db.Decimal(5, 2)
+  dailyBasicRate        Decimal @map("daily_basic_rate") @db.Decimal(12, 2)
+  leaveEncashmentAmount Decimal @map("leave_encashment_amount") @db.Decimal(12, 2)
 
   // Additional Additions
-  gratuityAmount         Decimal   @default(0) @map("gratuity_amount") @db.Decimal(12, 2)
-  bonusAmount            Decimal   @default(0) @map("bonus_amount") @db.Decimal(12, 2)
-  totalAdditions         Decimal   @map("total_additions") @db.Decimal(12, 2)
+  gratuityAmount Decimal @default(0) @map("gratuity_amount") @db.Decimal(12, 2)
+  bonusAmount    Decimal @default(0) @map("bonus_amount") @db.Decimal(12, 2)
+  totalAdditions Decimal @map("total_additions") @db.Decimal(12, 2)
 
   // Deductions
-  noticeShortfallDays    Int       @default(0) @map("notice_shortfall_days")
-  noticeDeductionAmount  Decimal   @default(0) @map("notice_deduction_amount") @db.Decimal(12, 2)
-  employeePf             Decimal   @default(0) @map("employee_pf") @db.Decimal(12, 2)
-  professionalTax        Decimal   @default(0) @map("professional_tax") @db.Decimal(12, 2)
-  otherDeductions        Decimal   @default(0) @map("other_deductions") @db.Decimal(12, 2)
-  otherDeductionsRemarks String?   @map("other_deductions_remarks")
-  totalDeductions        Decimal   @map("total_deductions") @db.Decimal(12, 2)
+  noticeShortfallDays    Int     @default(0) @map("notice_shortfall_days")
+  noticeDeductionAmount  Decimal @default(0) @map("notice_deduction_amount") @db.Decimal(12, 2)
+  employeePf             Decimal @default(0) @map("employee_pf") @db.Decimal(12, 2)
+  professionalTax        Decimal @default(0) @map("professional_tax") @db.Decimal(12, 2)
+  otherDeductions        Decimal @default(0) @map("other_deductions") @db.Decimal(12, 2)
+  otherDeductionsRemarks String? @map("other_deductions_remarks")
+  totalDeductions        Decimal @map("total_deductions") @db.Decimal(12, 2)
 
   // Final Net Settlement
-  netSettlementAmount    Decimal   @map("net_settlement_amount") @db.Decimal(12, 2)
-  status                 FnFStatus @default(DRAFT)
-  approvedByUserId       String?   @map("approved_by_user_id") @db.Uuid
-  approvedAt             DateTime? @map("approved_at")
-  remarks                String?
-  createdAt              DateTime  @default(now()) @map("created_at")
-  updatedAt              DateTime  @updatedAt @map("updated_at")
+  netSettlementAmount Decimal   @map("net_settlement_amount") @db.Decimal(12, 2)
+  status              FnFStatus @default(DRAFT)
+  approvedByUserId    String?   @map("approved_by_user_id") @db.Uuid
+  approvedAt          DateTime? @map("approved_at")
+  remarks             String?
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   exitRequest  ExitRequest  @relation(fields: [exitRequestId], references: [id], onDelete: Cascade)
@@ -971,3 +994,53 @@ model FnFSettlement {
   @@map("fnf_settlements")
 }
 
+// ---------------------------------------------------------------------------
+// 12. Notification Engine & Announcements (Module 11)
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id              String           @id @default(uuid()) @db.Uuid
+  organizationId  String           @map("organization_id") @db.Uuid
+  recipientUserId String           @map("recipient_user_id") @db.Uuid
+  senderUserId    String?          @map("sender_user_id") @db.Uuid
+  type            NotificationType
+  title           String
+  message         String
+  actionUrl       String?          @map("action_url")
+  metadata        Json?
+  isRead          Boolean          @default(false) @map("is_read")
+  readAt          DateTime?        @map("read_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recipientUser User         @relation("ReceivedNotifications", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  senderUser    User?        @relation("SentNotifications", fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, recipientUserId, isRead])
+  @@index([organizationId, recipientUserId, createdAt])
+  @@map("notifications")
+}
+
+model Announcement {
+  id                 String               @id @default(uuid()) @db.Uuid
+  organizationId     String               @map("organization_id") @db.Uuid
+  title              String
+  content            String
+  priority           AnnouncementPriority @default(NORMAL)
+  targetDepartmentId String?              @map("target_department_id") @db.Uuid
+  createdByUserId    String               @map("created_by_user_id") @db.Uuid
+  isActive           Boolean              @default(true) @map("is_active")
+  expiresAt          DateTime?            @map("expires_at")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  // Relations
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy        User         @relation("CreatedAnnouncements", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  targetDepartment Department?  @relation(fields: [targetDepartmentId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, isActive, createdAt])
+  @@index([organizationId, targetDepartmentId])
+  @@map("announcements")
+}

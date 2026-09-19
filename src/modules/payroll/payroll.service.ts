@@ -3,10 +3,12 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { PayrollBatchStatus, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
+import { NotificationEventBusService } from '../notifications/notification-event-bus.service';
 import { SetSalaryStructureDto } from './dto/set-salary-structure.dto';
 import { UpdatePayrollConfigDto } from './dto/update-payroll-config.dto';
 import { CalculatePayrollBatchDto } from './dto/calculate-payroll-batch.dto';
@@ -18,6 +20,7 @@ export class PayrollService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly attendanceService: AttendanceService,
+    @Optional() private readonly eventBus?: NotificationEventBusService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -536,7 +539,7 @@ export class PayrollService {
       );
     }
 
-    return this.prisma.payrollBatch.update({
+    const updatedBatch = await this.prisma.payrollBatch.update({
       where: { id: batchId },
       data: {
         status: PayrollBatchStatus.DISBURSED,
@@ -545,6 +548,38 @@ export class PayrollService {
         paymentReference: dto.paymentReference,
       },
     });
+
+    if (this.eventBus) {
+      try {
+        const payslips = await this.prisma.payslip.findMany({
+          where: { batchId, organizationId },
+          include: {
+            employee: {
+              include: {
+                user: { select: { id: true } },
+              },
+            },
+          },
+        });
+
+        for (const ps of payslips) {
+          if (ps.employee?.user?.id) {
+            this.eventBus.emitPayslipReleased({
+              organizationId,
+              recipientUserId: ps.employee.user.id,
+              payslipId: ps.id,
+              month: batch.month,
+              year: batch.year,
+              netPayable: Number(ps.netPay),
+            });
+          }
+        }
+      } catch {
+        // ignore notification dispatch failure in batch
+      }
+    }
+
+    return updatedBatch;
   }
 
   // ---------------------------------------------------------------------------
