@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
+import { Modal } from './Modal';
 
 export function PayrollPage({ user }: { user: any }) {
   const [config, setConfig] = useState<any>(null);
@@ -386,141 +387,152 @@ export function PayrollPage({ user }: { user: any }) {
 
       {/* Set Salary Structure Modal */}
       {showSalaryModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-        }}>
-          <div className="card" style={{ width: '500px', maxWidth: '90%' }}>
-            <h3 style={{ marginBottom: '14px' }}>💵 Set / Revise Salary Structure</h3>
-            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
-              Append-Only Ledger (Rule #4): Updates close previous active row with <code>effectiveTo</code> and creates a new active version.
-            </p>
+        <Modal onClose={() => setShowSalaryModal(false)}>
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: 1000, padding: '20px', boxSizing: 'border-box',
+          }}>
+            <div className="card" style={{ width: '500px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
 
-            <form onSubmit={handleSetSalary} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600 }}>Employee</label>
-                <select
-                  value={salEmpId}
-                  onChange={(e) => setSalEmpId(e.target.value)}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
-                >
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.employeeCode} — {emp.firstName} {emp.lastName}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <h3 style={{ marginBottom: '14px' }}>💵 Set / Revise Salary Structure</h3>
+              <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
+                Append-Only Ledger (Rule #4): Updates close previous active row with <code>effectiveTo</code> and creates a new active version.
+              </p>
 
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600 }}>Annual CTC (INR)</label>
-                <input
-                  type="number"
-                  value={salAnnualCtc}
-                  onChange={(e) => setSalAnnualCtc(Number(e.target.value))}
-                  step="1000"
-                  required
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
-                />
-              </div>
-
-              {/* Automatic Statutory Breakdown Preview */}
-              <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', fontSize: '12px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontWeight: 700, marginBottom: '6px' }}>Monthly Breakdown Preview:</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Monthly Gross:</span> <strong>₹{monthlyGrossPreview}</strong>
+              <form onSubmit={handleSetSalary} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Employee</label>
+                  <select
+                    value={salEmpId}
+                    onChange={(e) => setSalEmpId(e.target.value)}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                  >
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.employeeCode} — {emp.firstName} {emp.lastName}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Basic (50%):</span> <strong>₹{basicPreview}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>HRA (25%):</span> <strong>₹{hraPreview}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Special Allowance (25%):</span> <strong>₹{splPreview}</strong>
-                </div>
-              </div>
 
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600 }}>Effective From Date</label>
-                <input
-                  type="date"
-                  value={salEffectiveFrom}
-                  onChange={(e) => setSalEffectiveFrom(e.target.value)}
-                  required
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
-                />
-              </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Annual CTC (INR)</label>
+                  <input
+                    type="number"
+                    value={salAnnualCtc}
+                    onChange={(e) => setSalAnnualCtc(Number(e.target.value))}
+                    step="1000"
+                    required
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                  />
+                </div>
 
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600 }}>Revision Reason</label>
-                <input
-                  type="text"
-                  value={salReason}
-                  onChange={(e) => setSalReason(e.target.value)}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
-                />
-              </div>
+                {/* Automatic Statutory Breakdown Preview */}
+                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', fontSize: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontWeight: 700, marginBottom: '6px' }}>Monthly Breakdown Preview:</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Monthly Gross:</span> <strong>₹{monthlyGrossPreview}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Basic (50%):</span> <strong>₹{basicPreview}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>HRA (25%):</span> <strong>₹{hraPreview}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Special Allowance (25%):</span> <strong>₹{splPreview}</strong>
+                  </div>
+                </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowSalaryModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={salSubmitting}>
-                  {salSubmitting ? 'Saving...' : 'Save Structure'}
-                </button>
-              </div>
-            </form>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Effective From Date</label>
+                  <input
+                    type="date"
+                    value={salEffectiveFrom}
+                    onChange={(e) => setSalEffectiveFrom(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Revision Reason</label>
+                  <input
+                    type="text"
+                    value={salReason}
+                    onChange={(e) => setSalReason(e.target.value)}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                  />
+                </div>
+
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowSalaryModal(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={salSubmitting}>
+                    {salSubmitting ? 'Saving...' : 'Save Structure'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Disburse Batch Modal */}
       {showDisburseModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-        }}>
-          <div className="card" style={{ width: '450px', maxWidth: '90%' }}>
-            <h3 style={{ marginBottom: '14px' }}>💳 Disburse Payroll Batch</h3>
-            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
-              Confirm corporate bank disbursal and record the transaction reference identifier.
-            </p>
+        <Modal onClose={() => setShowDisburseModal(false)}>
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: 1000, padding: '20px', boxSizing: 'border-box',
+          }}>
+            <div className="card" style={{ width: '450px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+              <h3 style={{ marginBottom: '14px' }}>💳 Disburse Payroll Batch</h3>
+              <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
+                Confirm corporate bank disbursal and record the transaction reference identifier.
+              </p>
 
-            <form onSubmit={handleDisburseBatch} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600 }}>Payment Reference (UTR / Batch Ref)</label>
-                <input
-                  type="text"
-                  value={paymentRef}
-                  onChange={(e) => setPaymentRef(e.target.value)}
-                  required
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
-                />
-              </div>
+              <form onSubmit={handleDisburseBatch} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Payment Reference (UTR / Batch Ref)</label>
+                  <input
+                    type="text"
+                    value={paymentRef}
+                    onChange={(e) => setPaymentRef(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                  />
+                </div>
 
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600 }}>Disbursal Notes</label>
-                <input
-                  type="text"
-                  value={disburseNotes}
-                  onChange={(e) => setDisburseNotes(e.target.value)}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
-                />
-              </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Disbursal Notes</label>
+                  <input
+                    type="text"
+                    value={disburseNotes}
+                    onChange={(e) => setDisburseNotes(e.target.value)}
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                  />
+                </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowDisburseModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={disburseLoading} style={{ background: '#16a34a' }}>
-                  {disburseLoading ? 'Disbursing...' : 'Confirm Disbursal'}
-                </button>
-              </div>
-            </form>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowDisburseModal(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={disburseLoading} style={{ background: '#16a34a' }}>
+                    {disburseLoading ? 'Disbursing...' : 'Confirm Disbursal'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
+
     </div>
   );
 }

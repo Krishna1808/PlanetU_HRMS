@@ -5,6 +5,7 @@ import {
   CreateDepartmentDto,
   SetDepartmentHeadDto,
   CreateDesignationDto,
+  UpdateDesignationDto,
   CreateGradeDto,
   CreateLocationDto,
 } from './dto/masters.dto';
@@ -69,6 +70,16 @@ export class MastersController {
     @Body() dto: CreateDesignationDto,
   ) {
     return this.mastersService.createDesignation(user.organizationId, dto);
+  }
+
+  @Patch('designations/:id')
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  async updateDesignation(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateDesignationDto,
+  ) {
+    return this.mastersService.updateDesignation(user.organizationId, id, dto);
   }
 
   // Grades

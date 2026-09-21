@@ -255,7 +255,13 @@ export const LoginPage: React.FC<Props> = ({ onLoginSuccess }) => {
                 style={{ width: '100%', padding: '10px', fontSize: '14px', fontWeight: 700, marginTop: '6px' }}
                 disabled={loading}
               >
-                {loading ? 'Signing in...' : `Sign In as ${selectedRole}`}
+                {loading ? (
+                  <>
+                    <span className="spinner" /> Signing in...
+                  </>
+                ) : (
+                  `Sign In as ${selectedRole}`
+                )}
               </button>
             </form>
 

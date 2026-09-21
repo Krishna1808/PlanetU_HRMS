@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
+import { Modal } from './Modal';
 
 export function EssDashboardPage() {
   const [data, setData] = useState<any>(null);
@@ -426,19 +427,25 @@ export function EssDashboardPage() {
 
       {/* 6. Self-Profile Edit Modal (FR-EMP-006) */}
       {showEditModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000,
-        }}>
-          <div className="card" style={{ width: '500px', maxWidth: '90%' }}>
+        <Modal onClose={() => setShowEditModal(false)}>
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+            padding: '20px',
+            boxSizing: 'border-box',
+          }}>
+            <div className="card" style={{ width: '500px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+
+
             <h3 style={{ marginBottom: '12px' }}>✏️ Update Contact & Emergency Info</h3>
             <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
               Per FR-EMP-006, employees may self-update low-risk personal contact details. Designation, salary, and statutory fields require HR Admin.
@@ -525,24 +532,30 @@ export function EssDashboardPage() {
               </div>
             </form>
           </div>
-        </div>
+          </div>
+        </Modal>
       )}
 
       {/* Apply Leave Modal */}
       {showApplyModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            backdropFilter: 'blur(2px)',
-          }}
-        >
-          <div className="card" style={{ width: '480px', maxWidth: '92vw' }}>
+        <Modal onClose={() => setShowApplyModal(false)}>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              backdropFilter: 'blur(4px)',
+              padding: '20px',
+              boxSizing: 'border-box',
+            }}
+          >
+            <div className="card" style={{ width: '480px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: 700 }}>🌴 Apply for Leave</h3>
               <button
@@ -657,8 +670,10 @@ export function EssDashboardPage() {
               </div>
             </form>
           </div>
-        </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
+
 }

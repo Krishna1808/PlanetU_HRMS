@@ -160,8 +160,53 @@ export default function App() {
 
   if (checkingAuth) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: '#64748b' }}>
-        Loading PlanetU HRMS...
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+          color: '#f8fafc',
+          gap: '16px',
+        }}
+      >
+        <div
+          style={{
+            width: '68px',
+            height: '68px',
+            borderRadius: '18px',
+            background: 'rgba(56, 189, 248, 0.1)',
+            border: '1px solid rgba(56, 189, 248, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '34px',
+            boxShadow: '0 0 35px rgba(56, 189, 248, 0.2)',
+            animation: 'pulseGlow 2s infinite ease-in-out',
+          }}
+        >
+          🪐
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: '18px', color: '#38bdf8', letterSpacing: '-0.02em' }}>
+            PlanetU HRMS
+          </div>
+          <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>
+            Initializing Workspace...
+          </div>
+        </div>
+        <div style={{ width: '130px', height: '3px', background: '#334155', borderRadius: '999px', overflow: 'hidden', marginTop: '6px' }}>
+          <div
+            className="skeleton"
+            style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(90deg, #38bdf8 0%, #818cf8 50%, #38bdf8 100%)',
+            }}
+          />
+        </div>
       </div>
     );
   }
@@ -479,35 +524,66 @@ export default function App() {
             {/* Module 11 Notification Bell with Live Unread Counter */}
             <NotificationBell user={user} onNavigateTab={(tab) => setActiveTab(tab as MainTab)} />
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid #334155', paddingLeft: '14px' }}>
-              <span style={{ fontSize: '13px', color: '#cbd5e1' }}>{user.email}</span>
-              <span
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderLeft: '1px solid #334155', paddingLeft: '16px' }}>
+              <div
                 style={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  padding: '2px 8px',
-                  borderRadius: '999px',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
                   background:
                     user.role === 'CLIENT_SUPER_ADMIN'
-                      ? '#7c3aed'
+                      ? 'linear-gradient(135deg, #7c3aed, #a855f7)'
                       : user.role === 'HR_ADMIN'
-                      ? '#059669'
+                      ? 'linear-gradient(135deg, #059669, #10b981)'
                       : user.role === 'FINANCE'
-                      ? '#d97706'
-                      : '#2563eb',
+                      ? 'linear-gradient(135deg, #d97706, #f59e0b)'
+                      : user.role === 'MANAGER'
+                      ? 'linear-gradient(135deg, #2563eb, #3b82f6)'
+                      : 'linear-gradient(135deg, #0284c7, #38bdf8)',
                   color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                  flexShrink: 0,
                 }}
+                title={user.email}
               >
-                {user.role}
-              </span>
+                {user.email?.slice(0, 2).toUpperCase() || 'U'}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
+                  {user.email}
+                </span>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color:
+                      user.role === 'CLIENT_SUPER_ADMIN'
+                        ? '#c4b5fd'
+                        : user.role === 'HR_ADMIN'
+                        ? '#6ee7b7'
+                        : user.role === 'FINANCE'
+                        ? '#fde68a'
+                        : '#93c5fd',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  {user.role}
+                </span>
+              </div>
               <button
                 className="btn btn-secondary"
                 style={{
-                  padding: '4px 10px',
+                  padding: '5px 12px',
                   fontSize: '12px',
-                  background: '#334155',
-                  color: '#f8fafc',
-                  borderColor: '#475569',
+                  background: '#1e293b',
+                  color: '#cbd5e1',
+                  borderColor: '#334155',
+                  marginLeft: '4px',
                 }}
                 onClick={handleLogout}
               >
@@ -519,7 +595,7 @@ export default function App() {
 
         {/* Main Content Area */}
         <main style={{ flex: 1, padding: '24px 28px', overflowY: 'auto' }}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+          <div key={activeTab} className="tab-page-enter" style={{ maxWidth: '1240px', margin: '0 auto' }}>
             {activeTab === 'ess' && <EssDashboardPage />}
 
             {activeTab === 'organization' && <OrganizationMastersPage />}
@@ -527,7 +603,7 @@ export default function App() {
             {activeTab === 'onboarding' && <OnboardingPage user={user} />}
 
             {activeTab === 'employees' && (
-              <div>
+              <div key={employeeSubView} className="tab-page-enter">
                 {employeeSubView === 'list' && (
                   <EmployeeListPage
                     onSelectEmployee={(id) => {

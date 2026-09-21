@@ -3,8 +3,9 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
-import { Prisma, Role, EmploymentStatus } from '@prisma/client';
+import { Prisma, Role, EmploymentStatus, NotificationType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EmployeeSequenceService } from './employee-sequence.service';
@@ -13,6 +14,8 @@ import { CreateEmployeeDto } from '../dto/create-employee.dto';
 import { UpdateEmployeeDto } from '../dto/update-employee.dto';
 import { QueryEmployeeDto } from '../dto/query-employee.dto';
 import { CreateEmployeeDocumentDto } from '../dto/create-document.dto';
+import { TerminateEmployeeDto } from '../dto/terminate-employee.dto';
+import { NotificationService } from '../../notifications/notification.service';
 import { AuthenticatedUser } from '../../../common/types/authenticated-user.interface';
 
 @Injectable()
@@ -21,6 +24,7 @@ export class EmployeeService {
     private readonly prisma: PrismaService,
     private readonly sequenceService: EmployeeSequenceService,
     private readonly rbacService: EmployeeRbacService,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   /**
@@ -168,11 +172,14 @@ export class EmployeeService {
     employeeId: string,
     viewer: AuthenticatedUser,
   ) {
+    const isHrOrAdmin =
+      viewer.role === Role.CLIENT_SUPER_ADMIN || viewer.role === Role.HR_ADMIN;
+
     const employee = await this.prisma.employee.findFirst({
       where: {
         id: employeeId,
         organizationId,
-        deletedAt: null,
+        ...(isHrOrAdmin ? {} : { deletedAt: null }),
       },
       include: {
         department: { select: { id: true, name: true, codePrefix: true } },
@@ -320,24 +327,125 @@ export class EmployeeService {
   }
 
   /**
-   * FR-EMP-007: Soft-delete employee on termination/exit — never hard-delete
+   * FR-EMP-007: Soft-delete employee on termination / issue termination notice
    */
   async softDeleteEmployee(
     organizationId: string,
     employeeId: string,
     viewer: AuthenticatedUser,
+    dtoOrReason?: TerminateEmployeeDto | { reason?: string; noticePeriodDays?: number; terminationDate?: string } | string,
   ) {
+    if (viewer.employeeId === employeeId) {
+      throw new BadRequestException('You cannot terminate your own employee account');
+    }
+
     const employee = await this.prisma.employee.findFirst({
       where: { id: employeeId, organizationId, deletedAt: null },
+      include: {
+        user: { select: { id: true, email: true, role: true } },
+      },
     });
 
-    if (!employee) {
+    if (!employee || employee.employmentStatus === EmploymentStatus.TERMINATED) {
       throw new NotFoundException('Employee not found or already deactivated');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const now = new Date();
+    if (
+      viewer.role === Role.HR_ADMIN &&
+      employee.user?.role === Role.CLIENT_SUPER_ADMIN
+    ) {
+      throw new ForbiddenException('HR Admin cannot terminate a Client Super Admin');
+    }
 
+    // Parse DTO or reason string
+    let noticePeriodDays = 0;
+    let reason = 'Involuntary Termination / Notice Issued';
+    let requestedDate: Date | null = null;
+
+    if (typeof dtoOrReason === 'string') {
+      reason = dtoOrReason.trim() || reason;
+      noticePeriodDays = 0;
+    } else if (dtoOrReason && typeof dtoOrReason === 'object') {
+      if (dtoOrReason.reason) {
+        reason = dtoOrReason.reason.trim();
+      }
+      if (dtoOrReason.noticePeriodDays !== undefined) {
+        noticePeriodDays = Math.max(0, Number(dtoOrReason.noticePeriodDays));
+      }
+      if (dtoOrReason.terminationDate) {
+        const parsed = new Date(dtoOrReason.terminationDate);
+        if (!isNaN(parsed.getTime())) {
+          requestedDate = parsed;
+        }
+      }
+    }
+
+    const now = new Date();
+
+    if (noticePeriodDays > 0) {
+      // Notice Period flow: set scheduled last working day and mark as NOTICE_PERIOD
+      const exitDate =
+        requestedDate || new Date(now.getTime() + noticePeriodDays * 24 * 60 * 60 * 1000);
+      const exitDateFormatted = exitDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const empUpdated = await tx.employee.update({
+          where: { id: employeeId },
+          data: {
+            employmentStatus: EmploymentStatus.NOTICE_PERIOD,
+            dateOfExit: exitDate,
+          },
+        });
+
+        // Update active job history ledger row with termination notice details
+        await tx.employeeJobHistory.updateMany({
+          where: { organizationId, employeeId, effectiveTo: null },
+          data: {
+            reason: `Termination Notice: ${reason} (Notice Period: ${noticePeriodDays} days, Last Working Day: ${exitDate.toISOString().split('T')[0]})`,
+            changedByUserId: viewer.id,
+          },
+        });
+
+        return empUpdated;
+      });
+
+      // Dispatch in-app notification to employee
+      if (this.notificationService && employee.user?.id) {
+        try {
+          await this.notificationService.createNotification(organizationId, {
+            recipientUserId: employee.user.id,
+            senderUserId: viewer.id,
+            type: NotificationType.SYSTEM,
+            title: 'Official Termination Notice Issued',
+            message: `You have been served an official termination notice with a notice period of ${noticePeriodDays} day(s). Your scheduled last working day is ${exitDateFormatted}. Reason: ${reason}`,
+            actionUrl: '/profile',
+            metadata: {
+              employeeId,
+              noticePeriodDays,
+              dateOfExit: exitDate.toISOString(),
+              reason,
+            },
+          });
+        } catch {
+          // Keep operation resilient even if notification service has error
+        }
+      }
+
+      return {
+        message: `Termination notice issued for employee ${updated.employeeCode}. Notice period: ${noticePeriodDays} days (Last Working Day: ${exitDateFormatted}). Notification sent to employee.`,
+        employeeId: updated.id,
+        employmentStatus: EmploymentStatus.NOTICE_PERIOD,
+        dateOfExit: exitDate,
+        noticePeriodDays,
+      };
+    }
+
+    // Immediate Termination flow (noticePeriodDays === 0)
+    const result = await this.prisma.$transaction(async (tx) => {
       // Soft delete employee
       const deactivated = await tx.employee.update({
         where: { id: employeeId },
@@ -359,17 +467,42 @@ export class EmployeeService {
         where: { organizationId, employeeId, effectiveTo: null },
         data: {
           effectiveTo: now,
-          reason: 'Employee Deactivated / Terminated',
+          reason: `Employee Deactivated / Terminated (Immediate): ${reason}`,
           changedByUserId: viewer.id,
         },
       });
 
-      return {
-        message: `Employee ${deactivated.employeeCode} successfully deactivated`,
-        employeeId: deactivated.id,
-        deactivatedAt: now,
-      };
+      return deactivated;
     });
+
+    // Dispatch immediate termination notification if user existed
+    if (this.notificationService && employee.user?.id) {
+      try {
+        await this.notificationService.createNotification(organizationId, {
+          recipientUserId: employee.user.id,
+          senderUserId: viewer.id,
+          type: NotificationType.SYSTEM,
+          title: 'Employment Terminated Immediately',
+          message: `Your employment has been terminated effective immediately. Reason: ${reason}`,
+          actionUrl: '/profile',
+          metadata: {
+            employeeId,
+            noticePeriodDays: 0,
+            dateOfExit: now.toISOString(),
+            reason,
+          },
+        });
+      } catch {
+        // Safe swallow
+      }
+    }
+
+    return {
+      message: `Employee ${result.employeeCode} successfully deactivated`,
+      employeeId: result.id,
+      deactivatedAt: now,
+      employmentStatus: EmploymentStatus.TERMINATED,
+    };
   }
 
   /**
@@ -386,7 +519,7 @@ export class EmployeeService {
 
     const where: Prisma.EmployeeWhereInput = {
       organizationId,
-      deletedAt: null, // Active employees only
+      ...(query.status === EmploymentStatus.TERMINATED ? {} : { deletedAt: null }),
     };
 
     if (query.departmentId) where.departmentId = query.departmentId;

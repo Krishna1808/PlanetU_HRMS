@@ -17,6 +17,7 @@ import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { QueryEmployeeDto } from './dto/query-employee.dto';
 import { CreateEmployeeDocumentDto } from './dto/create-document.dto';
+import { TerminateEmployeeDto } from './dto/terminate-employee.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -91,6 +92,21 @@ export class EmployeesController {
   }
 
   /**
+   * POST /api/v1/employees/:id/terminate
+   * Issue termination notice with notice period days (HR_ADMIN and CLIENT_SUPER_ADMIN only)
+   */
+  @Post(':id/terminate')
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async terminateEmployee(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: TerminateEmployeeDto,
+  ) {
+    return this.employeeService.softDeleteEmployee(user.organizationId, id, user, dto);
+  }
+
+  /**
    * DELETE /api/v1/employees/:id
    * Soft-delete on exit / termination (HR_ADMIN and CLIENT_SUPER_ADMIN only)
    */
@@ -100,8 +116,9 @@ export class EmployeesController {
   async softDeleteEmployee(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
+    @Body() body?: TerminateEmployeeDto,
   ) {
-    return this.employeeService.softDeleteEmployee(user.organizationId, id, user);
+    return this.employeeService.softDeleteEmployee(user.organizationId, id, user, body);
   }
 
   /**

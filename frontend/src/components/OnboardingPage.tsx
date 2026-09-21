@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
+import { Modal } from './Modal';
 
 interface OnboardingPageProps {
   user?: any;
@@ -428,173 +429,183 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
 
       {/* Invite Candidate Modal */}
       {showInviteModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-        }}>
-          <div className="card" style={{ width: '560px', maxWidth: '92%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3 style={{ marginBottom: '16px' }}>Invite Candidate for Onboarding</h3>
-            <form onSubmit={handleInviteSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>First Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={inviteForm.firstName}
-                    onChange={(e) => setInviteForm({ ...inviteForm, firstName: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Last Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={inviteForm.lastName}
-                    onChange={(e) => setInviteForm({ ...inviteForm, lastName: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
+        <Modal onClose={() => setShowInviteModal(false)}>
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: 1000, padding: '20px', boxSizing: 'border-box',
+          }}>
+            <div className="card" style={{ width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Personal Email *</label>
-                  <input
-                    type="email"
-                    required
-                    value={inviteForm.personalEmail}
-                    onChange={(e) => setInviteForm({ ...inviteForm, personalEmail: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
+              <h3 style={{ marginBottom: '16px' }}>Invite Candidate for Onboarding</h3>
+              <form onSubmit={handleInviteSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>First Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={inviteForm.firstName}
+                      onChange={(e) => setInviteForm({ ...inviteForm, firstName: e.target.value })}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Last Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={inviteForm.lastName}
+                      onChange={(e) => setInviteForm({ ...inviteForm, lastName: e.target.value })}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Phone Number</label>
-                  <input
-                    type="text"
-                    value={inviteForm.phone}
-                    onChange={(e) => setInviteForm({ ...inviteForm, phone: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Personal Email *</label>
+                    <input
+                      type="email"
+                      required
+                      value={inviteForm.personalEmail}
+                      onChange={(e) => setInviteForm({ ...inviteForm, personalEmail: e.target.value })}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Phone Number</label>
+                    <input
+                      type="text"
+                      value={inviteForm.phone}
+                      onChange={(e) => setInviteForm({ ...inviteForm, phone: e.target.value })}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Target Department *</label>
+                    <select
+                      value={inviteForm.departmentId}
+                      onChange={(e) => setInviteForm({ ...inviteForm, departmentId: e.target.value })}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    >
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name} ({d.codePrefix})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Target Designation *</label>
+                    <select
+                      value={inviteForm.designationId}
+                      onChange={(e) => setInviteForm({ ...inviteForm, designationId: e.target.value })}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    >
+                      {designations.map((des) => (
+                        <option key={des.id} value={des.id}>{des.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Grade (Optional)</label>
+                    <select
+                      value={inviteForm.gradeId}
+                      onChange={(e) => setInviteForm({ ...inviteForm, gradeId: e.target.value })}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    >
+                      <option value="">No Grade</option>
+                      {grades.map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Location (Optional)</label>
+                    <select
+                      value={inviteForm.locationId}
+                      onChange={(e) => setInviteForm({ ...inviteForm, locationId: e.target.value })}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    >
+                      <option value="">No Location</option>
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>{loc.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Proposed Joining Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={inviteForm.proposedJoiningDate}
+                      onChange={(e) => setInviteForm({ ...inviteForm, proposedJoiningDate: e.target.value })}
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Offered Annual CTC (₹)</label>
+                    <input
+                      type="number"
+                      value={inviteForm.offeredCtc}
+                      onChange={(e) => setInviteForm({ ...inviteForm, offeredCtc: e.target.value })}
+                      placeholder="e.g. 600000"
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Target Department *</label>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Reporting Manager</label>
                   <select
-                    value={inviteForm.departmentId}
-                    onChange={(e) => setInviteForm({ ...inviteForm, departmentId: e.target.value })}
+                    value={inviteForm.reportingManagerId}
+                    onChange={(e) => setInviteForm({ ...inviteForm, reportingManagerId: e.target.value })}
                     style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
                   >
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name} ({d.codePrefix})</option>
+                    <option value="">None / Self-Managed</option>
+                    {managers.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.employeeCode} — {m.firstName} {m.lastName}
+                      </option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Target Designation *</label>
-                  <select
-                    value={inviteForm.designationId}
-                    onChange={(e) => setInviteForm({ ...inviteForm, designationId: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  >
-                    {designations.map((des) => (
-                      <option key={des.id} value={des.id}>{des.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Grade (Optional)</label>
-                  <select
-                    value={inviteForm.gradeId}
-                    onChange={(e) => setInviteForm({ ...inviteForm, gradeId: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  >
-                    <option value="">No Grade</option>
-                    {grades.map((g) => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
-                  </select>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowInviteModal(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    {submitting ? 'Sending Invitation...' : 'Send Onboarding Invitation'}
+                  </button>
                 </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Location (Optional)</label>
-                  <select
-                    value={inviteForm.locationId}
-                    onChange={(e) => setInviteForm({ ...inviteForm, locationId: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  >
-                    <option value="">No Location</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>{loc.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Proposed Joining Date *</label>
-                  <input
-                    type="date"
-                    required
-                    value={inviteForm.proposedJoiningDate}
-                    onChange={(e) => setInviteForm({ ...inviteForm, proposedJoiningDate: e.target.value })}
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Offered Annual CTC (₹)</label>
-                  <input
-                    type="number"
-                    value={inviteForm.offeredCtc}
-                    onChange={(e) => setInviteForm({ ...inviteForm, offeredCtc: e.target.value })}
-                    placeholder="e.g. 600000"
-                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600 }}>Reporting Manager</label>
-                <select
-                  value={inviteForm.reportingManagerId}
-                  onChange={(e) => setInviteForm({ ...inviteForm, reportingManagerId: e.target.value })}
-                  style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-                >
-                  <option value="">None / Self-Managed</option>
-                  {managers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.employeeCode} — {m.firstName} {m.lastName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowInviteModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? 'Sending Invitation...' : 'Send Onboarding Invitation'}
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
+        </Modal>
       )}
+
 
       {/* Candidate Details & Checklist Inspector Modal */}
       {showDetailsModal && selectedCandidate && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-        }}>
-          <div className="card" style={{ width: '640px', maxWidth: '92%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <Modal onClose={() => setShowDetailsModal(false)}>
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: 1000, padding: '20px', boxSizing: 'border-box',
+          }}>
+            <div className="card" style={{ width: '640px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
               <div>
                 <h3 style={{ margin: 0 }}>{selectedCandidate.firstName} {selectedCandidate.lastName}</h3>
@@ -688,16 +699,21 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
               )}
             </div>
           </div>
-        </div>
+          </div>
+        </Modal>
       )}
 
       {/* Pre-Boarding Form Modal */}
       {showPreboardingModal && selectedCandidate && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
-        }}>
-          <div className="card" style={{ width: '580px', maxWidth: '92%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <Modal onClose={() => setShowPreboardingModal(false)}>
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: 1000, padding: '20px', boxSizing: 'border-box',
+          }}>
+            <div className="card" style={{ width: '580px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+
             <h3 style={{ marginBottom: '16px' }}>Pre-Boarding Submission Form</h3>
             <p style={{ fontSize: '12px', color: '#64748b', marginTop: '-10px', marginBottom: '16px' }}>
               Candidate: <strong>{selectedCandidate.firstName} {selectedCandidate.lastName}</strong> ({selectedCandidate.personalEmail})
@@ -810,8 +826,10 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
               </div>
             </form>
           </div>
-        </div>
+          </div>
+        </Modal>
       )}
+
     </div>
   );
 }

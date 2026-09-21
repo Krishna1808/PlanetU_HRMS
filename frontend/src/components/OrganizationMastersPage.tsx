@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
+import { Modal } from './Modal';
 
 export function OrganizationMastersPage() {
   const [activeTab, setActiveTab] = useState<'departments' | 'designations' | 'grades' | 'locations'>('departments');
@@ -31,6 +32,18 @@ export function OrganizationMastersPage() {
   // Designation Form State
   const [desigName, setDesigName] = useState('');
   const [desigDescription, setDesigDescription] = useState('');
+
+  // Edit Designation Master State
+  const [editingDesig, setEditingDesig] = useState<any | null>(null);
+  const [editDesigName, setEditDesigName] = useState('');
+  const [editDesigDescription, setEditDesigDescription] = useState('');
+  const [updatingDesig, setUpdatingDesig] = useState(false);
+
+  // Quick Employee Position Change Modal in Department Profile
+  const [positionModalEmployee, setPositionModalEmployee] = useState<any | null>(null);
+  const [empNewDesignationId, setEmpNewDesignationId] = useState('');
+  const [empChangeReason, setEmpChangeReason] = useState('');
+  const [savingEmpPosition, setSavingEmpPosition] = useState(false);
 
   // Grade Form State
   const [gradeName, setGradeName] = useState('');
@@ -163,6 +176,74 @@ export function OrganizationMastersPage() {
       setError(err?.message || 'Failed to create designation');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleStartEditDesig = (desig: any) => {
+    setEditingDesig(desig);
+    setEditDesigName(desig.name);
+    setEditDesigDescription(desig.description || '');
+  };
+
+  const handleCancelEditDesig = () => {
+    setEditingDesig(null);
+    setEditDesigName('');
+    setEditDesigDescription('');
+  };
+
+  const handleUpdateDesignation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDesig) return;
+    setUpdatingDesig(true);
+    setError('');
+    try {
+      await api.updateDesignation(editingDesig.id, {
+        name: editDesigName.trim(),
+        description: editDesigDescription.trim() || undefined,
+      });
+      setSuccessMsg(`Designation '${editDesigName}' updated successfully!`);
+      setEditingDesig(null);
+      setEditDesigName('');
+      setEditDesigDescription('');
+      await loadAll();
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to update designation');
+    } finally {
+      setUpdatingDesig(false);
+    }
+  };
+
+  const handleOpenEmpPositionModal = (emp: any) => {
+    setPositionModalEmployee(emp);
+    setEmpNewDesignationId(emp.designation?.id || '');
+    setEmpChangeReason('');
+  };
+
+  const handleSaveEmpPosition = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!positionModalEmployee || !empNewDesignationId) return;
+    setSavingEmpPosition(true);
+    setProfileSuccessMsg('');
+    setProfileErrorMsg('');
+    try {
+      await api.updateEmployee(positionModalEmployee.id, {
+        designationId: empNewDesignationId,
+        changeReason: empChangeReason.trim() || 'Designation update from Department Profile roster',
+      });
+      if (selectedDeptProfile) {
+        const refreshed = await api.getDepartmentById(selectedDeptProfile.id);
+        setSelectedDeptProfile(refreshed);
+      }
+      const updatedEmps = await api.getEmployees().catch(() => ({ data: [] }));
+      setAllEmployees(updatedEmps?.data || []);
+      setProfileSuccessMsg(`Position updated for ${positionModalEmployee.firstName} ${positionModalEmployee.lastName} successfully!`);
+      setPositionModalEmployee(null);
+      setTimeout(() => setProfileSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setProfileErrorMsg(err?.message || 'Failed to update employee position');
+    } finally {
+      setSavingEmpPosition(false);
     }
   };
 
@@ -325,7 +406,6 @@ export function OrganizationMastersPage() {
                       <th>Prefix</th>
                       <th>Head / Manager</th>
                       <th>Team Size</th>
-                      <th>Description</th>
                       <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
@@ -395,9 +475,6 @@ export function OrganizationMastersPage() {
                           >
                             👥 {d._count?.employees ?? 0}
                           </span>
-                        </td>
-                        <td style={{ color: '#64748b', fontSize: '13px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {d.description || '—'}
                         </td>
                         <td style={{ textAlign: 'right' }}>
                           <button
@@ -521,14 +598,25 @@ export function OrganizationMastersPage() {
                     <th>Job Title / Designation</th>
                     <th>Description</th>
                     <th>Created</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {designations.map((d) => (
-                    <tr key={d.id}>
+                    <tr key={d.id} style={{ background: editingDesig?.id === d.id ? '#f0f9ff' : undefined }}>
                       <td><strong>{d.name}</strong></td>
                       <td style={{ color: '#64748b', fontSize: '13px' }}>{d.description || '—'}</td>
                       <td style={{ color: '#94a3b8', fontSize: '12px' }}>{new Date(d.createdAt).toLocaleDateString()}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ fontSize: '12px', padding: '4px 8px' }}
+                          onClick={() => handleStartEditDesig(d)}
+                        >
+                          ✏️ Edit
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -536,40 +624,82 @@ export function OrganizationMastersPage() {
             )}
           </div>
 
-          <div className="card" style={{ background: '#f8fafc' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>➕ Add New Designation / Role</h3>
-            <form onSubmit={handleAddDesignation} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
-                  Designation / Role Title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Principal Architect"
-                  value={desigName}
-                  onChange={(e) => setDesigName(e.target.value)}
-                  style={{ width: '100%', padding: '7px 10px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
-                />
-              </div>
+          <div className="card" style={{ background: editingDesig ? '#f0f9ff' : '#f8fafc', border: editingDesig ? '1px solid #bae6fd' : undefined }}>
+            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px', color: editingDesig ? '#0369a1' : undefined }}>
+              {editingDesig ? '✏️ Edit Designation / Role' : '➕ Add New Designation / Role'}
+            </h3>
+            {editingDesig ? (
+              <form onSubmit={handleUpdateDesignation} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
+                    Designation / Role Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Principal Architect"
+                    value={editDesigName}
+                    onChange={(e) => setEditDesigName(e.target.value)}
+                    style={{ width: '100%', padding: '7px 10px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                  />
+                </div>
 
-              <div>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
-                  Description / Role Scope
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Responsibilities & scope..."
-                  value={desigDescription}
-                  onChange={(e) => setDesigDescription(e.target.value)}
-                  style={{ width: '100%', padding: '7px 10px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
-                />
-              </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
+                    Description / Role Scope
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Responsibilities & scope..."
+                    value={editDesigDescription}
+                    onChange={(e) => setEditDesigDescription(e.target.value)}
+                    style={{ width: '100%', padding: '7px 10px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                  />
+                </div>
 
-              <button type="submit" className="btn btn-primary" disabled={submitting} style={{ marginTop: '6px' }}>
-                {submitting ? 'Creating...' : 'Create Designation'}
-              </button>
-            </form>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                  <button type="submit" className="btn btn-primary" disabled={updatingDesig} style={{ flex: 1 }}>
+                    {updatingDesig ? 'Saving...' : 'Save Changes'}
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={handleCancelEditDesig}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleAddDesignation} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
+                    Designation / Role Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Principal Architect"
+                    value={desigName}
+                    onChange={(e) => setDesigName(e.target.value)}
+                    style={{ width: '100%', padding: '7px 10px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
+                    Description / Role Scope
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Responsibilities & scope..."
+                    value={desigDescription}
+                    onChange={(e) => setDesigDescription(e.target.value)}
+                    style={{ width: '100%', padding: '7px 10px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <button type="submit" className="btn btn-primary" disabled={submitting} style={{ marginTop: '6px' }}>
+                  {submitting ? 'Creating...' : 'Create Designation'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -757,34 +887,38 @@ export function OrganizationMastersPage() {
 
       {/* DEPARTMENT PROFILE MODAL */}
       {showProfileModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            backgroundColor: 'rgba(15, 23, 42, 0.7)',
-            backdropFilter: 'blur(3px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-          }}
-          onClick={() => setShowProfileModal(false)}
-        >
+        <Modal onClose={() => setShowProfileModal(false)}>
           <div
+            className="modal-backdrop-smooth"
             style={{
-              background: '#ffffff',
-              borderRadius: '12px',
-              width: '100%',
-              maxWidth: '920px',
-              maxHeight: '90vh',
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1000,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
               display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              overflow: 'hidden',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={() => setShowProfileModal(false)}
           >
+            <div
+              className="modal-dialog-smooth"
+              style={{
+                background: '#ffffff',
+                borderRadius: '12px',
+                width: '100%',
+                maxWidth: '920px',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                overflow: 'hidden',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+
             {/* Modal Header */}
             <div
               style={{
@@ -1109,6 +1243,7 @@ export function OrganizationMastersPage() {
                               <th>Reporting Manager</th>
                               <th>Joining Date</th>
                               <th>Status</th>
+                              <th style={{ textAlign: 'right' }}>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1190,6 +1325,16 @@ export function OrganizationMastersPage() {
                                       {emp.employmentStatus || 'ACTIVE'}
                                     </span>
                                   </td>
+                                  <td style={{ textAlign: 'right' }}>
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary"
+                                      style={{ fontSize: '12px', padding: '4px 8px' }}
+                                      onClick={() => handleOpenEmpPositionModal(emp)}
+                                    >
+                                      ✏️ Change Position
+                                    </button>
+                                  </td>
                                 </tr>
                               );
                             })}
@@ -1222,8 +1367,153 @@ export function OrganizationMastersPage() {
               </button>
             </div>
           </div>
-        </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Change Employee Position Modal */}
+      {positionModalEmployee && (
+        <Modal onClose={() => setPositionModalEmployee(null)}>
+          <div
+            className="modal-backdrop-smooth"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1100,
+              padding: '20px',
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setPositionModalEmployee(null);
+            }}
+          >
+            <div
+              className="card modal-dialog-smooth"
+              style={{
+                width: '100%',
+                maxWidth: '480px',
+                maxHeight: '90vh',
+                padding: 0,
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                overflow: 'hidden',
+              }}
+            >
+
+            <div
+              style={{
+                padding: '16px 20px',
+                background: '#0f172a',
+                color: '#ffffff',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
+                  ✏️ Change Designation / Position
+                </h3>
+                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+                  {positionModalEmployee.firstName} {positionModalEmployee.lastName} ({positionModalEmployee.employeeCode})
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPositionModalEmployee(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: '20px',
+                  cursor: 'pointer',
+                  padding: '4px 8px',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEmpPosition} style={{ padding: '20px' }}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                  Current Position
+                </label>
+                <div style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+                  {positionModalEmployee.designation?.name || 'No designation currently assigned'}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                  New Designation / Role *
+                </label>
+                <select
+                  required
+                  value={empNewDesignationId}
+                  onChange={(e) => setEmpNewDesignationId(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                >
+                  <option value="" disabled>Select new designation...</option>
+                  {designations.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                  Reason for Change
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Annual promotion, role restructuring..."
+                  value={empChangeReason}
+                  onChange={(e) => setEmpChangeReason(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                />
+                <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: '4px' }}>
+                  This change will be permanently recorded into the employee's career audit trail.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setPositionModalEmployee(null)}
+                  disabled={savingEmpPosition}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingEmpPosition || !empNewDesignationId || empNewDesignationId === positionModalEmployee.designation?.id}
+                >
+                  {savingEmpPosition ? (
+                    <>
+                      <span className="spinner" /> Updating...
+                    </>
+                  ) : (
+                    'Confirm Position Change'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
+
 }

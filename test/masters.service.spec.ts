@@ -29,10 +29,16 @@ describe('MastersService (Module 2: Org Masters — Departments, Designations, G
         })),
       },
       designation: {
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockImplementation(async (args: any) => ({
           id: 'des-new',
+          organizationId: orgId,
+          ...args.data,
+        })),
+        update: jest.fn().mockImplementation(async (args: any) => ({
+          id: args.where.id,
           organizationId: orgId,
           ...args.data,
         })),
@@ -363,6 +369,56 @@ describe('MastersService (Module 2: Org Masters — Departments, Designations, G
           organizationId_name: { organizationId: orgId, name: 'Architect' },
         },
       });
+    });
+  });
+
+  describe('updateDesignation', () => {
+    it('updates designation successfully', async () => {
+      mockPrisma.designation.findFirst.mockResolvedValue({
+        id: 'des-1',
+        organizationId: orgId,
+        name: 'Junior Engineer',
+      });
+      mockPrisma.designation.findUnique.mockResolvedValue(null);
+
+      const result = await service.updateDesignation(orgId, 'des-1', {
+        name: 'Associate Engineer',
+        description: 'Updated scope',
+      });
+
+      expect(mockPrisma.designation.update).toHaveBeenCalledWith({
+        where: { id: 'des-1' },
+        data: {
+          name: 'Associate Engineer',
+          description: 'Updated scope',
+        },
+      });
+      expect(result).toBeDefined();
+    });
+
+    it('throws NotFoundException when designation does not exist', async () => {
+      mockPrisma.designation.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.updateDesignation(orgId, 'des-ghost', { name: 'Lead' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ConflictException when renaming to an existing designation name', async () => {
+      mockPrisma.designation.findFirst.mockResolvedValue({
+        id: 'des-1',
+        organizationId: orgId,
+        name: 'Junior Engineer',
+      });
+      mockPrisma.designation.findUnique.mockResolvedValue({
+        id: 'des-2',
+        organizationId: orgId,
+        name: 'Senior Engineer',
+      });
+
+      await expect(
+        service.updateDesignation(orgId, 'des-1', { name: 'Senior Engineer' }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 

@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateDepartmentDto,
   CreateDesignationDto,
+  UpdateDesignationDto,
   CreateGradeDto,
   CreateLocationDto,
 } from './dto/masters.dto';
@@ -225,6 +226,46 @@ export class MastersService {
         organizationId,
         name: dto.name,
         description: dto.description,
+      },
+    });
+  }
+
+  async updateDesignation(
+    organizationId: string,
+    id: string,
+    dto: UpdateDesignationDto,
+  ) {
+    const existing = await this.prisma.designation.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Designation not found');
+    }
+
+    if (
+      dto.name &&
+      dto.name.trim() &&
+      dto.name.trim().toLowerCase() !== existing.name.toLowerCase()
+    ) {
+      const conflict = await this.prisma.designation.findUnique({
+        where: {
+          organizationId_name: {
+            organizationId,
+            name: dto.name.trim(),
+          },
+        },
+      });
+      if (conflict) {
+        throw new ConflictException(`Designation "${dto.name}" already exists`);
+      }
+    }
+
+    return this.prisma.designation.update({
+      where: { id },
+      data: {
+        name: dto.name ? dto.name.trim() : undefined,
+        description: dto.description !== undefined ? dto.description.trim() : undefined,
       },
     });
   }

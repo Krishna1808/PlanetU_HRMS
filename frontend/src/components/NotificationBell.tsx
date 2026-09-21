@@ -245,13 +245,14 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
       {/* Backdrop overlay for drawer */}
       {isOpen && (
         <div
+          className="modal-backdrop-smooth"
           onClick={() => setIsOpen(false)}
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(15, 23, 42, 0.4)',
+            background: 'rgba(15, 23, 42, 0.45)',
             zIndex: 1000,
-            backdropFilter: 'blur(2px)',
+            backdropFilter: 'blur(3px)',
           }}
         />
       )}
@@ -260,6 +261,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
       {isOpen && (
         <div
           ref={drawerRef}
+          className="drawer-slide-smooth"
           style={{
             position: 'fixed',
             top: 0,
@@ -273,7 +275,6 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
             display: 'flex',
             flexDirection: 'column',
             color: '#1e293b',
-            animation: 'slideIn 0.2s ease-out',
           }}
         >
           {/* Drawer Header */}

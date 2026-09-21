@@ -60,6 +60,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  updateDesignation: (id: string, data: { name?: string; description?: string }) =>
+    fetchJson<any>(`/masters/designations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
 
   getGrades: () => fetchJson<any[]>('/masters/grades'),
   createGrade: (data: { name: string; level?: number; description?: string }) =>
@@ -92,6 +97,17 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
+
+  terminateEmployee: (
+    id: string,
+    payload: string | { noticePeriodDays?: number; reason: string; terminationDate?: string },
+  ) => {
+    const body = typeof payload === 'string' ? { reason: payload, noticePeriodDays: 0 } : payload;
+    return fetchJson<any>(`/employees/${id}/terminate`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
 
   // 4. Module 3: Shifts
   getShifts: () => fetchJson<any[]>('/shifts'),

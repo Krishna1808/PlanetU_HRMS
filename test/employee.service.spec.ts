@@ -63,6 +63,7 @@ const mockEmployee = {
   grade: null,
   location: null,
   reportingManager: null,
+  user: { id: 'user-emp-1', email: 'john@planetu.com', role: Role.EMPLOYEE },
 };
 
 describe('EmployeeService (Module 3: Employee Lifecycle)', () => {
@@ -70,6 +71,7 @@ describe('EmployeeService (Module 3: Employee Lifecycle)', () => {
   let mockPrisma: any;
   let mockSequenceService: any;
   let mockRbacService: any;
+  let mockNotificationService: any;
 
   beforeEach(() => {
     mockPrisma = {
@@ -116,10 +118,15 @@ describe('EmployeeService (Module 3: Employee Lifecycle)', () => {
     // Real RBAC service for proper field-level security testing
     mockRbacService = new EmployeeRbacService();
 
+    mockNotificationService = {
+      createNotification: jest.fn().mockResolvedValue({ id: 'notif-1' }),
+    };
+
     service = new EmployeeService(
       mockPrisma as unknown as PrismaService,
       mockSequenceService as unknown as EmployeeSequenceService,
       mockRbacService,
+      mockNotificationService,
     );
   });
 
@@ -435,6 +442,68 @@ describe('EmployeeService (Module 3: Employee Lifecycle)', () => {
       );
       expect(result.message).toContain('ENG-0001');
       expect(result.deactivatedAt).toBeInstanceOf(Date);
+    });
+
+    it('issues termination notice when noticePeriodDays > 0, sets status to NOTICE_PERIOD, sets dateOfExit, and dispatches notification', async () => {
+      mockPrisma.employee.findFirst.mockResolvedValue(mockEmployee);
+      mockPrisma.employee.update.mockResolvedValue({
+        ...mockEmployee,
+        employmentStatus: EmploymentStatus.NOTICE_PERIOD,
+        dateOfExit: new Date(Date.now() + 30 * 86400000),
+      });
+
+      const result = await service.softDeleteEmployee(orgId, empId, hrAdmin, {
+        noticePeriodDays: 30,
+        reason: 'Restructuring and organizational changes',
+      });
+
+      expect(mockPrisma.employee.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: empId },
+          data: expect.objectContaining({
+            employmentStatus: EmploymentStatus.NOTICE_PERIOD,
+            dateOfExit: expect.any(Date),
+          }),
+        }),
+      );
+      // User account should NOT be deactivated during notice period
+      expect(mockPrisma.user.updateMany).not.toHaveBeenCalled();
+      // Job history ledger should record notice details
+      expect(mockPrisma.employeeJobHistory.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            reason: expect.stringContaining('Notice Period: 30 days'),
+          }),
+        }),
+      );
+      // Notification service should be called to alert employee
+      expect(mockNotificationService.createNotification).toHaveBeenCalledWith(
+        orgId,
+        expect.objectContaining({
+          recipientUserId: 'user-emp-1',
+          title: 'Official Termination Notice Issued',
+          message: expect.stringContaining('notice period of 30 day(s)'),
+        }),
+      );
+      expect(result.employmentStatus).toBe(EmploymentStatus.NOTICE_PERIOD);
+      expect(result.noticePeriodDays).toBe(30);
+    });
+
+    it('prevents self-termination with BadRequestException', async () => {
+      await expect(
+        service.softDeleteEmployee(orgId, empId, employeeUser),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('prevents HR Admin from terminating a Client Super Admin with ForbiddenException', async () => {
+      mockPrisma.employee.findFirst.mockResolvedValue({
+        ...mockEmployee,
+        user: { id: 'admin-user', role: Role.CLIENT_SUPER_ADMIN },
+      });
+
+      await expect(
+        service.softDeleteEmployee(orgId, empId, hrAdmin),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws NotFoundException when trying to delete an already deactivated employee', async () => {

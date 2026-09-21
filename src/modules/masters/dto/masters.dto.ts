@@ -36,6 +36,16 @@ export class CreateDesignationDto {
   description?: string;
 }
 
+export class UpdateDesignationDto {
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
+
 export class CreateGradeDto {
   @IsString()
   @IsNotEmpty({ message: 'Grade name is required (e.g. L1, M2)' })

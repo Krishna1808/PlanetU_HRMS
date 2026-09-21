@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
+import { Modal } from './Modal';
 
 interface OffboardingPageProps {
   user: any;
@@ -88,7 +89,7 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
         noticePeriodDays: Number(applyForm.noticePeriodDays),
         proposedLastWorkingDay: new Date(applyForm.proposedLastWorkingDay).toISOString(),
       });
-      setSuccessMsg('Exit request submitted successfully');
+      setSuccessMsg('Resignation request submitted successfully');
       setShowApplyModal(false);
       setApplyForm({
         reason: '',
@@ -98,7 +99,7 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
       });
       loadRequests();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to submit exit request');
+      setErrorMsg(err.message || 'Failed to submit resignation request');
     }
   };
 
@@ -241,7 +242,7 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
           style={{ background: '#2563eb', color: '#ffffff', padding: '10px 18px', fontWeight: 600 }}
           onClick={() => setShowApplyModal(true)}
         >
-          + Submit Resignation / Initiate Exit
+          + Apply for Resignation
         </button>
       </div>
 
@@ -491,29 +492,35 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
 
       {/* MODAL 1: Apply for Resignation */}
       {showApplyModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15,23,42,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
+        <Modal onClose={() => setShowApplyModal(false)}>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15,23,42,0.6)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px',
+              boxSizing: 'border-box',
+            }}
+          >
           <div
             style={{
               background: '#ffffff',
               borderRadius: '8px',
               padding: '24px',
               width: '480px',
-              maxWidth: '90vw',
+              maxWidth: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
             }}
           >
             <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: 700 }}>
-              Initiate Resignation / Exit Request
+              Submit Resignation Request
             </h3>
             <form onSubmit={handleApplyResignation} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
@@ -526,7 +533,6 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
                   style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
                 >
                   <option value="RESIGNATION">Resignation (Voluntary)</option>
-                  <option value="TERMINATION">Termination (Involuntary)</option>
                   <option value="RETIREMENT">Retirement</option>
                   <option value="CONTRACT_END">End of Contract</option>
                 </select>
@@ -586,20 +592,25 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
               </div>
             </form>
           </div>
-        </div>
+          </div>
+        </Modal>
       )}
 
       {/* MODAL 2: Action Resignation */}
       {showActionModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15,23,42,0.6)',
-            display: 'flex',
+        <Modal onClose={() => setShowActionModal(null)}>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15,23,42,0.6)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 1000,
+            padding: '20px',
+            boxSizing: 'border-box',
           }}
         >
           <div
@@ -608,7 +619,9 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
               borderRadius: '8px',
               padding: '24px',
               width: '460px',
-              maxWidth: '90vw',
+              maxWidth: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
             }}
           >
             <h3 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: 700 }}>
@@ -672,31 +685,37 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
               </div>
             </form>
           </div>
-        </div>
+          </div>
+        </Modal>
       )}
 
       {/* MODAL 3: Clearance Tasks Inspector */}
       {showTasksModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15,23,42,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
+        <Modal onClose={() => setShowTasksModal(null)}>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15,23,42,0.6)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px',
+              boxSizing: 'border-box',
+            }}
+          >
           <div
             style={{
               background: '#ffffff',
               borderRadius: '8px',
               padding: '24px',
               width: '680px',
-              maxWidth: '92vw',
-              maxHeight: '85vh',
+              maxWidth: '100%',
+              maxHeight: '90vh',
               overflowY: 'auto',
+
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -803,30 +822,35 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
               ))}
             </div>
           </div>
-        </div>
+          </div>
+        </Modal>
       )}
 
       {/* MODAL 4: Exit Interview */}
       {showInterviewModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15,23,42,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
+        <Modal onClose={() => setShowInterviewModal(null)}>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15,23,42,0.6)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px',
+              boxSizing: 'border-box',
+            }}
+          >
           <div
             style={{
               background: '#ffffff',
               borderRadius: '8px',
               padding: '24px',
               width: '520px',
-              maxWidth: '90vw',
-              maxHeight: '85vh',
+              maxWidth: '100%',
+              maxHeight: '90vh',
               overflowY: 'auto',
             }}
           >
@@ -921,29 +945,34 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
               </div>
             </form>
           </div>
-        </div>
+          </div>
+        </Modal>
       )}
 
       {/* MODAL 5: Full and Final (FnF) Settlement Statement */}
       {showFnFModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15,23,42,0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
+        <Modal onClose={() => setShowFnFModal(null)}>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15,23,42,0.6)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px',
+              boxSizing: 'border-box',
+            }}
+          >
           <div
             style={{
               background: '#ffffff',
               borderRadius: '8px',
               padding: '24px',
               width: '640px',
-              maxWidth: '92vw',
+              maxWidth: '100%',
               maxHeight: '90vh',
               overflowY: 'auto',
             }}
@@ -1049,8 +1078,10 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
               </button>
             </div>
           </div>
-        </div>
+          </div>
+        </Modal>
       )}
     </div>
   );
 };
+
