@@ -282,11 +282,13 @@ model Department {
   name           String
   codePrefix     String   @map("code_prefix") // e.g., 'ENG', 'HR', 'SLS'
   description    String?
+  headId         String?  @map("head_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  employees             Employee[]
+  head                  Employee?              @relation("DepartmentHead", fields: [headId], references: [id], onDelete: SetNull)
+  employees             Employee[]             @relation("DepartmentEmployees")
   jobHistories          EmployeeJobHistory[]
   employeeCodeSequences EmployeeCodeSequence[]
   onboardingCandidates  OnboardingCandidate[]
@@ -418,7 +420,8 @@ model Employee {
   // Relations
   organization                Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user                        User?
-  department                  Department                @relation(fields: [departmentId], references: [id])
+  department                  Department                @relation("DepartmentEmployees", fields: [departmentId], references: [id])
+  departmentsHeaded           Department[]              @relation("DepartmentHead")
   designation                 Designation               @relation(fields: [designationId], references: [id])
   grade                       Grade?                    @relation(fields: [gradeId], references: [id])
   location                    Location?                 @relation(fields: [locationId], references: [id])

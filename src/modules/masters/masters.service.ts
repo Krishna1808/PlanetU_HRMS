@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CreateDepartmentDto,
@@ -17,7 +17,125 @@ export class MastersService {
   async getDepartments(organizationId: string) {
     return this.prisma.department.findMany({
       where: { organizationId },
+      include: {
+        head: {
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+            personalEmail: true,
+            designation: { select: { id: true, name: true } },
+            user: { select: { role: true, email: true } },
+          },
+        },
+        _count: {
+          select: {
+            employees: {
+              where: { deletedAt: null },
+            },
+          },
+        },
+      },
       orderBy: { name: 'asc' },
+    });
+  }
+
+  async getDepartmentById(organizationId: string, departmentId: string) {
+    const department = await this.prisma.department.findFirst({
+      where: { id: departmentId, organizationId },
+      include: {
+        head: {
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+            personalEmail: true,
+            designation: { select: { id: true, name: true } },
+            user: { select: { role: true, email: true } },
+          },
+        },
+        employees: {
+          where: { deletedAt: null },
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+            personalEmail: true,
+            dateOfJoining: true,
+            employmentStatus: true,
+            employmentType: true,
+            designation: { select: { id: true, name: true } },
+            reportingManager: {
+              select: { id: true, employeeCode: true, firstName: true, lastName: true },
+            },
+            user: { select: { role: true, email: true } },
+          },
+          orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+        },
+        _count: {
+          select: {
+            employees: {
+              where: { deletedAt: null },
+            },
+          },
+        },
+      },
+    });
+
+    if (!department) {
+      throw new NotFoundException('Department not found');
+    }
+
+    return department;
+  }
+
+  async setDepartmentHead(
+    organizationId: string,
+    departmentId: string,
+    headEmployeeId: string | null,
+  ) {
+    const department = await this.prisma.department.findFirst({
+      where: { id: departmentId, organizationId },
+    });
+    if (!department) {
+      throw new NotFoundException('Department not found');
+    }
+
+    if (headEmployeeId) {
+      const employee = await this.prisma.employee.findFirst({
+        where: { id: headEmployeeId, organizationId, deletedAt: null },
+      });
+      if (!employee) {
+        throw new NotFoundException('Employee not found or inactive');
+      }
+    }
+
+    return this.prisma.department.update({
+      where: { id: departmentId },
+      data: { headId: headEmployeeId || null },
+      include: {
+        head: {
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+            personalEmail: true,
+            designation: { select: { id: true, name: true } },
+            user: { select: { role: true, email: true } },
+          },
+        },
+        _count: {
+          select: {
+            employees: {
+              where: { deletedAt: null },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -36,12 +154,44 @@ export class MastersService {
       throw new ConflictException(`Department with code prefix "${dto.codePrefix}" already exists`);
     }
 
+    const cleanHeadId = dto.headId?.trim() ? dto.headId.trim() : null;
+
+    if (cleanHeadId) {
+      const employee = await this.prisma.employee.findFirst({
+        where: { id: cleanHeadId, organizationId, deletedAt: null },
+      });
+      if (!employee) {
+        throw new NotFoundException('Head employee not found or inactive');
+      }
+    }
+
     return this.prisma.department.create({
       data: {
         organizationId,
         name: dto.name,
         codePrefix: dto.codePrefix.toUpperCase(),
         description: dto.description,
+        headId: cleanHeadId || undefined,
+      },
+      include: {
+        head: {
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+            personalEmail: true,
+            designation: { select: { id: true, name: true } },
+            user: { select: { role: true, email: true } },
+          },
+        },
+        _count: {
+          select: {
+            employees: {
+              where: { deletedAt: null },
+            },
+          },
+        },
       },
     });
   }

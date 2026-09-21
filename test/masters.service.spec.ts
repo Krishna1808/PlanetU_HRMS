@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { MastersService } from '../src/modules/masters/masters.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -11,11 +11,19 @@ describe('MastersService (Module 2: Org Masters — Departments, Designations, G
 
   beforeEach(() => {
     mockPrisma = {
+      employee: {
+        findFirst: jest.fn(),
+      },
       department: {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockImplementation(async (args: any) => ({
           id: 'dept-new',
+          organizationId: orgId,
+          ...args.data,
+        })),
+        update: jest.fn().mockImplementation(async (args: any) => ({
+          id: args.where.id,
           organizationId: orgId,
           ...args.data,
         })),
@@ -57,7 +65,7 @@ describe('MastersService (Module 2: Org Masters — Departments, Designations, G
   // -------------------------------------------------------------------------
 
   describe('getDepartments', () => {
-    it('returns all departments for the organization ordered by name', async () => {
+    it('returns all departments for the organization ordered by name with head and count', async () => {
       const mockDepts = [
         { id: 'dept-1', name: 'Engineering', codePrefix: 'ENG' },
         { id: 'dept-2', name: 'HR', codePrefix: 'HR' },
@@ -70,6 +78,10 @@ describe('MastersService (Module 2: Org Masters — Departments, Designations, G
       expect(result[0].name).toBe('Engineering');
       expect(mockPrisma.department.findMany).toHaveBeenCalledWith({
         where: { organizationId: orgId },
+        include: expect.objectContaining({
+          head: expect.any(Object),
+          _count: expect.any(Object),
+        }),
         orderBy: { name: 'asc' },
       });
     });
@@ -78,6 +90,84 @@ describe('MastersService (Module 2: Org Masters — Departments, Designations, G
       mockPrisma.department.findMany.mockResolvedValue([]);
       const result = await service.getDepartments(orgId);
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('getDepartmentById', () => {
+    it('returns department with head and employees roster', async () => {
+      const mockDept = {
+        id: 'dept-1',
+        organizationId: orgId,
+        name: 'Engineering',
+        codePrefix: 'ENG',
+        head: { id: 'emp-mgr', firstName: 'Vikram', lastName: 'Singhania' },
+        employees: [{ id: 'emp-1', firstName: 'Aarav', lastName: 'Sharma' }],
+        _count: { employees: 1 },
+      };
+      mockPrisma.department.findFirst.mockResolvedValue(mockDept);
+
+      const result = await service.getDepartmentById(orgId, 'dept-1');
+      expect(result).toEqual(mockDept);
+      expect(mockPrisma.department.findFirst).toHaveBeenCalledWith({
+        where: { id: 'dept-1', organizationId: orgId },
+        include: expect.objectContaining({
+          head: expect.any(Object),
+          employees: expect.any(Object),
+          _count: expect.any(Object),
+        }),
+      });
+    });
+
+    it('throws NotFoundException if department does not exist', async () => {
+      mockPrisma.department.findFirst.mockResolvedValue(null);
+
+      await expect(service.getDepartmentById(orgId, 'dept-invalid')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('setDepartmentHead', () => {
+    it('successfully assigns an employee as department head', async () => {
+      mockPrisma.department.findFirst.mockResolvedValue({ id: 'dept-1', organizationId: orgId });
+      mockPrisma.employee.findFirst.mockResolvedValue({ id: 'emp-1', organizationId: orgId });
+
+      await service.setDepartmentHead(orgId, 'dept-1', 'emp-1');
+
+      expect(mockPrisma.department.update).toHaveBeenCalledWith({
+        where: { id: 'dept-1' },
+        data: { headId: 'emp-1' },
+        include: expect.objectContaining({
+          head: expect.any(Object),
+          _count: expect.any(Object),
+        }),
+      });
+    });
+
+    it('allows unassigning head by setting null', async () => {
+      mockPrisma.department.findFirst.mockResolvedValue({ id: 'dept-1', organizationId: orgId });
+
+      await service.setDepartmentHead(orgId, 'dept-1', null);
+
+      expect(mockPrisma.department.update).toHaveBeenCalledWith({
+        where: { id: 'dept-1' },
+        data: { headId: null },
+        include: expect.objectContaining({
+          head: expect.any(Object),
+          _count: expect.any(Object),
+        }),
+      });
+    });
+
+    it('throws NotFoundException if department does not exist', async () => {
+      mockPrisma.department.findFirst.mockResolvedValue(null);
+
+      await expect(service.setDepartmentHead(orgId, 'dept-none', 'emp-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException if head employee does not exist', async () => {
+      mockPrisma.department.findFirst.mockResolvedValue({ id: 'dept-1', organizationId: orgId });
+      mockPrisma.employee.findFirst.mockResolvedValue(null);
+
+      await expect(service.setDepartmentHead(orgId, 'dept-1', 'emp-nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -97,6 +187,10 @@ describe('MastersService (Module 2: Org Masters — Departments, Designations, G
           name: 'Finance',
           codePrefix: 'FIN', // should be uppercased
           description: 'Finance Department',
+        }),
+        include: expect.objectContaining({
+          head: expect.any(Object),
+          _count: expect.any(Object),
         }),
       });
       expect(result.codePrefix).toBe('FIN');
@@ -145,6 +239,61 @@ describe('MastersService (Module 2: Org Masters — Departments, Designations, G
           name: 'Operations',
           codePrefix: 'OPS',
           description: undefined,
+        }),
+        include: expect.objectContaining({
+          head: expect.any(Object),
+          _count: expect.any(Object),
+        }),
+      });
+    });
+
+    it('creates department without manager or head (headId omitted or null)', async () => {
+      mockPrisma.department.findFirst.mockResolvedValue(null);
+
+      await service.createDepartment(orgId, {
+        name: 'Quality Assurance',
+        codePrefix: 'QA',
+        headId: undefined,
+      });
+
+      expect(mockPrisma.department.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          organizationId: orgId,
+          name: 'Quality Assurance',
+          codePrefix: 'QA',
+          headId: undefined,
+        }),
+        include: expect.objectContaining({
+          head: expect.any(Object),
+          _count: expect.any(Object),
+        }),
+      });
+      expect(mockPrisma.employee.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('creates department with initial manager/head when headId is provided', async () => {
+      mockPrisma.department.findFirst.mockResolvedValue(null);
+      mockPrisma.employee.findFirst.mockResolvedValue({ id: 'emp-mgr', organizationId: orgId });
+
+      await service.createDepartment(orgId, {
+        name: 'Design',
+        codePrefix: 'DES',
+        headId: 'emp-mgr',
+      });
+
+      expect(mockPrisma.employee.findFirst).toHaveBeenCalledWith({
+        where: { id: 'emp-mgr', organizationId: orgId, deletedAt: null },
+      });
+      expect(mockPrisma.department.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          organizationId: orgId,
+          name: 'Design',
+          codePrefix: 'DES',
+          headId: 'emp-mgr',
+        }),
+        include: expect.objectContaining({
+          head: expect.any(Object),
+          _count: expect.any(Object),
         }),
       });
     });

@@ -35,6 +35,113 @@ export class EssService {
   ) {}
 
   /**
+   * Ensures the current user has an associated Employee profile.
+   * In PlanetU HRMS, every user in the organisation (Super Admin, HR, Manager, Finance, Employee)
+   * is fundamentally an employee entitled to full ESS self-service.
+   */
+  async ensureEmployee(
+    organizationId: string,
+    currentUser: AuthenticatedUser,
+  ): Promise<string> {
+    if (currentUser.employeeId) {
+      return currentUser.employeeId;
+    }
+
+    if (!this.prisma.employee?.findFirst) {
+      throw new BadRequestException('User account is not linked to an employee profile');
+    }
+
+    // Check if an employee with personalEmail matching the user's email already exists
+    let employee = await this.prisma.employee.findFirst({
+      where: {
+        organizationId,
+        personalEmail: { equals: currentUser.email, mode: 'insensitive' },
+        deletedAt: null,
+      },
+    });
+
+    if (!employee) {
+      // Find fallback master records
+      const defaultDept = await this.prisma.department.findFirst({
+        where: { organizationId },
+        orderBy: { createdAt: 'asc' },
+      });
+      const defaultDesig = await this.prisma.designation.findFirst({
+        where: { organizationId },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      if (!defaultDept || !defaultDesig) {
+        throw new BadRequestException(
+          'Organization master records (Department/Designation) must be configured first',
+        );
+      }
+
+      const rolePrefix =
+        currentUser.role === Role.CLIENT_SUPER_ADMIN
+          ? 'ADM'
+          : currentUser.role === Role.HR_ADMIN
+          ? 'HR'
+          : currentUser.role === Role.FINANCE
+          ? 'FIN'
+          : currentUser.role === Role.MANAGER
+          ? 'MGR'
+          : defaultDept.codePrefix || 'EMP';
+
+      const count = await this.prisma.employee.count({ where: { organizationId } });
+      const employeeCode = `${rolePrefix}-${String(count + 1).padStart(4, '0')}`;
+
+      const emailUsername = currentUser.email.split('@')[0];
+      const parts = emailUsername.split(/[._-]/);
+      const firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+      const lastName =
+        parts.length > 1
+          ? parts.slice(1).map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
+          : currentUser.role.replace(/_/g, ' ');
+
+      employee = await this.prisma.employee.create({
+        data: {
+          organizationId,
+          employeeCode,
+          firstName,
+          lastName,
+          personalEmail: currentUser.email,
+          departmentId: defaultDept.id,
+          designationId: defaultDesig.id,
+          dateOfJoining: new Date('2024-01-01'),
+          employmentStatus: 'ACTIVE',
+          employmentType: 'FULL_TIME',
+        },
+      });
+
+      // Assign default shift
+      const defaultShift = await this.prisma.shift.findFirst({
+        where: { organizationId, isDefault: true },
+      });
+      if (defaultShift) {
+        await this.prisma.employeeShiftAssignment.create({
+          data: {
+            organizationId,
+            employeeId: employee.id,
+            shiftId: defaultShift.id,
+            effectiveFrom: new Date('2024-01-01'),
+            weeklyOffDays: ['SATURDAY', 'SUNDAY'],
+          },
+        }).catch(() => {});
+      }
+    }
+
+    // Link employee to user in database
+    await this.prisma.user.update({
+      where: { id: currentUser.id },
+      data: { employeeId: employee.id },
+    });
+    currentUser.employeeId = employee.id;
+
+    return employee.id;
+  }
+
+  /**
    * Aggregated home dashboard payload.
    * Concurrent retrieval via Promise.all with 0 round-trip cascading.
    */
@@ -42,10 +149,7 @@ export class EssService {
     organizationId: string,
     currentUser: AuthenticatedUser,
   ): Promise<EssDashboardResponse> {
-    const employeeId = currentUser.employeeId;
-    if (!employeeId) {
-      throw new BadRequestException('User account is not linked to an employee profile');
-    }
+    const employeeId = await this.ensureEmployee(organizationId, currentUser);
 
     const today = new Date();
 
@@ -162,14 +266,18 @@ export class EssService {
       };
     }
 
-    // 7. Manager Overview (if user has MANAGER role)
+    // 7. Manager Overview (if user is MANAGER, HR_ADMIN, or CLIENT_SUPER_ADMIN)
     let managerOverview: EssManagerOverview | undefined;
-    if (currentUser.role === Role.MANAGER) {
+    if (
+      currentUser.role === Role.MANAGER ||
+      currentUser.role === Role.HR_ADMIN ||
+      currentUser.role === Role.CLIENT_SUPER_ADMIN
+    ) {
       const [reportsCount, pendingApprovals] = await Promise.all([
         this.prisma.employee.count({
           where: {
             organizationId,
-            reportingManagerId: employeeId,
+            ...(currentUser.role === Role.MANAGER ? { reportingManagerId: employeeId } : {}),
             deletedAt: null,
           },
         }),
@@ -198,13 +306,11 @@ export class EssService {
    * Full employee profile with field-level editability metadata (FR-EMP-006).
    */
   async getMyProfile(organizationId: string, currentUser: AuthenticatedUser) {
-    if (!currentUser.employeeId) {
-      throw new BadRequestException('User account is not linked to an employee profile');
-    }
+    const employeeId = await this.ensureEmployee(organizationId, currentUser);
 
     const profile = await this.employeeService.getEmployeeById(
       organizationId,
-      currentUser.employeeId,
+      employeeId,
       currentUser,
     );
 
@@ -247,13 +353,11 @@ export class EssService {
     dto: UpdateMyProfileDto,
     currentUser: AuthenticatedUser,
   ) {
-    if (!currentUser.employeeId) {
-      throw new BadRequestException('User account is not linked to an employee profile');
-    }
+    const employeeId = await this.ensureEmployee(organizationId, currentUser);
 
     return this.employeeService.updateEmployee(
       organizationId,
-      currentUser.employeeId,
+      employeeId,
       dto,
       currentUser,
     );
@@ -268,9 +372,7 @@ export class EssService {
     year?: number,
     month?: number,
   ) {
-    if (!currentUser.employeeId) {
-      throw new BadRequestException('User account is not linked to an employee profile');
-    }
+    const employeeId = await this.ensureEmployee(organizationId, currentUser);
 
     const targetYear = year || new Date().getFullYear();
     const targetMonth = month || new Date().getMonth() + 1;
@@ -278,13 +380,13 @@ export class EssService {
     const [finalizedDays, records] = await Promise.all([
       this.attendanceService.getFinalizedPayableDays(
         organizationId,
-        currentUser.employeeId,
+        employeeId,
         targetYear,
         targetMonth,
       ),
       this.attendanceService.getEmployeeAttendanceHistory(
         organizationId,
-        currentUser.employeeId,
+        employeeId,
       ),
     ]);
 
@@ -300,13 +402,11 @@ export class EssService {
    * Live leave balances and application history.
    */
   async getMyLeaves(organizationId: string, currentUser: AuthenticatedUser) {
-    if (!currentUser.employeeId) {
-      throw new BadRequestException('User account is not linked to an employee profile');
-    }
+    const employeeId = await this.ensureEmployee(organizationId, currentUser);
 
     const [balances, requests] = await Promise.all([
-      this.leaveService.getEmployeeLeaveBalances(organizationId, currentUser.employeeId),
-      this.leaveService.listEmployeeRequests(organizationId, currentUser.employeeId),
+      this.leaveService.getEmployeeLeaveBalances(organizationId, employeeId),
+      this.leaveService.listEmployeeRequests(organizationId, employeeId),
     ]);
 
     return {
@@ -319,11 +419,9 @@ export class EssService {
    * Personal historical payslips.
    */
   async getMyPayslips(organizationId: string, currentUser: AuthenticatedUser) {
-    if (!currentUser.employeeId) {
-      throw new BadRequestException('User account is not linked to an employee profile');
-    }
+    const employeeId = await this.ensureEmployee(organizationId, currentUser);
 
-    return this.payrollService.getMyPayslips(organizationId, currentUser.employeeId);
+    return this.payrollService.getMyPayslips(organizationId, employeeId);
   }
 
   /**

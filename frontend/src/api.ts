@@ -42,7 +42,13 @@ export const api = {
 
   // 2. Masters
   getDepartments: () => fetchJson<any[]>('/masters/departments'),
-  createDepartment: (data: { name: string; codePrefix: string; description?: string }) =>
+  getDepartmentById: (id: string) => fetchJson<any>(`/masters/departments/${id}`),
+  setDepartmentHead: (id: string, headEmployeeId: string | null) =>
+    fetchJson<any>(`/masters/departments/${id}/head`, {
+      method: 'PATCH',
+      body: JSON.stringify({ headEmployeeId }),
+    }),
+  createDepartment: (data: { name: string; codePrefix: string; description?: string; headId?: string }) =>
     fetchJson<any>('/masters/departments', {
       method: 'POST',
       body: JSON.stringify(data),

@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { MastersService } from './masters.service';
 import {
   CreateDepartmentDto,
+  SetDepartmentHeadDto,
   CreateDesignationDto,
   CreateGradeDto,
   CreateLocationDto,
@@ -24,6 +25,14 @@ export class MastersController {
     return this.mastersService.getDepartments(user.organizationId);
   }
 
+  @Get('departments/:id')
+  async getDepartmentById(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.mastersService.getDepartmentById(user.organizationId, id);
+  }
+
   @Post('departments')
   @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
   async createDepartment(
@@ -31,6 +40,20 @@ export class MastersController {
     @Body() dto: CreateDepartmentDto,
   ) {
     return this.mastersService.createDepartment(user.organizationId, dto);
+  }
+
+  @Patch('departments/:id/head')
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  async setDepartmentHead(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: SetDepartmentHeadDto,
+  ) {
+    return this.mastersService.setDepartmentHead(
+      user.organizationId,
+      id,
+      dto.headEmployeeId ?? null,
+    );
   }
 
   // Designations

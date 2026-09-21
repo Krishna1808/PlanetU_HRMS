@@ -45,12 +45,30 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User account is inactive or no longer exists');
     }
 
+    let employeeId = user.employeeId;
+    if (!employeeId) {
+      const matching = await this.prisma.employee.findFirst({
+        where: {
+          organizationId: user.organizationId,
+          personalEmail: { equals: user.email, mode: 'insensitive' },
+          deletedAt: null,
+        },
+      });
+      if (matching) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { employeeId: matching.id },
+        });
+        employeeId = matching.id;
+      }
+    }
+
     return {
       id: user.id,
       organizationId: user.organizationId,
       email: user.email,
       role: user.role,
-      employeeId: user.employeeId,
+      employeeId,
     };
   }
 }

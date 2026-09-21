@@ -14,6 +14,16 @@ export class CreateDepartmentDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsString()
+  @IsOptional()
+  headId?: string | null;
+}
+
+export class SetDepartmentHeadDto {
+  @IsString()
+  @IsOptional()
+  headEmployeeId?: string | null;
 }
 
 export class CreateDesignationDto {
