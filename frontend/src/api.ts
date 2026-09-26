@@ -80,6 +80,37 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // Holiday Calendar
+  getHolidays: (params?: { year?: number; locationId?: string; isRestricted?: boolean }) => {
+    const q = new URLSearchParams();
+    if (params?.year) q.append('year', String(params.year));
+    if (params?.locationId) q.append('locationId', params.locationId);
+    if (params?.isRestricted !== undefined) q.append('isRestricted', String(params.isRestricted));
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return fetchJson<any[]>(`/masters/holidays${queryStr}`);
+  },
+  createHoliday: (data: {
+    name: string;
+    date: string;
+    year?: number;
+    isRestricted?: boolean;
+    description?: string;
+    locationId?: string;
+  }) =>
+    fetchJson<any>('/masters/holidays', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateHoliday: (id: string, data: any) =>
+    fetchJson<any>(`/masters/holidays/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteHoliday: (id: string) =>
+    fetchJson<any>(`/masters/holidays/${id}`, {
+      method: 'DELETE',
+    }),
+
   // 3. Module 1: Employees
   getEmployees: () =>
     fetchJson<{ data: any[]; pagination: any }>('/employees?limit=50'),

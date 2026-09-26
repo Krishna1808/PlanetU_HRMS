@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { MastersService } from './masters.service';
 import {
@@ -9,6 +9,11 @@ import {
   CreateGradeDto,
   CreateLocationDto,
 } from './dto/masters.dto';
+import {
+  CreateHolidayDto,
+  UpdateHolidayDto,
+  QueryHolidaysDto,
+} from './dto/holiday.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -110,5 +115,44 @@ export class MastersController {
     @Body() dto: CreateLocationDto,
   ) {
     return this.mastersService.createLocation(user.organizationId, dto);
+  }
+
+  // -------------------------------------------------------------------------
+  // Holiday Calendar
+  // -------------------------------------------------------------------------
+  @Get('holidays')
+  async getHolidays(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: QueryHolidaysDto,
+  ) {
+    return this.mastersService.getHolidays(user.organizationId, query);
+  }
+
+  @Post('holidays')
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  async createHoliday(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateHolidayDto,
+  ) {
+    return this.mastersService.createHoliday(user.organizationId, dto);
+  }
+
+  @Patch('holidays/:id')
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  async updateHoliday(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateHolidayDto,
+  ) {
+    return this.mastersService.updateHoliday(user.organizationId, id, dto);
+  }
+
+  @Delete('holidays/:id')
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  async deleteHoliday(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.mastersService.deleteHoliday(user.organizationId, id);
   }
 }

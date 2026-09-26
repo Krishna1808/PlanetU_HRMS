@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
+import { Icons } from './Icons';
 
 export function EssDashboardPage() {
   const [data, setData] = useState<any>(null);
@@ -163,7 +164,7 @@ export function EssDashboardPage() {
     );
   }
 
-  const { profile, shift, todayAttendance, leaveBalances, recentLeaveRequests, latestPayslip, managerOverview } = data;
+  const { profile, shift, todayAttendance, leaveBalances, recentLeaveRequests, latestPayslip, managerOverview, upcomingHolidays } = data;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -215,7 +216,10 @@ export function EssDashboardPage() {
         {/* Attendance Card */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>⏱️ Today's Attendance</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icons.Clock size={18} color="#2563eb" />
+              <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Today's Attendance</h3>
+            </div>
             <span
               className={`badge ${
                 todayAttendance.status === 'PRESENT'
@@ -353,6 +357,98 @@ export function EssDashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Upcoming Holidays Card */}
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icons.Calendar size={18} color="#2563eb" />
+              <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Upcoming Holidays</h3>
+            </div>
+            <span className="badge badge-role">
+              {upcomingHolidays?.length ? `${upcomingHolidays.length} upcoming` : 'None'}
+            </span>
+          </div>
+
+          {(!upcomingHolidays || upcomingHolidays.length === 0) ? (
+            <div style={{ color: '#64748b', fontSize: '13px', textAlign: 'center', padding: '24px 0' }}>
+              No upcoming holidays scheduled for your location.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {upcomingHolidays.map((h: any) => {
+                const hDate = new Date(h.date);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const diffTime = hDate.getTime() - today.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const countdownText = diffDays === 0 ? 'Today' : diffDays === 1 ? 'Tomorrow' : `In ${diffDays} days`;
+
+                return (
+                  <div
+                    key={h.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 10px',
+                      background: '#f8fafc',
+                      borderRadius: '8px',
+                      border: '1px solid #e2e8f0',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div
+                        style={{
+                          background: h.isRestricted ? '#fffbeb' : '#eff6ff',
+                          border: `1px solid ${h.isRestricted ? '#fde68a' : '#bfdbfe'}`,
+                          color: h.isRestricted ? '#b45309' : '#1d4ed8',
+                          padding: '3px 6px',
+                          borderRadius: '6px',
+                          textAlign: 'center',
+                          minWidth: '40px',
+                        }}
+                      >
+                        <div style={{ fontSize: '9px', fontWeight: 700, textTransform: 'uppercase' }}>
+                          {hDate.toLocaleDateString('en-US', { month: 'short' })}
+                        </div>
+                        <div style={{ fontSize: '15px', fontWeight: 800, lineHeight: 1.1 }}>
+                          {hDate.getDate()}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+                          {h.name}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <span>{hDate.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                          <span>•</span>
+                          <span>{h.location ? h.location.name : 'All Branches'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span
+                        className="badge"
+                        style={{
+                          fontSize: '11px',
+                          background: h.isRestricted ? '#fef3c7' : '#dcfce7',
+                          color: h.isRestricted ? '#92400e' : '#15803d',
+                          border: `1px solid ${h.isRestricted ? '#fde68a' : '#bbf7d0'}`,
+                        }}
+                      >
+                        {h.isRestricted ? 'Restricted' : 'Mandatory'}
+                      </span>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', fontWeight: 500 }}>
+                        {countdownText}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 4. Leave Balances Grid */}
@@ -364,7 +460,7 @@ export function EssDashboardPage() {
             onClick={openApplyLeaveModal}
             style={{ padding: '6px 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            Apply
+            <Icons.Plus size={14} color="#ffffff" />
             <span>Apply for Leave</span>
           </button>
         </div>

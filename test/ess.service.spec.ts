@@ -44,6 +44,17 @@ describe('EssService (Module 7: Employee Self-Service Aggregation Engine)', () =
       employee: {
         count: jest.fn().mockResolvedValue(3),
       },
+      holiday: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'hol-1',
+            name: 'Republic Day',
+            date: new Date('2026-01-26'),
+            isRestricted: false,
+            location: null,
+          },
+        ]),
+      },
     };
 
     mockEmployeeService = {

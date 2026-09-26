@@ -161,6 +161,7 @@ export class EssService {
       leaveBalancesData,
       leaveRequests,
       payslips,
+      holidaysData,
     ] = await Promise.all([
       this.employeeService.getEmployeeById(organizationId, employeeId, currentUser),
       this.shiftService.getEmployeeShiftForDate(organizationId, employeeId, today),
@@ -168,6 +169,17 @@ export class EssService {
       this.leaveService.getEmployeeLeaveBalances(organizationId, employeeId),
       this.leaveService.listEmployeeRequests(organizationId, employeeId),
       this.payrollService.getMyPayslips(organizationId, employeeId),
+      this.prisma.holiday?.findMany
+        ? this.prisma.holiday.findMany({
+            where: {
+              organizationId,
+              date: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+            },
+            orderBy: { date: 'asc' },
+            take: 4,
+            include: { location: { select: { name: true } } },
+          })
+        : Promise.resolve([]),
     ]);
 
     // 1. Profile Summary
@@ -291,6 +303,16 @@ export class EssService {
       };
     }
 
+    // 8. Upcoming Holidays
+    const upcomingHolidays = (holidaysData || []).map((h: any) => ({
+      id: h.id,
+      name: h.name,
+      date: new Date(h.date).toISOString().split('T')[0],
+      isRestricted: Boolean(h.isRestricted),
+      description: h.description || null,
+      locationName: h.location?.name || 'All Locations',
+    }));
+
     return {
       profile,
       shift,
@@ -298,6 +320,7 @@ export class EssService {
       leaveBalances,
       recentLeaveRequests,
       latestPayslip,
+      upcomingHolidays,
       ...(managerOverview && { managerOverview }),
     };
   }

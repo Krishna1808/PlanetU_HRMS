@@ -75,6 +75,15 @@ export interface EssManagerOverview {
   pendingLeaveApprovalsCount: number;
 }
 
+export interface EssUpcomingHolidayItem {
+  id: string;
+  name: string;
+  date: string;
+  isRestricted: boolean;
+  description?: string | null;
+  locationName: string;
+}
+
 export interface EssDashboardResponse {
   profile: EssProfileSummary;
   shift: EssShiftCard;
@@ -82,5 +91,6 @@ export interface EssDashboardResponse {
   leaveBalances: EssLeaveBalanceItem[];
   recentLeaveRequests: EssRecentLeaveItem[];
   latestPayslip: EssLatestPayslipItem | null;
+  upcomingHolidays?: EssUpcomingHolidayItem[];
   managerOverview?: EssManagerOverview;
 }

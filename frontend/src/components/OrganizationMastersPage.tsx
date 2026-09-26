@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
+import { Icons } from './Icons';
 
 export function OrganizationMastersPage() {
-  const [activeTab, setActiveTab] = useState<'departments' | 'designations' | 'grades' | 'locations'>('departments');
+  const [activeTab, setActiveTab] = useState<
+    'departments' | 'designations' | 'grades' | 'locations' | 'holidays'
+  >('departments');
   const [departments, setDepartments] = useState<any[]>([]);
   const [designations, setDesignations] = useState<any[]>([]);
   const [grades, setGrades] = useState<any[]>([]);
@@ -12,6 +15,22 @@ export function OrganizationMastersPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Holiday Calendar State
+  const [holidays, setHolidays] = useState<any[]>([]);
+  const [holidayYear, setHolidayYear] = useState<number>(new Date().getFullYear());
+  const [holidayLocationFilter, setHolidayLocationFilter] = useState<string>('');
+  const [holidayTypeFilter, setHolidayTypeFilter] = useState<string>('ALL');
+
+  // Holiday Modal State
+  const [showHolidayModal, setShowHolidayModal] = useState(false);
+  const [editingHoliday, setEditingHoliday] = useState<any | null>(null);
+  const [holidayName, setHolidayName] = useState('');
+  const [holidayDate, setHolidayDate] = useState(new Date().toISOString().split('T')[0]);
+  const [holidayIsRestricted, setHolidayIsRestricted] = useState(false);
+  const [holidayDescription, setHolidayDescription] = useState('');
+  const [holidayLocationId, setHolidayLocationId] = useState('');
+  const [submittingHoliday, setSubmittingHoliday] = useState(false);
 
   // Department Form State
   const [deptName, setDeptName] = useState('');
@@ -63,19 +82,21 @@ export function OrganizationMastersPage() {
     try {
       setLoading(true);
       setError('');
-      const [deptRes, desigRes, gradeRes, locRes, empRes, meRes] = await Promise.all([
+      const [deptRes, desigRes, gradeRes, locRes, empRes, meRes, holRes] = await Promise.all([
         api.getDepartments().catch(() => []),
         api.getDesignations().catch(() => []),
         api.getGrades().catch(() => []),
         api.getLocations().catch(() => []),
         api.getEmployees().catch(() => ({ data: [] })),
         api.getMe().catch(() => null),
+        api.getHolidays({ year: holidayYear }).catch(() => []),
       ]);
       setDepartments(deptRes || []);
       setDesignations(desigRes || []);
       setGrades(gradeRes || []);
       setLocations(locRes || []);
       setAllEmployees(empRes?.data || []);
+      setHolidays(holRes || []);
       if (meRes) setCurrentUser(meRes);
     } catch (err: any) {
       setError(err?.message || 'Failed to load organization masters');
@@ -84,9 +105,105 @@ export function OrganizationMastersPage() {
     }
   };
 
+  const loadHolidays = async () => {
+    try {
+      const res = await api.getHolidays({
+        year: holidayYear,
+        locationId: holidayLocationFilter || undefined,
+        isRestricted:
+          holidayTypeFilter === 'MANDATORY'
+            ? false
+            : holidayTypeFilter === 'RESTRICTED'
+            ? true
+            : undefined,
+      });
+      setHolidays(res || []);
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     loadAll();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'holidays') {
+      loadHolidays();
+    }
+  }, [holidayYear, holidayLocationFilter, holidayTypeFilter, activeTab]);
+
+  const handleOpenAddHoliday = () => {
+    setEditingHoliday(null);
+    setHolidayName('');
+    setHolidayDate(new Date().toISOString().split('T')[0]);
+    setHolidayIsRestricted(false);
+    setHolidayDescription('');
+    setHolidayLocationId('');
+    setShowHolidayModal(true);
+  };
+
+  const handleStartEditHoliday = (holiday: any) => {
+    setEditingHoliday(holiday);
+    setHolidayName(holiday.name);
+    setHolidayDate(new Date(holiday.date).toISOString().split('T')[0]);
+    setHolidayIsRestricted(Boolean(holiday.isRestricted));
+    setHolidayDescription(holiday.description || '');
+    setHolidayLocationId(holiday.locationId || '');
+    setShowHolidayModal(true);
+  };
+
+  const handleSaveHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!holidayName.trim() || !holidayDate) {
+      setError('Please provide holiday name and date');
+      return;
+    }
+    setSubmittingHoliday(true);
+    setError('');
+    try {
+      if (editingHoliday) {
+        await api.updateHoliday(editingHoliday.id, {
+          name: holidayName.trim(),
+          date: holidayDate,
+          isRestricted: holidayIsRestricted,
+          description: holidayDescription.trim() || undefined,
+          locationId: holidayLocationId || null,
+        });
+        setSuccessMsg(`Holiday '${holidayName}' updated successfully!`);
+      } else {
+        await api.createHoliday({
+          name: holidayName.trim(),
+          date: holidayDate,
+          isRestricted: holidayIsRestricted,
+          description: holidayDescription.trim() || undefined,
+          locationId: holidayLocationId || undefined,
+        });
+        setSuccessMsg(`Holiday '${holidayName}' added to the calendar!`);
+      }
+      setShowHolidayModal(false);
+      await loadHolidays();
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save holiday');
+    } finally {
+      setSubmittingHoliday(false);
+    }
+  };
+
+  const handleDeleteHoliday = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to remove "${name}" from the holiday calendar?`)) {
+      return;
+    }
+    try {
+      await api.deleteHoliday(id);
+      setSuccessMsg(`Holiday "${name}" removed from calendar.`);
+      await loadHolidays();
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to delete holiday');
+    }
+  };
 
   const handleOpenDepartmentProfile = async (deptId: string) => {
     setShowProfileModal(true);
@@ -336,33 +453,38 @@ export function OrganizationMastersPage() {
       {/* Navigation Subtabs */}
       <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', background: '#ffffff', padding: '8px 16px', borderRadius: '8px', flexWrap: 'wrap' }}>
         {[
-          { key: 'departments', label: `Departments (${departments.length})`, icon: '' },
-          { key: 'designations', label: `Designations / Job Roles (${designations.length})`, icon: '' },
-          { key: 'grades', label: `Grades & Levels (${grades.length})`, icon: '' },
-          { key: 'locations', label: `Locations (${locations.length})`, icon: '' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
-            style={{
-              padding: '8px 16px',
-              border: 'none',
-              background: activeTab === tab.key ? '#2563eb' : 'transparent',
-              color: activeTab === tab.key ? '#ffffff' : '#64748b',
-              fontWeight: activeTab === tab.key ? 700 : 500,
-              fontSize: '13px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <span>{tab.icon}</span>
-            <span>{tab.label}</span>
-          </button>
-        ))}
+          { key: 'departments', label: `Departments (${departments.length})`, icon: Icons.Building },
+          { key: 'designations', label: `Designations / Job Roles (${designations.length})`, icon: Icons.Briefcase },
+          { key: 'grades', label: `Grades & Levels (${grades.length})`, icon: Icons.Award },
+          { key: 'locations', label: `Locations (${locations.length})`, icon: Icons.MapPin },
+          { key: 'holidays', label: `Holiday Calendar (${holidays.length})`, icon: Icons.Calendar },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as any)}
+              style={{
+                padding: '8px 16px',
+                border: 'none',
+                background: isActive ? '#2563eb' : 'transparent',
+                color: isActive ? '#ffffff' : '#64748b',
+                fontWeight: isActive ? 700 : 500,
+                fontSize: '13px',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Icon size={16} color={isActive ? '#ffffff' : '#64748b'} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Status Alerts */}
@@ -883,6 +1005,377 @@ export function OrganizationMastersPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* 5. HOLIDAYS TAB */}
+      {activeTab === 'holidays' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Holiday Top Toolbar */}
+          <div
+            className="card"
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '16px',
+              padding: '16px 20px',
+            }}
+          >
+            <div>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                Annual Holiday Calendar ({holidayYear})
+              </h3>
+              <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
+                Paid statutory public holidays and optional restricted/floating festivals observed by the organization.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {/* Year filter */}
+              <select
+                value={holidayYear}
+                onChange={(e) => setHolidayYear(Number(e.target.value))}
+                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#ffffff', fontWeight: 600 }}
+              >
+                {[2024, 2025, 2026, 2027, 2028].map((y) => (
+                  <option key={y} value={y}>
+                    Year {y}
+                  </option>
+                ))}
+              </select>
+
+              {/* Location filter */}
+              <select
+                value={holidayLocationFilter}
+                onChange={(e) => setHolidayLocationFilter(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#ffffff' }}
+              >
+                <option value="">All Locations (Company-wide)</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name} {loc.city ? `(${loc.city})` : ''}
+                  </option>
+                ))}
+              </select>
+
+              {/* Type filter */}
+              <select
+                value={holidayTypeFilter}
+                onChange={(e) => setHolidayTypeFilter(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#ffffff' }}
+              >
+                <option value="ALL">All Holidays</option>
+                <option value="MANDATORY">Mandatory Only</option>
+                <option value="RESTRICTED">Restricted / Floating Only</option>
+              </select>
+
+              {isSuperOrHrAdmin && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleOpenAddHoliday}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', fontSize: '13px' }}
+                >
+                  <Icons.Plus size={16} color="#ffffff" />
+                  <span>Add Holiday</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Holiday List Grid / Cards */}
+          {holidays.length === 0 ? (
+            <div className="card" style={{ padding: '48px 24px', textAlign: 'center', color: '#64748b' }}>
+              <div style={{ display: 'inline-flex', padding: '16px', background: '#f1f5f9', borderRadius: '50%', marginBottom: '12px' }}>
+                <Icons.Calendar size={32} color="#94a3b8" />
+              </div>
+              <h4 style={{ margin: '0 0 6px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                No Holidays Scheduled for {holidayYear}
+              </h4>
+              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                {isSuperOrHrAdmin
+                  ? 'Click "Add Holiday" above to add statutory and company holidays to the calendar.'
+                  : 'No holidays have been published for this year yet.'}
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+              {holidays.map((h) => {
+                const dateObj = new Date(h.date);
+                const dayNum = dateObj.toLocaleDateString('en-US', { day: '2-digit', timeZone: 'UTC' });
+                const monthStr = dateObj.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase();
+                const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+                const isRestricted = Boolean(h.isRestricted);
+
+                return (
+                  <div
+                    key={h.id}
+                    className="card"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '16px',
+                      padding: '18px 20px',
+                      borderLeft: `4px solid ${isRestricted ? '#f59e0b' : '#10b981'}`,
+                      position: 'relative',
+                    }}
+                  >
+                    {/* Date Block */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        minWidth: '58px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', letterSpacing: '0.5px' }}>
+                        {monthStr}
+                      </span>
+                      <span style={{ fontSize: '24px', fontWeight: 900, color: '#0f172a', lineHeight: 1.1 }}>
+                        {dayNum}
+                      </span>
+                    </div>
+
+                    {/* Holiday Info */}
+                    <div style={{ flexGrow: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                        <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+                          {h.name}
+                        </h4>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            background: isRestricted ? '#fef3c7' : '#dcfce7',
+                            color: isRestricted ? '#92400e' : '#166534',
+                          }}
+                        >
+                          {isRestricted ? 'Restricted / Floating' : 'Mandatory Public'}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '6px' }}>
+                        {dayOfWeek} • {h.location ? `Branch: ${h.location.name}` : 'All Locations (Company-wide)'}
+                      </div>
+
+                      {h.description && (
+                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#475569', lineHeight: 1.4 }}>
+                          {h.description}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    {isSuperOrHrAdmin && (
+                      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditHoliday(h)}
+                          title="Edit Holiday"
+                          style={{
+                            background: '#f8fafc',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '4px',
+                            padding: '6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Icons.Edit size={14} color="#475569" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteHoliday(h.id, h.name)}
+                          title="Delete Holiday"
+                          style={{
+                            background: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            borderRadius: '4px',
+                            padding: '6px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Icons.Trash size={14} color="#dc2626" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* HOLIDAY ADD / EDIT MODAL */}
+      {showHolidayModal && (
+        <Modal onClose={() => setShowHolidayModal(false)}>
+          <div
+            className="modal-backdrop-smooth"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 1000,
+              backgroundColor: 'rgba(15, 23, 42, 0.65)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
+            }}
+            onClick={() => setShowHolidayModal(false)}
+          >
+            <div
+              className="modal-dialog-smooth"
+              style={{
+                background: '#ffffff',
+                borderRadius: '12px',
+                width: '100%',
+                maxWidth: '520px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                overflow: 'hidden',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div
+                style={{
+                  background: '#0f172a',
+                  color: '#f8fafc',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Icons.Calendar size={18} color="#38bdf8" />
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
+                    {editingHoliday ? 'Edit Holiday' : 'Add New Holiday'}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowHolidayModal(false)}
+                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '18px' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Form */}
+              <form onSubmit={handleSaveHoliday} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    Holiday Name <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Republic Day, Diwali, Independence Day"
+                    value={holidayName}
+                    onChange={(e) => setHolidayName(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                      Date <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={holidayDate}
+                      onChange={(e) => setHolidayDate(e.target.value)}
+                      style={{ width: '100%', padding: '8px 12px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                      Holiday Type
+                    </label>
+                    <select
+                      value={holidayIsRestricted ? 'RESTRICTED' : 'MANDATORY'}
+                      onChange={(e) => setHolidayIsRestricted(e.target.value === 'RESTRICTED')}
+                      style={{ width: '100%', padding: '8px 12px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box', background: '#ffffff' }}
+                    >
+                      <option value="MANDATORY">Mandatory Public Holiday</option>
+                      <option value="RESTRICTED">Restricted / Floating Holiday</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    Applicable Location
+                  </label>
+                  <select
+                    value={holidayLocationId}
+                    onChange={(e) => setHolidayLocationId(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box', background: '#ffffff' }}
+                  >
+                    <option value="">All Locations (Company-wide)</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name} {loc.city ? `(${loc.city})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>
+                    Description / Notes
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Optional notes or details regarding this holiday..."
+                    value={holidayDescription}
+                    onChange={(e) => setHolidayDescription(e.target.value)}
+                    style={{ width: '100%', padding: '8px 12px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '6px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowHolidayModal(false)}
+                    style={{ padding: '8px 16px', fontSize: '13px' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={submittingHoliday}
+                    style={{ padding: '8px 16px', fontSize: '13px' }}
+                  >
+                    {submittingHoliday ? 'Saving...' : editingHoliday ? 'Update Holiday' : 'Save Holiday'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* DEPARTMENT PROFILE MODAL */}
