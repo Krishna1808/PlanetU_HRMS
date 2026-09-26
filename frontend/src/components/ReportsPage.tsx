@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
+import {
+  DonutChart,
+  BarChart as SvgBarChart,
+  MultiSeriesBarChart,
+  CircularGauge,
+  FunnelPipeline,
+} from './ReportCharts';
+import { Icons } from './Icons';
 
 interface ReportsPageProps {
   user: any;
@@ -22,6 +30,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
   // Selected filters
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getUTCFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getUTCMonth() + 1);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
 
   // Data states
   const [overviewData, setOverviewData] = useState<any>(null);
@@ -36,24 +46,38 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
     user.role === 'HR_ADMIN' ||
     user.role === 'FINANCE';
 
+  // Load departments list for filter
+  useEffect(() => {
+    api
+      .getDepartments()
+      .then((data) => setDepartments(Array.isArray(data) ? data : []))
+      .catch(() => setDepartments([]));
+  }, []);
+
   const loadData = async () => {
     setLoading(true);
     setErrorMsg('');
     try {
+      const deptFilter = selectedDepartmentId || undefined;
+
       if (activeTab === 'overview') {
         const res = await api.getReportsOverview();
         setOverviewData(res);
       } else if (activeTab === 'workforce') {
-        const res = await api.getWorkforceReports();
+        const res = await api.getWorkforceReports({ departmentId: deptFilter });
         setWorkforceData(res);
       } else if (activeTab === 'attendance') {
         const res = await api.getAttendanceReports({
           year: selectedYear,
           month: selectedMonth,
+          departmentId: deptFilter,
         });
         setAttendanceData(res);
       } else if (activeTab === 'leaves') {
-        const res = await api.getLeaveReports({ year: selectedYear });
+        const res = await api.getLeaveReports({
+          year: selectedYear,
+          departmentId: deptFilter,
+        });
         setLeaveData(res);
       } else if (activeTab === 'payroll') {
         if (canSeePayroll) {
@@ -73,27 +97,38 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
 
   useEffect(() => {
     loadData();
-  }, [activeTab, selectedYear, selectedMonth]);
+  }, [activeTab, selectedYear, selectedMonth, selectedDepartmentId]);
 
   const handleExportCsv = async (reportType: string) => {
     try {
       await api.downloadReportCsv(reportType, {
         year: selectedYear,
         month: selectedMonth,
+        departmentId: selectedDepartmentId || undefined,
       });
     } catch (err: any) {
       alert(`Export failed: ${err.message}`);
     }
   };
 
+  const selectedDepartmentName =
+    departments.find((d) => d.id === selectedDepartmentId)?.name || 'All Departments';
+
+  const monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Top Header */}
+      {/* Top Header & Filter Toolbar */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px',
           background: '#ffffff',
           padding: '20px 24px',
           borderRadius: '8px',
@@ -101,87 +136,148 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
         }}
       >
         <div>
-          <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>
-            Reports & Dashboards Engine
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Icons.BarChart size={22} color="#2563eb" />
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>
+              Reports & Dashboards Engine
+            </h2>
+          </div>
           <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
             Cross-module executive business intelligence, workforce demographics, statutory summaries, and CSV data exports.
           </p>
         </div>
 
-        {/* Global Year/Month Filter */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
-          >
-            {[2024, 2025, 2026, 2027].map((y) => (
-              <option key={y} value={y}>
-                Year {y}
-              </option>
-            ))}
-          </select>
+        {/* Global Filters: Department, Year, Month */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Department Filter (Applicable to Workforce, Attendance, Leaves, and Exports) */}
+          {(activeTab === 'workforce' ||
+            activeTab === 'attendance' ||
+            activeTab === 'leaves' ||
+            activeTab === 'exports') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Dept:</span>
+              <select
+                value={selectedDepartmentId}
+                onChange={(e) => setSelectedDepartmentId(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  background: '#ffffff',
+                  fontWeight: 500,
+                  color: '#0f172a',
+                }}
+              >
+                <option value="">All Departments</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          {(activeTab === 'attendance' || activeTab === 'exports') && (
+          {/* Year Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Year:</span>
             <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+                background: '#ffffff',
+                fontWeight: 500,
+                color: '#0f172a',
+              }}
             >
-              {[
-                { m: 1, name: 'Jan' },
-                { m: 2, name: 'Feb' },
-                { m: 3, name: 'Mar' },
-                { m: 4, name: 'Apr' },
-                { m: 5, name: 'May' },
-                { m: 6, name: 'Jun' },
-                { m: 7, name: 'Jul' },
-                { m: 8, name: 'Aug' },
-                { m: 9, name: 'Sep' },
-                { m: 10, name: 'Oct' },
-                { m: 11, name: 'Nov' },
-                { m: 12, name: 'Dec' },
-              ].map((item) => (
-                <option key={item.m} value={item.m}>
-                  {item.name}
+              {[2024, 2025, 2026, 2027].map((y) => (
+                <option key={y} value={y}>
+                  {y}
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Month Filter */}
+          {(activeTab === 'attendance' || activeTab === 'exports') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Month:</span>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  background: '#ffffff',
+                  fontWeight: 500,
+                  color: '#0f172a',
+                }}
+              >
+                {monthNames.map((name, idx) => (
+                  <option key={idx + 1} value={idx + 1}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
         </div>
       </div>
 
       {/* Sub Navigation Bar */}
-      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: '8px',
+          overflowX: 'auto',
+          borderBottom: '1px solid #e2e8f0',
+          paddingBottom: '8px',
+        }}
+      >
         {[
-          { key: 'overview', label: 'Executive Overview' },
-          { key: 'workforce', label: 'Workforce Demographics' },
-          { key: 'attendance', label: 'Attendance Patterns' },
-          { key: 'leaves', label: 'Leave Utilization' },
-          ...(canSeePayroll ? [{ key: 'payroll', label: 'Payroll & Statutory' }] : []),
-          { key: 'lifecycle', label: 'Talent Lifecycle' },
-          { key: 'exports', label: 'CSV Data Exports' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as ReportTab)}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '6px',
-              border: 'none',
-              background: activeTab === tab.key ? '#2563eb' : '#ffffff',
-              color: activeTab === tab.key ? '#ffffff' : '#475569',
-              fontWeight: activeTab === tab.key ? 700 : 500,
-              fontSize: '13px',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              boxShadow: activeTab === tab.key ? '0 1px 3px rgba(37,99,235,0.3)' : 'none',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+          { key: 'overview', label: 'Executive Overview', icon: Icons.BarChart },
+          { key: 'workforce', label: 'Workforce Demographics', icon: Icons.Users },
+          { key: 'attendance', label: 'Attendance Patterns', icon: Icons.Clock },
+          { key: 'leaves', label: 'Leave Utilization', icon: Icons.Calendar },
+          ...(canSeePayroll ? [{ key: 'payroll', label: 'Payroll & Statutory', icon: Icons.Dollar }] : []),
+          { key: 'lifecycle', label: 'Talent Lifecycle', icon: Icons.Rocket },
+          { key: 'exports', label: 'CSV Data Exports', icon: Icons.Download },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as ReportTab)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                background: isActive ? '#2563eb' : '#ffffff',
+                color: isActive ? '#ffffff' : '#475569',
+                fontWeight: isActive ? 700 : 500,
+                fontSize: '13px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: isActive ? '0 1px 3px rgba(37,99,235,0.3)' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Icon size={16} color={isActive ? '#ffffff' : '#64748b'} />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Error Message */}
@@ -194,26 +290,35 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
             color: '#991b1b',
             borderRadius: '4px',
             fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}
         >
-          <strong>Error:</strong> {errorMsg}
+          <Icons.AlertTriangle size={18} color="#ef4444" />
+          <span>
+            <strong>Error:</strong> {errorMsg}
+          </span>
         </div>
       )}
 
       {loading ? (
-        <div style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
-          Loading real-time analytics...
+        <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
+          <div style={{ fontSize: '15px', fontWeight: 600 }}>Loading real-time analytics...</div>
+          <div style={{ fontSize: '13px', marginTop: '4px', color: '#94a3b8' }}>
+            Compiling live multi-module telemetry data
+          </div>
         </div>
       ) : (
         <>
           {/* TAB 1: Executive Overview */}
           {activeTab === 'overview' && overviewData && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* KPI Cards Grid */}
+              {/* KPI Cards & Presence Gauge Grid */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
                   gap: '16px',
                 }}
               >
@@ -224,21 +329,30 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                   <div style={{ fontSize: '32px', fontWeight: 900, color: '#0f172a', margin: '6px 0' }}>
                     {overviewData.activeHeadcount}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#10b981' }}>
+                  <div style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Icons.Check size={14} color="#10b981" />
                     +{overviewData.newHiresThisMonth} joined • -{overviewData.exitsThisMonth} exited this month
                   </div>
                 </div>
 
-                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                    Today's Presence Rate
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      Today's Presence
+                    </div>
+                    <div style={{ fontSize: '30px', fontWeight: 900, color: '#2563eb', margin: '4px 0' }}>
+                      {overviewData.presenceRate}%
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      {overviewData.todayPunches} clocked in ({overviewData.todayLatePunches} late)
+                    </div>
                   </div>
-                  <div style={{ fontSize: '32px', fontWeight: 900, color: '#2563eb', margin: '6px 0' }}>
-                    {overviewData.presenceRate}%
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {overviewData.todayPunches} clocked in ({overviewData.todayLatePunches} late arrivals)
-                  </div>
+                  <CircularGauge
+                    value={overviewData.presenceRate}
+                    label=""
+                    size={80}
+                    strokeWidth={8}
+                  />
                 </div>
 
                 {overviewData.currentMonthPayrollExpense !== null && (
@@ -268,9 +382,11 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                 </div>
               </div>
 
-              {/* Quick Summary Info */}
+              {/* Real-time telemetry summary */}
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
-                <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>Real-Time System Health</h4>
+                <h4 style={{ margin: '0 0 6px', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                  Cross-Module Telemetry Engine
+                </h4>
                 <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>
                   Live cross-module aggregations reflect instant database commits across Attendance (M4), Leaves (M5), Payroll (M6), Onboarding (M8), and Offboarding (M9).
                 </p>
@@ -280,82 +396,78 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
 
           {/* TAB 2: Workforce Demographics */}
           {activeTab === 'workforce' && workforceData && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
-              {/* Department Breakdown */}
-              <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Headcount by Department</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {workforceData.byDepartment.map((d: any) => (
-                    <div key={d.departmentId}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                        <span style={{ fontWeight: 600 }}>{d.name}</span>
-                        <span>{d.count} ({d.percentage}%)</span>
-                      </div>
-                      <div style={{ background: '#f1f5f9', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{ width: `${d.percentage}%`, background: '#3b82f6', height: '100%' }} />
-                      </div>
-                    </div>
-                  ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {selectedDepartmentId && (
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '10px 16px', fontSize: '13px', color: '#1e40af' }}>
+                  Filtering demographics specifically for <strong>{selectedDepartmentName}</strong> ({workforceData.totalActive} active members).
                 </div>
-              </div>
+              )}
 
-              {/* Gender Diversity */}
-              <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Gender Diversity Ratio</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {workforceData.byGender.map((g: any) => (
-                    <div key={g.gender}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                        <span style={{ fontWeight: 600 }}>{g.gender}</span>
-                        <span>{g.count} ({g.percentage}%)</span>
-                      </div>
-                      <div style={{ background: '#f1f5f9', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div
-                          style={{
-                            width: `${g.percentage}%`,
-                            background: g.gender === 'FEMALE' ? '#ec4899' : '#3b82f6',
-                            height: '100%',
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+                {/* Department Distribution (Donut Chart) */}
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                    Headcount by Department
+                  </h3>
+                  <DonutChart
+                    data={workforceData.byDepartment.map((d: any) => ({
+                      label: d.name,
+                      value: d.count,
+                    }))}
+                    centerTitle="Active Staff"
+                    centerValue={workforceData.totalActive}
+                    size={180}
+                  />
                 </div>
-              </div>
 
-              {/* Grade Distribution */}
-              <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Grade Levels</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {workforceData.byGrade.map((gr: any) => (
-                    <div key={gr.gradeId}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                        <span style={{ fontWeight: 600 }}>{gr.name}</span>
-                        <span>{gr.count} ({gr.percentage}%)</span>
-                      </div>
-                      <div style={{ background: '#f1f5f9', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{ width: `${gr.percentage}%`, background: '#8b5cf6', height: '100%' }} />
-                      </div>
-                    </div>
-                  ))}
+                {/* Gender Diversity (Donut Chart) */}
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                    Gender Diversity Ratio
+                  </h3>
+                  <DonutChart
+                    data={workforceData.byGender.map((g: any) => ({
+                      label: g.gender,
+                      value: g.count,
+                      color: g.gender === 'FEMALE' ? '#ec4899' : g.gender === 'MALE' ? '#3b82f6' : '#8b5cf6',
+                    }))}
+                    centerTitle="Workforce"
+                    centerValue={workforceData.totalActive}
+                    size={180}
+                  />
                 </div>
-              </div>
 
-              {/* Employment Types */}
-              <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Employment Types</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {workforceData.byEmploymentType.map((et: any) => (
-                    <div key={et.employmentType}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                        <span style={{ fontWeight: 600 }}>{et.employmentType}</span>
-                        <span>{et.count} ({et.percentage}%)</span>
-                      </div>
-                      <div style={{ background: '#f1f5f9', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{ width: `${et.percentage}%`, background: '#10b981', height: '100%' }} />
-                      </div>
-                    </div>
-                  ))}
+                {/* Grade Distribution (Bar Chart) */}
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                    Grade Level Distribution
+                  </h3>
+                  <SvgBarChart
+                    data={workforceData.byGrade.map((gr: any) => ({
+                      label: gr.name,
+                      value: gr.count,
+                      color: '#8b5cf6',
+                    }))}
+                    defaultColor="#8b5cf6"
+                    height={200}
+                    yAxisFormatter={(v) => `${v}`}
+                  />
+                </div>
+
+                {/* Employment Types */}
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                    Employment Types
+                  </h3>
+                  <DonutChart
+                    data={workforceData.byEmploymentType.map((et: any) => ({
+                      label: et.employmentType,
+                      value: et.count,
+                    }))}
+                    centerTitle="Contracts"
+                    centerValue={workforceData.totalActive}
+                    size={180}
+                  />
                 </div>
               </div>
             </div>
@@ -364,74 +476,108 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
           {/* TAB 3: Attendance Patterns */}
           {activeTab === 'attendance' && attendanceData && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {selectedDepartmentId && (
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '10px 16px', fontSize: '13px', color: '#1e40af' }}>
+                  Scoped to department: <strong>{selectedDepartmentName}</strong> for {monthNames[selectedMonth - 1]} {selectedYear}.
+                </div>
+              )}
+
+              {/* Attendance Summary Cards */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
                   gap: '16px',
                 }}
               >
-                <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>OVERALL PRESENCE RATE</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#2563eb', margin: '4px 0' }}>
-                    {attendanceData.overallPresenceRate}%
+                <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                      Monthly Presence Rate
+                    </div>
+                    <div style={{ fontSize: '26px', fontWeight: 900, color: '#2563eb', margin: '4px 0' }}>
+                      {attendanceData.overallPresenceRate}%
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b' }}>
+                      {monthNames[selectedMonth - 1]} {selectedYear}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>For {selectedMonth}/{selectedYear}</div>
+                  <CircularGauge
+                    value={attendanceData.overallPresenceRate}
+                    label=""
+                    size={72}
+                    strokeWidth={7}
+                  />
                 </div>
 
                 <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>TOTAL LATE ARRIVALS</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#f59e0b', margin: '4px 0' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Late Arrivals
+                  </div>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#f59e0b', margin: '4px 0' }}>
                     {attendanceData.lateness.lateCount}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {attendanceData.lateness.totalLateMinutes} late minutes
+                    {attendanceData.lateness.totalLateMinutes} total late minutes
                   </div>
                 </div>
 
                 <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>ABSENT DAYS (UNEXCUSED)</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#ef4444', margin: '4px 0' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Unexcused Absences
+                  </div>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#ef4444', margin: '4px 0' }}>
                     {attendanceData.statusCounts.ABSENT || 0}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>Flagged for payroll deduction</div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    LOP payroll deductions
+                  </div>
                 </div>
 
                 <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>AUTHORIZED LEAVE DAYS</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#8b5cf6', margin: '4px 0' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Authorized Leaves
+                  </div>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#8b5cf6', margin: '4px 0' }}>
                     {attendanceData.statusCounts.ON_LEAVE || 0}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>Approved leaves</div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    Approved applications
+                  </div>
                 </div>
               </div>
 
-              {/* Day-by-Day Volume Timeline */}
-              <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Daily Punch Activity</h3>
-                {attendanceData.dailyTimeline.length === 0 ? (
-                  <div style={{ color: '#94a3b8', fontSize: '13px' }}>No punch records recorded for this month.</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {attendanceData.dailyTimeline.map((d: any) => (
-                      <div
-                        key={d.date}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          fontSize: '12px',
-                          borderBottom: '1px solid #f1f5f9',
-                          paddingBottom: '4px',
-                        }}
-                      >
-                        <span style={{ width: '90px', fontWeight: 600 }}>{d.date}</span>
-                        <span style={{ color: '#15803d', width: '80px' }}>{d.present} Present</span>
-                        <span style={{ color: '#b91c1c', width: '80px' }}>{d.absent} Absent</span>
-                        <span style={{ color: '#6b21a8', width: '90px' }}>{d.onLeave} On Leave</span>
-                      </div>
-                    ))}
+              {/* Interactive Daily Punch Activity Stacked Bar Chart */}
+              <div style={{ background: '#ffffff', padding: '24px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                      Daily Punch Activity ({monthNames[selectedMonth - 1]} {selectedYear})
+                    </h3>
+                    <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#64748b' }}>
+                      Hover over any day column to view exact Present, Absent, and On-Leave headcounts.
+                    </p>
                   </div>
+                </div>
+
+                {attendanceData.dailyTimeline.length === 0 ? (
+                  <div style={{ padding: '36px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                    No punch records recorded for {monthNames[selectedMonth - 1]} {selectedYear}.
+                  </div>
+                ) : (
+                  <MultiSeriesBarChart
+                    stacked={true}
+                    height={260}
+                    data={attendanceData.dailyTimeline.map((d: any) => ({
+                      label: d.date.slice(8), // Show day number '01', '02', etc.
+                      series: [
+                        { name: 'Present', value: d.present, color: '#10b981' },
+                        { name: 'On Leave', value: d.onLeave, color: '#8b5cf6' },
+                        { name: 'Absent', value: d.absent, color: '#ef4444' },
+                      ],
+                    }))}
+                    yAxisFormatter={(v) => `${v}`}
+                  />
                 )}
               </div>
             </div>
@@ -439,42 +585,46 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
 
           {/* TAB 4: Leave Utilization */}
           {activeTab === 'leaves' && leaveData && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
-              {/* Leave Type Breakdown */}
-              <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>
-                  Days Consumed by Leave Type ({leaveData.year})
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {leaveData.byLeaveType.map((lt: any) => (
-                    <div key={lt.code} style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                        <div>
-                          <strong>{lt.name} ({lt.code})</strong>
-                          <span style={{ fontSize: '11px', marginLeft: '6px', color: lt.isPaid ? '#059669' : '#d97706' }}>
-                            {lt.isPaid ? 'PAID' : 'UNPAID'}
-                          </span>
-                        </div>
-                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{lt.totalDays} days</span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                        {lt.count} approved applications
-                      </div>
-                    </div>
-                  ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {selectedDepartmentId && (
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '10px 16px', fontSize: '13px', color: '#1e40af' }}>
+                  Scoped to department: <strong>{selectedDepartmentName}</strong> for year {leaveData.year}.
                 </div>
-              </div>
+              )}
 
-              {/* Department Comparison */}
-              <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Department Consumption</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {leaveData.byDepartment.map((d: any) => (
-                    <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', borderBottom: '1px solid #f1f5f9', paddingBottom: '6px' }}>
-                      <span style={{ fontWeight: 600 }}>{d.name}</span>
-                      <strong style={{ color: '#2563eb' }}>{d.totalDays} days</strong>
-                    </div>
-                  ))}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+                {/* Leave Type Breakdown (Bar Chart) */}
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                    Days Consumed by Leave Type ({leaveData.year})
+                  </h3>
+                  <SvgBarChart
+                    data={leaveData.byLeaveType.map((lt: any) => ({
+                      label: lt.code,
+                      value: lt.totalDays,
+                      color: lt.isPaid ? '#10b981' : '#f59e0b',
+                      sublabel: `${lt.name} (${lt.isPaid ? 'Paid' : 'Unpaid'}) • ${lt.count} applications`,
+                    }))}
+                    height={220}
+                    yAxisFormatter={(v) => `${v}d`}
+                  />
+                </div>
+
+                {/* Department Consumption (Bar Chart) */}
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                    Department Consumption ({leaveData.year})
+                  </h3>
+                  <SvgBarChart
+                    data={leaveData.byDepartment.map((d: any) => ({
+                      label: d.name,
+                      value: d.totalDays,
+                      color: '#2563eb',
+                    }))}
+                    defaultColor="#2563eb"
+                    height={220}
+                    yAxisFormatter={(v) => `${v}d`}
+                  />
                 </div>
               </div>
             </div>
@@ -512,7 +662,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                   <div style={{ fontSize: '24px', fontWeight: 900, color: '#0f172a', margin: '4px 0' }}>
                     ₹{payrollData.statutoryLiabilities.totalProfessionalTax.toLocaleString()}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#64748b' }}>State government remittances</div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>State remittances</div>
                 </div>
 
                 <div style={{ background: '#eff6ff', padding: '16px', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
@@ -524,79 +674,114 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                 </div>
               </div>
 
-              {/* Monthly Batches Trend Table */}
-              <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Monthly Payroll Runs ({payrollData.year})</h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                      <th style={{ padding: '10px 14px' }}>Month</th>
-                      <th style={{ padding: '10px 14px' }}>Batch</th>
-                      <th style={{ padding: '10px 14px' }}>Employees</th>
-                      <th style={{ padding: '10px 14px' }}>Total Gross</th>
-                      <th style={{ padding: '10px 14px' }}>Total Deductions</th>
-                      <th style={{ padding: '10px 14px' }}>Net Pay</th>
-                      <th style={{ padding: '10px 14px' }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payrollData.monthlyTrends.map((b: any) => (
-                      <tr key={b.batchName} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '10px 14px' }}>Month {b.month}</td>
-                        <td style={{ padding: '10px 14px', fontWeight: 600 }}>{b.batchName}</td>
-                        <td style={{ padding: '10px 14px' }}>{b.employeeCount}</td>
-                        <td style={{ padding: '10px 14px' }}>₹{b.totalGross.toLocaleString()}</td>
-                        <td style={{ padding: '10px 14px', color: '#dc2626' }}>-₹{b.totalDeductions.toLocaleString()}</td>
-                        <td style={{ padding: '10px 14px', fontWeight: 700, color: '#059669' }}>₹{b.totalNetPay.toLocaleString()}</td>
-                        <td style={{ padding: '10px 14px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: '#dcfce7', color: '#166534' }}>
-                            {b.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* Monthly Gross vs Net Pay Trend Chart */}
+              <div style={{ background: '#ffffff', padding: '24px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                  Month-on-Month Payroll Trends ({payrollData.year})
+                </h3>
+                {payrollData.monthlyTrends.length === 0 ? (
+                  <div style={{ padding: '36px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                    No payroll batches generated for year {payrollData.year}.
+                  </div>
+                ) : (
+                  <MultiSeriesBarChart
+                    data={payrollData.monthlyTrends.map((b: any) => ({
+                      label: monthNames[b.month - 1] || `M${b.month}`,
+                      series: [
+                        { name: 'Gross Pay', value: b.totalGross, color: '#3b82f6' },
+                        { name: 'Net Pay', value: b.totalNetPay, color: '#10b981' },
+                      ],
+                    }))}
+                    height={240}
+                    yAxisFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                  />
+                )}
               </div>
+
+              {/* Department Cost Distribution */}
+              {payrollData.departmentDistribution && payrollData.departmentDistribution.length > 0 && (
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                    Department Payroll Cost Distribution ({payrollData.year})
+                  </h3>
+                  <DonutChart
+                    data={payrollData.departmentDistribution.map((d: any) => ({
+                      label: d.department,
+                      value: d.totalNet,
+                    }))}
+                    centerTitle="Net Payroll"
+                    centerValue={`₹${(payrollData.summary.totalYearNet / 1000).toFixed(0)}k`}
+                    size={200}
+                  />
+                </div>
+              )}
             </div>
           )}
 
           {/* TAB 6: Talent Lifecycle */}
           {activeTab === 'lifecycle' && lifecycleData && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
-              {/* Onboarding Funnel */}
+              {/* Onboarding Funnel (FunnelChart) */}
               <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>Onboarding Pipeline Conversion</h3>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                    Onboarding Pipeline Conversion
+                  </h3>
                   <span style={{ fontSize: '14px', fontWeight: 800, color: '#059669' }}>
                     {lifecycleData.onboarding.conversionRate}% Converted
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>1. Invited Candidates</span>
-                    <strong>{lifecycleData.onboarding.totalCandidates}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>2. In Progress / Pre-boarding</span>
-                    <strong>{lifecycleData.onboarding.funnel.IN_PROGRESS || 0}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>3. Form Submitted</span>
-                    <strong>{lifecycleData.onboarding.funnel.SUBMITTED || 0}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#059669', fontWeight: 700 }}>
-                    <span>4. Converted to Official Employees</span>
-                    <strong>{lifecycleData.onboarding.convertedCount}</strong>
-                  </div>
-                </div>
+                <FunnelPipeline
+                  steps={[
+                    {
+                      label: 'Invited Candidates',
+                      count: lifecycleData.onboarding.totalCandidates,
+                      percentage: 100,
+                      color: '#3b82f6',
+                    },
+                    {
+                      label: 'Pre-boarding In Progress',
+                      count: lifecycleData.onboarding.funnel.IN_PROGRESS || 0,
+                      percentage:
+                        lifecycleData.onboarding.totalCandidates > 0
+                          ? Math.round(
+                              ((lifecycleData.onboarding.funnel.IN_PROGRESS || 0) /
+                                lifecycleData.onboarding.totalCandidates) *
+                                100,
+                            )
+                          : 0,
+                      color: '#6366f1',
+                    },
+                    {
+                      label: 'Form Submitted',
+                      count: lifecycleData.onboarding.funnel.SUBMITTED || 0,
+                      percentage:
+                        lifecycleData.onboarding.totalCandidates > 0
+                          ? Math.round(
+                              ((lifecycleData.onboarding.funnel.SUBMITTED || 0) /
+                                lifecycleData.onboarding.totalCandidates) *
+                                100,
+                            )
+                          : 0,
+                      color: '#f59e0b',
+                    },
+                    {
+                      label: 'Converted to Official Employees',
+                      count: lifecycleData.onboarding.convertedCount,
+                      percentage: lifecycleData.onboarding.conversionRate,
+                      color: '#10b981',
+                    },
+                  ]}
+                />
               </div>
 
               {/* Exit Reasons & Ratings */}
               <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>Exit Interview Average Ratings</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                  Exit Interview Average Feedback Scores
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   {[
                     { label: 'Company Culture', val: lifecycleData.offboarding.averageRatings.culture },
                     { label: 'Management & Leadership', val: lifecycleData.offboarding.averageRatings.management },
@@ -605,11 +790,18 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                   ].map((r) => (
                     <div key={r.label}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                        <span>{r.label}</span>
-                        <strong>{r.val} / 5</strong>
+                        <span style={{ fontWeight: 600, color: '#1e293b' }}>{r.label}</span>
+                        <strong style={{ color: '#0f172a' }}>{r.val} / 5</strong>
                       </div>
-                      <div style={{ background: '#f1f5f9', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{ width: `${(r.val / 5) * 100}%`, background: '#f59e0b', height: '100%' }} />
+                      <div style={{ background: '#f1f5f9', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            width: `${(r.val / 5) * 100}%`,
+                            background: r.val >= 4 ? '#10b981' : r.val >= 3 ? '#f59e0b' : '#ef4444',
+                            height: '100%',
+                            transition: 'width 0.4s ease',
+                          }}
+                        />
                       </div>
                     </div>
                   ))}
@@ -621,66 +813,85 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
           {/* TAB 7: CSV Data Exports */}
           {activeTab === 'exports' && (
             <div style={{ background: '#ffffff', padding: '24px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: 700 }}>1-Click CSV Report Exports</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>
+                  1-Click Standard CSV Data Exports
+                </h3>
+                <div style={{ fontSize: '12px', background: '#f1f5f9', padding: '4px 10px', borderRadius: '4px', color: '#475569' }}>
+                  Export Scope: <strong>{selectedDepartmentName}</strong> • Year <strong>{selectedYear}</strong> • Month <strong>{monthNames[selectedMonth - 1]}</strong>
+                </div>
+              </div>
               <p style={{ margin: '0 0 24px', fontSize: '13px', color: '#64748b' }}>
-                Download compliance-ready, standardized tabular CSV data extracts for labor audits, accountant reviews, and tax filings.
+                Download compliance-ready, standardized RFC 4180 CSV data extracts for labor audits, accountant reviews, and tax filings.
               </p>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '16px' }}>
-                  <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>Headcount Master</h4>
-                  <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
-                    Complete employee register: Code, Name, Email, Department, Designation, Grade, Status, Joining Date.
-                  </p>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>Headcount Master</h4>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
+                      Complete employee register: Code, Name, Email, Department, Designation, Grade, Status, Joining Date.
+                    </p>
+                  </div>
                   <button
                     className="btn btn-primary"
-                    style={{ width: '100%', padding: '8px', fontSize: '12px' }}
+                    style={{ width: '100%', padding: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                     onClick={() => handleExportCsv('headcount')}
                   >
+                    <Icons.Download size={14} color="#ffffff" />
                     Download Headcount CSV
                   </button>
                 </div>
 
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '16px' }}>
-                  <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>Attendance Register</h4>
-                  <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
-                    Selected month punches: Date, Employee, Check-In, Check-Out, Active Minutes, Lateness, Status.
-                  </p>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>Attendance Register</h4>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
+                      Punches for {monthNames[selectedMonth - 1]} {selectedYear}: Date, Employee, Check-In, Check-Out, Active Minutes, Lateness, Status.
+                    </p>
+                  </div>
                   <button
                     className="btn btn-primary"
-                    style={{ width: '100%', padding: '8px', fontSize: '12px' }}
+                    style={{ width: '100%', padding: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                     onClick={() => handleExportCsv('attendance')}
                   >
+                    <Icons.Download size={14} color="#ffffff" />
                     Download Attendance CSV
                   </button>
                 </div>
 
                 {canSeePayroll && (
-                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '16px' }}>
-                    <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>Payroll Batches</h4>
-                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
-                      Payroll history: Year, Month, Batch Name, Total Gross, Total Deductions, Total Net Pay.
-                    </p>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>Payroll Batches</h4>
+                      <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
+                        Payroll history: Year, Month, Batch Name, Total Gross, Total Deductions, Total Net Pay.
+                      </p>
+                    </div>
                     <button
                       className="btn btn-primary"
-                      style={{ width: '100%', padding: '8px', fontSize: '12px' }}
+                      style={{ width: '100%', padding: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       onClick={() => handleExportCsv('payroll')}
                     >
+                      <Icons.Download size={14} color="#ffffff" />
                       Download Payroll CSV
                     </button>
                   </div>
                 )}
 
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '16px' }}>
-                  <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>Leave Applications</h4>
-                  <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
-                    Annual leave records: Employee, Department, Leave Type, Dates, Total Days, Status, Reason.
-                  </p>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '18px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>Leave Applications</h4>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
+                      Annual leave records: Employee, Department, Leave Type, Dates, Total Days, Status, Reason.
+                    </p>
+                  </div>
                   <button
                     className="btn btn-primary"
-                    style={{ width: '100%', padding: '8px', fontSize: '12px' }}
+                    style={{ width: '100%', padding: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                     onClick={() => handleExportCsv('leaves')}
                   >
+                    <Icons.Download size={14} color="#ffffff" />
                     Download Leaves CSV
                   </button>
                 </div>

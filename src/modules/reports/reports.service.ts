@@ -161,7 +161,8 @@ export class ReportsService {
    */
   async getWorkforceAnalytics(
     organizationId: string,
-    currentUser: AuthenticatedUser,
+    query?: ReportQueryDto,
+    currentUser?: AuthenticatedUser,
   ) {
     const activeWhere: Prisma.EmployeeWhereInput = {
       organizationId,
@@ -170,6 +171,21 @@ export class ReportsService {
         notIn: [EmploymentStatus.RESIGNED, EmploymentStatus.TERMINATED],
       },
     };
+
+    if (query?.departmentId) {
+      activeWhere.departmentId = query.departmentId;
+    }
+
+    if (
+      currentUser?.role === Role.MANAGER &&
+      currentUser.employeeId &&
+      !query?.departmentId
+    ) {
+      activeWhere.OR = [
+        { reportingManagerId: currentUser.employeeId },
+        { id: currentUser.employeeId },
+      ];
+    }
 
     const [
       totalActive,
@@ -727,8 +743,13 @@ export class ReportsService {
 
     switch (reportType.toLowerCase()) {
       case 'headcount': {
+        const where: Prisma.EmployeeWhereInput = { organizationId, deletedAt: null };
+        if (query.departmentId) {
+          where.departmentId = query.departmentId;
+        }
+
         const employees = await this.prisma.employee.findMany({
-          where: { organizationId, deletedAt: null },
+          where,
           orderBy: { employeeCode: 'asc' },
           include: {
             department: { select: { name: true } },
@@ -778,11 +799,16 @@ export class ReportsService {
         const startOfMonth = new Date(Date.UTC(year, month - 1, 1));
         const endOfMonth = new Date(Date.UTC(year, month, 0, 23, 59, 59));
 
+        const where: Prisma.AttendanceRecordWhereInput = {
+          organizationId,
+          date: { gte: startOfMonth, lte: endOfMonth },
+        };
+        if (query.departmentId) {
+          where.employee = { departmentId: query.departmentId };
+        }
+
         const records = await this.prisma.attendanceRecord.findMany({
-          where: {
-            organizationId,
-            date: { gte: startOfMonth, lte: endOfMonth },
-          },
+          where,
           orderBy: [{ date: 'asc' }, { employee: { employeeCode: 'asc' } }],
           include: {
             employee: {
@@ -873,8 +899,16 @@ export class ReportsService {
         const startOfYear = new Date(Date.UTC(year, 0, 1));
         const endOfYear = new Date(Date.UTC(year, 11, 31, 23, 59, 59));
 
+        const where: Prisma.LeaveRequestWhereInput = {
+          organizationId,
+          startDate: { gte: startOfYear, lte: endOfYear },
+        };
+        if (query.departmentId) {
+          where.employee = { departmentId: query.departmentId };
+        }
+
         const leaves = await this.prisma.leaveRequest.findMany({
-          where: { organizationId, startDate: { gte: startOfYear, lte: endOfYear } },
+          where,
           orderBy: { startDate: 'desc' },
           include: {
             leaveType: { select: { name: true, code: true } },

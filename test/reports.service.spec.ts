@@ -143,13 +143,38 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       mockPrisma.designation.findMany.mockResolvedValue([{ id: 'des-1', name: 'Software Engineer' }]);
       mockPrisma.grade.findMany.mockResolvedValue([{ id: 'g-1', name: 'L2', level: 2 }]);
 
-      const workforce = await service.getWorkforceAnalytics(orgId, mockAdminUser);
+      const workforce = await service.getWorkforceAnalytics(orgId, {}, mockAdminUser);
 
       expect(workforce.totalActive).toBe(20);
       expect(workforce.byDepartment.length).toBe(2);
       expect(workforce.byDepartment[0].name).toBe('Engineering');
       expect(workforce.byDepartment[0].percentage).toBe(75);
       expect(workforce.byGender.length).toBe(2);
+    });
+
+    it('scopes active employee query when departmentId filter is provided', async () => {
+      mockPrisma.employee.count.mockResolvedValue(15);
+      mockPrisma.employee.groupBy
+        .mockResolvedValueOnce([{ departmentId: 'd-1', _count: 15 }])
+        .mockResolvedValueOnce([{ designationId: 'des-1', _count: 15 }])
+        .mockResolvedValueOnce([{ gradeId: 'g-1', _count: 15 }])
+        .mockResolvedValueOnce([{ gender: 'MALE', _count: 15 }])
+        .mockResolvedValueOnce([{ employmentType: 'FULL_TIME', _count: 15 }]);
+
+      mockPrisma.department.findMany.mockResolvedValue([
+        { id: 'd-1', name: 'Engineering', codePrefix: 'ENG' },
+      ]);
+      mockPrisma.designation.findMany.mockResolvedValue([{ id: 'des-1', name: 'Software Engineer' }]);
+      mockPrisma.grade.findMany.mockResolvedValue([{ id: 'g-1', name: 'L2', level: 2 }]);
+
+      const workforce = await service.getWorkforceAnalytics(orgId, { departmentId: 'd-1' }, mockAdminUser);
+
+      expect(workforce.totalActive).toBe(15);
+      expect(mockPrisma.employee.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ departmentId: 'd-1' }),
+        }),
+      );
     });
   });
 
@@ -336,6 +361,41 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       expect(result.filename).toContain('planetu_headcount_master');
       expect(result.csv).toContain('Employee Code,First Name,Last Name');
       expect(result.csv).toContain('ENG-0001,Rohan,Sharma');
+    });
+
+    it('filters attendance CSV export by departmentId when provided', async () => {
+      mockPrisma.attendanceRecord.findMany.mockResolvedValue([
+        {
+          date: new Date('2026-09-01'),
+          employee: {
+            employeeCode: 'ENG-0001',
+            firstName: 'Rohan',
+            lastName: 'Sharma',
+            department: { name: 'Engineering' },
+          },
+          checkInTime: new Date('2026-09-01T09:00:00Z'),
+          checkOutTime: new Date('2026-09-01T18:00:00Z'),
+          totalActiveMinutes: 540,
+          status: 'PRESENT',
+          isLate: false,
+        },
+      ]);
+
+      const result = await service.exportReportCsv(
+        orgId,
+        'attendance',
+        { year: 2026, month: 9, departmentId: 'dept-eng' },
+        mockAdminUser,
+      );
+
+      expect(result.filename).toContain('planetu_attendance_2026_9');
+      expect(mockPrisma.attendanceRecord.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            employee: { departmentId: 'dept-eng' },
+          }),
+        }),
+      );
     });
 
     it('rejects unsupported report types with BadRequestException', async () => {

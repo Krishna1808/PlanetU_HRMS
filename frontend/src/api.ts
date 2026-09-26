@@ -356,7 +356,12 @@ export const api = {
 
   // 11. Module 10: Reports & Dashboards Engine
   getReportsOverview: () => fetchJson<any>('/reports/overview'),
-  getWorkforceReports: () => fetchJson<any>('/reports/workforce'),
+  getWorkforceReports: (params?: { departmentId?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.departmentId) q.append('departmentId', params.departmentId);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return fetchJson<any>(`/reports/workforce${queryStr}`);
+  },
   getAttendanceReports: (params?: { year?: number; month?: number; departmentId?: string }) => {
     const q = new URLSearchParams();
     if (params?.year) q.append('year', String(params.year));

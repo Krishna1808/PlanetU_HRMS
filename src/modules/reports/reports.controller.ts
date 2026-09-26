@@ -39,8 +39,11 @@ export class ReportsController {
     Role.FINANCE,
     Role.MANAGER,
   )
-  async getWorkforceAnalytics(@CurrentUser() user: AuthenticatedUser) {
-    return this.reportsService.getWorkforceAnalytics(user.organizationId, user);
+  async getWorkforceAnalytics(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ReportQueryDto,
+  ) {
+    return this.reportsService.getWorkforceAnalytics(user.organizationId, query, user);
   }
 
   @Get('attendance')
