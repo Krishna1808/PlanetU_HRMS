@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import React from 'react';
 import { api } from './api';
 import { LoginPage } from './components/LoginPage';
 import { EssDashboardPage } from './components/EssDashboardPage';
@@ -14,6 +15,7 @@ import { OffboardingPage } from './components/OffboardingPage';
 import { ReportsPage } from './components/ReportsPage';
 import { OrganizationMastersPage } from './components/OrganizationMastersPage';
 import { NotificationBell } from './components/NotificationBell';
+import { Icons } from './components/Icons';
 
 type MainTab =
   | 'ess'
@@ -32,7 +34,7 @@ type EmployeeSubView = 'list' | 'add' | 'profile';
 interface NavTabItem {
   key: MainTab;
   label: string;
-  icon: string;
+  icon: keyof typeof Icons;
   section: string;
   allowedRoles: string[];
 }
@@ -42,7 +44,7 @@ const ALL_TABS: NavTabItem[] = [
   {
     key: 'ess',
     label: 'Employee Self-Service',
-    icon: '🏠',
+    icon: 'Home',
     section: 'WORKSPACE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'FINANCE', 'MANAGER', 'EMPLOYEE'],
   },
@@ -50,28 +52,28 @@ const ALL_TABS: NavTabItem[] = [
   {
     key: 'employees',
     label: 'Employees',
-    icon: '👥',
+    icon: 'Users',
     section: 'WORKFORCE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'],
   },
   {
     key: 'organization',
     label: 'Organization & Masters',
-    icon: '🏢',
+    icon: 'Building',
     section: 'WORKFORCE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN'],
   },
   {
     key: 'onboarding',
     label: 'Onboarding',
-    icon: '🚀',
+    icon: 'Rocket',
     section: 'WORKFORCE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN'],
   },
   {
     key: 'offboarding',
     label: 'Offboarding & Exit',
-    icon: '🚪',
+    icon: 'DoorExit',
     section: 'WORKFORCE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'FINANCE', 'MANAGER'],
   },
@@ -79,21 +81,21 @@ const ALL_TABS: NavTabItem[] = [
   {
     key: 'shifts',
     label: 'Shift Scheduling',
-    icon: '⏱️',
+    icon: 'Clock',
     section: 'TIME & ATTENDANCE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'],
   },
   {
     key: 'attendance',
     label: 'Attendance',
-    icon: '📍',
+    icon: 'MapPin',
     section: 'TIME & ATTENDANCE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER', 'FINANCE'],
   },
   {
     key: 'leaves',
     label: 'Leave Management',
-    icon: '🌴',
+    icon: 'Calendar',
     section: 'TIME & ATTENDANCE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'FINANCE', 'MANAGER', 'EMPLOYEE'],
   },
@@ -101,7 +103,7 @@ const ALL_TABS: NavTabItem[] = [
   {
     key: 'payroll',
     label: 'Payroll & Compliance',
-    icon: '💰',
+    icon: 'Dollar',
     section: 'FINANCE & COMPLIANCE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'FINANCE'],
   },
@@ -109,7 +111,7 @@ const ALL_TABS: NavTabItem[] = [
   {
     key: 'reports',
     label: 'Reports & Analytics',
-    icon: '📊',
+    icon: 'BarChart',
     section: 'INTELLIGENCE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'FINANCE', 'MANAGER'],
   },
@@ -174,20 +176,19 @@ export default function App() {
       >
         <div
           style={{
-            width: '68px',
-            height: '68px',
-            borderRadius: '18px',
-            background: 'rgba(56, 189, 248, 0.1)',
-            border: '1px solid rgba(56, 189, 248, 0.25)',
+            width: '84px',
+            height: '84px',
+            borderRadius: '20px',
+            background: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '34px',
-            boxShadow: '0 0 35px rgba(56, 189, 248, 0.2)',
+            padding: '12px',
+            boxShadow: '0 0 35px rgba(56, 189, 248, 0.25)',
             animation: 'pulseGlow 2s infinite ease-in-out',
           }}
         >
-          🪐
+          <img src="/logo.png" alt="PlanetU" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 800, fontSize: '18px', color: '#38bdf8', letterSpacing: '-0.02em' }}>
@@ -258,19 +259,23 @@ export default function App() {
           }}
         >
           {!sidebarCollapsed ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '20px' }}>🪐</span>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: '15px', color: '#38bdf8', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                  PlanetU HRMS
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              <div style={{ background: '#ffffff', padding: '3px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img src="/logo.png" alt="PlanetU" style={{ height: '24px', maxWidth: '85px', objectFit: 'contain' }} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 800, fontSize: '13px', color: '#38bdf8', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                  HRMS Suite
                 </div>
                 <div style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Enterprise Suite
+                  Enterprise
                 </div>
               </div>
             </div>
           ) : (
-            <span style={{ fontSize: '22px' }} title="PlanetU HRMS">🪐</span>
+            <div style={{ background: '#ffffff', padding: '4px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="PlanetU HRMS">
+              <img src="/logo.png" alt="PlanetU" style={{ height: '22px', maxWidth: '32px', objectFit: 'cover', objectPosition: 'left' }} />
+            </div>
           )}
 
           <button
@@ -289,7 +294,7 @@ export default function App() {
               justifyContent: 'center',
             }}
           >
-            ◀
+            <Icons.ChevronLeft size={14} color="#94a3b8" />
           </button>
         </div>
 
@@ -353,7 +358,9 @@ export default function App() {
                           if (!isActive) e.currentTarget.style.background = 'transparent';
                         }}
                       >
-                        <span style={{ fontSize: '16px', flexShrink: 0 }}>{t.icon}</span>
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {React.createElement(Icons[t.icon], { size: 17, color: isActive ? '#ffffff' : '#94a3b8' })}
+                        </span>
                         {!sidebarCollapsed && (
                           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {t.label}
@@ -496,11 +503,15 @@ export default function App() {
                 justifyContent: 'center',
               }}
             >
-              ☰
+              <Icons.Menu size={16} color="#f8fafc" />
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '18px' }}>{currentTabItem?.icon}</span>
+              {currentTabItem && (
+                <span style={{ display: 'flex', alignItems: 'center' }}>
+                  {React.createElement(Icons[currentTabItem.icon], { size: 18, color: '#38bdf8' })}
+                </span>
+              )}
               <span style={{ fontWeight: 700, fontSize: '15px', color: '#f8fafc' }}>
                 {currentTabItem?.label || 'PlanetU HRMS'}
               </span>

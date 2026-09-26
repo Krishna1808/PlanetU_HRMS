@@ -92,7 +92,7 @@ export function ShiftsPage() {
               setShowAssignModal(true);
             }}
           >
-            ➕ Assign Shift to Employee
+            Assign Shift to Employee
           </button>
         </div>
 

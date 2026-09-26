@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { api } from '../api';
+import { Icons } from './Icons';
 
 interface NotificationBellProps {
   user: any;
@@ -217,19 +218,20 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'LEAVE_STATUS':
-        return '🌴';
+        return <Icons.Calendar size={16} color="#2563eb" />;
       case 'ATTENDANCE_ALERT':
-        return '📍';
+        return <Icons.MapPin size={16} color="#d97706" />;
       case 'PAYSLIP_RELEASED':
-        return '💰';
+      case 'BONUS_AWARDED':
+        return <Icons.Dollar size={16} color="#059669" />;
       case 'SHIFT_ASSIGNED':
-        return '⏱️';
+        return <Icons.Clock size={16} color="#6366f1" />;
       case 'CLEARANCE_TASK':
-        return '🚪';
+        return <Icons.DoorExit size={16} color="#dc2626" />;
       case 'ANNOUNCEMENT':
-        return '📢';
+        return <Icons.Megaphone size={16} color="#7c3aed" />;
       default:
-        return 'ℹ️';
+        return <Icons.Bell size={16} color="#64748b" />;
     }
   };
 
@@ -269,7 +271,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
           transition: 'all 0.15s ease',
         }}
       >
-        <span style={{ fontSize: '16px' }}>🔔</span>
+        <Icons.Bell size={18} color="#f8fafc" />
         {unreadCount > 0 && (
           <span
             style={{
@@ -337,7 +339,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '18px' }}>🔔</span>
+              <Icons.Bell size={18} color="#f8fafc" />
               <span style={{ fontWeight: 700, fontSize: '15px' }}>Activity & Alerts</span>
               {unreadCount > 0 && (
                 <span
@@ -374,17 +376,18 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
               )}
               <button
                 onClick={() => setIsOpen(false)}
+                title="Close"
                 style={{
                   background: 'none',
                   border: 'none',
                   color: '#94a3b8',
-                  fontSize: '20px',
                   cursor: 'pointer',
-                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
                   padding: '2px 6px',
                 }}
               >
-                ✕
+                <Icons.Close size={18} color="#94a3b8" />
               </button>
             </div>
           </div>
@@ -450,7 +453,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                 gap: '6px',
               }}
             >
-              <span>📢 Announcements</span>
+              <span>Announcements</span>
               {announcements.filter((a) => a.isActive).length > 0 && (
                 <span
                   style={{
@@ -484,7 +487,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                 gap: '6px',
               }}
             >
-              <span>✉️ Test Email</span>
+              <span>Email Diagnostics</span>
             </button>
           </div>
 
@@ -529,7 +532,9 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
 
                 {!loading && notifications.length === 0 && (
                   <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
-                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>🎉</div>
+                    <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center' }}>
+                      <Icons.Check size={28} color="#10b981" />
+                    </div>
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#475569' }}>All caught up!</div>
                     <div style={{ fontSize: '12px', marginTop: '4px' }}>No {filterUnreadOnly ? 'unread' : ''} notifications at this time.</div>
                   </div>
@@ -607,7 +612,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                                   fontWeight: 600,
                                 }}
                               >
-                                ✓ Mark read
+                                Mark as read
                               </button>
                             )}
                           </div>
@@ -649,7 +654,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                           gap: '6px',
                         }}
                       >
-                        <span>📢</span>
+                        <Icons.Plus size={15} color="#f8fafc" />
                         <span>Broadcast New Announcement</span>
                       </button>
                     ) : (
@@ -669,9 +674,9 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                           <button
                             type="button"
                             onClick={() => setShowCompose(false)}
-                            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '14px' }}
+                            style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                           >
-                            ✕
+                            <Icons.Close size={16} />
                           </button>
                         </div>
 
@@ -714,7 +719,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                             >
                               <option value="NORMAL">Normal</option>
                               <option value="HIGH">High</option>
-                              <option value="URGENT">Urgent 🔴</option>
+                              <option value="URGENT">Urgent Priority</option>
                             </select>
                           </div>
 
@@ -734,10 +739,10 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                                   fontSize: '12px',
                                 }}
                               >
-                                <option value="">🌐 All Company</option>
+                                <option value="">Entire Organization (All Departments)</option>
                                 {departments.map((d) => (
                                   <option key={d.id} value={d.id}>
-                                    🏢 {d.name}
+                                    {d.name}
                                   </option>
                                 ))}
                               </select>
@@ -763,7 +768,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                                   )
                                   .map((d) => (
                                     <option key={d.id} value={d.id}>
-                                      🏢 {d.name} (My Department)
+                                      {d.name} (My Department)
                                     </option>
                                   ))}
                               </select>
@@ -774,7 +779,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                         {/* Duration / Auto-Expiration */}
                         <div style={{ marginBottom: '8px' }}>
                           <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
-                            ⏰ Auto-Deactivate Notice After
+                            Auto-Deactivate Notice After
                           </label>
                           <select
                             value={newDurationHours}
@@ -823,7 +828,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                               checked={sendEmail}
                               onChange={(e) => setSendEmail(e.target.checked)}
                             />
-                            <span>📧 Send real-time announcement email to targeted members</span>
+                            <span>Send real-time announcement email to targeted members</span>
                           </label>
 
                           <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#475569', cursor: 'pointer' }}>
@@ -832,7 +837,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                               checked={fanOut}
                               onChange={(e) => setFanOut(e.target.checked)}
                             />
-                            <span>🔔 Fan out in-app notifications to eligible employees</span>
+                            <span>Fan out in-app notifications to eligible employees</span>
                           </label>
                         </div>
 
@@ -876,7 +881,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                 {/* Announcements list */}
                 {announcements.length === 0 && (
                   <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
-                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>📢</div>
+                    <div style={{ marginBottom: "8px", display: "flex", justifyContent: "center" }}><Icons.Megaphone size={28} color="#94a3b8" /></div>
                     <div style={{ fontWeight: 600, fontSize: '14px', color: '#475569' }}>No announcements</div>
                     <div style={{ fontSize: '12px', marginTop: '4px' }}>There are currently no active company announcements.</div>
                   </div>
@@ -920,7 +925,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                             {a.priority}
                           </span>
                           <span style={{ fontSize: '11px', color: '#64748b' }}>
-                            {a.targetDepartment ? `🏢 ${a.targetDepartment.name}` : '🌐 Company-wide'}
+                            {a.targetDepartment ? `${a.targetDepartment.name}` : 'Company-wide'}
                           </span>
                           {a.expiresAt && (
                             <span
@@ -933,7 +938,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                                 fontWeight: 600,
                               }}
                             >
-                              ⏰ {new Date(a.expiresAt) > new Date() ? `Expires in ${Math.max(1, Math.ceil((new Date(a.expiresAt).getTime() - Date.now()) / (1000 * 3600)))}h` : 'Expired'}
+                              {new Date(a.expiresAt) > new Date() ? `Expires in ${Math.max(1, Math.ceil((new Date(a.expiresAt).getTime() - Date.now()) / (1000 * 3600)))}h` : 'Expired'}
                             </span>
                           )}
                         </div>
@@ -995,7 +1000,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '20px' }}>⚡</span>
+                    <Icons.Shield size={18} color="#2563eb" />
                     <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
                       Live Email Engine
                     </h4>
@@ -1059,12 +1064,12 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                   >
                     {sendingEmail ? (
                       <>
-                        <span>⏳</span>
+                        
                         <span>Dispatching Live Email...</span>
                       </>
                     ) : (
                       <>
-                        <span>✉️</span>
+                        
                         <span>Send Live Test Email</span>
                       </>
                     )}
@@ -1106,9 +1111,9 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                     >
                       {testEmailResult.success
                         ? testEmailResult.mode === 'live_smtp'
-                          ? '🎉 Delivered to Live Inbox!'
+                          ? 'Delivered to Live Inbox'
                           : 'ℹ️ Local Simulation Mode'
-                        : '❌ Delivery Failed'}
+                        : 'Delivery Failed'}
                     </div>
                     <div>{testEmailResult.message}</div>
                   </div>
@@ -1127,7 +1132,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                   }}
                 >
                   <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
-                    🛠️ Email Engine Providers:
+                    Email Engine Providers:
                   </div>
                   <div>
                     • <strong>Resend:</strong> In <code>.env</code>, set <code>SMTP_USER="resend"</code> &amp; <code>SMTP_PASS="re_..."</code>

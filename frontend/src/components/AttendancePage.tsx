@@ -75,7 +75,7 @@ export function AttendancePage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Module 4 Header */}
       <div className="card">
-        <h2 style={{ fontSize: '18px', fontWeight: 700 }}>📍 Attendance Management</h2>
+        <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Attendance Management</h2>
         <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
           Web check-in/out, grace period detection, active duration thresholds, unexcused absence tracking, and the authoritative <strong>single source of truth</strong> for payroll payable days.
         </p>
@@ -147,7 +147,7 @@ export function AttendancePage() {
       {/* Authoritative Single Source of Truth for Payroll Contract Tester */}
       <div className="card" style={{ borderLeft: '4px solid #2563eb' }}>
         <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>
-          🔍 Authoritative Payable Days Query (Attendance Contract for Payroll)
+          Authoritative Payable Days Query (Attendance Contract for Payroll)
         </h3>
         <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
           Payroll consumes <code>AttendanceService.getFinalizedPayableDays</code> directly. Test the single source of truth contract for any employee and month:

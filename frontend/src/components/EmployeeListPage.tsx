@@ -169,13 +169,13 @@ export const EmployeeListPage: React.FC<Props> = ({
         </div>
 
         <button className="btn btn-primary" onClick={onNavigateAdd} style={{ padding: '8px 18px', fontSize: '13px' }}>
-          <span>➕</span> Add New Employee
+          Add New Employee
         </button>
       </div>
 
       {terminateSuccess && (
         <div className="alert-success" style={{ marginBottom: '16px' }}>
-          <span>✅</span> {terminateSuccess}
+          {terminateSuccess}
         </div>
       )}
 
@@ -207,7 +207,7 @@ export const EmployeeListPage: React.FC<Props> = ({
               pointerEvents: 'none',
             }}
           >
-            🔍
+            
           </span>
           <input
             type="text"
@@ -237,7 +237,7 @@ export const EmployeeListPage: React.FC<Props> = ({
               }}
               title="Clear search"
             >
-              ✕
+              Close
             </button>
           )}
         </div>
@@ -314,7 +314,7 @@ export const EmployeeListPage: React.FC<Props> = ({
             margin: '12px 0',
           }}
         >
-          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔍</div>
+          
           {employees.length === 0 ? (
             <div>
               <strong style={{ fontSize: '15px', color: '#1e293b' }}>No employees found in the directory</strong>
@@ -459,7 +459,7 @@ export const EmployeeListPage: React.FC<Props> = ({
                         }}
                       >
                         {emp.employmentStatus === 'TERMINATED'
-                          ? '🛑 TERMINATED'
+                          ? 'TERMINATED'
                           : emp.employmentStatus === 'NOTICE_PERIOD'
                           ? '⏳ NOTICE PERIOD'
                           : emp.employmentStatus || 'ACTIVE'}
@@ -486,7 +486,7 @@ export const EmployeeListPage: React.FC<Props> = ({
                               setTerminateError('');
                             }}
                           >
-                            {emp.employmentStatus === 'NOTICE_PERIOD' ? '⏳ Notice / Exit' : '🛑 Terminate'}
+                            {emp.employmentStatus === 'NOTICE_PERIOD' ? 'Notice / Exit' : 'Terminate'}
                           </button>
                         )}
                       </div>
@@ -545,7 +545,7 @@ export const EmployeeListPage: React.FC<Props> = ({
             >
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#f8fafc' }}>
-                  🛑 Issue Termination Notice
+                  Issue Termination Notice
                 </h3>
                 <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#fecaca' }}>
                   {selectedTerminateEmp.firstName} {selectedTerminateEmp.lastName} ({selectedTerminateEmp.employeeCode})
@@ -568,7 +568,7 @@ export const EmployeeListPage: React.FC<Props> = ({
                   cursor: 'pointer',
                 }}
               >
-                ✕
+                Close
               </button>
             </div>
 
@@ -637,7 +637,7 @@ export const EmployeeListPage: React.FC<Props> = ({
                   }}
                 >
                   <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>📅</span> Effective Last Working Day: <strong>{calculateEffectiveExitDate(noticePeriodDays)}</strong> ({noticePeriodDays} days notice)
+                    Effective Last Working Day: <strong>{calculateEffectiveExitDate(noticePeriodDays)}</strong> ({noticePeriodDays} days notice)
                   </div>
                   <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#1e3a8a' }}>
                     Status transitions to <strong>NOTICE_PERIOD</strong>. The employee will receive an official notification informing them of this termination notice, the {noticePeriodDays}-day notice period, and scheduled last working day. Platform login credentials remain active until exit.
@@ -655,7 +655,7 @@ export const EmployeeListPage: React.FC<Props> = ({
                     lineHeight: 1.5,
                   }}
                 >
-                  <strong>⚠️ Immediate Deactivation (0 Days Notice)</strong>
+                  <strong>Immediate Deactivation (0 Days Notice)</strong>
                   <p style={{ margin: '4px 0 0', fontSize: '12px' }}>
                     This will immediately revoke <strong>{selectedTerminateEmp.firstName} {selectedTerminateEmp.lastName}</strong>'s login credentials, set status to <strong>TERMINATED</strong>, record today as the exit date, and send an immediate separation notification to the employee.
                   </p>
@@ -664,7 +664,7 @@ export const EmployeeListPage: React.FC<Props> = ({
 
               {terminateError && (
                 <div style={{ padding: '10px 14px', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '13px' }}>
-                  ⚠️ {terminateError}
+                  {terminateError}
                 </div>
               )}
 

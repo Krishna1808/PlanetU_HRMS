@@ -256,7 +256,7 @@ export function LeavesPage({ user }: { user: any }) {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>🌴 Leave Management</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Leave Management</h2>
             <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
               Append-only transaction ledger, shift-aware weekly off deductions, accrual policies, and multi-tier approval workflows.
             </p>
@@ -269,19 +269,19 @@ export function LeavesPage({ user }: { user: any }) {
                   style={{ background: '#f8fafc', borderColor: '#cbd5e1', color: '#0f172a' }}
                   onClick={() => setShowAddPolicyModal(true)}
                 >
-                  ➕ Add Leave Policy
+                  Add Leave Policy
                 </button>
                 <button
                   className="btn btn-secondary"
                   style={{ background: '#f0fdf4', borderColor: '#86efac', color: '#15803d' }}
                   onClick={openAllocateModal}
                 >
-                  ⚙️ Set / Allocate Leaves
+                  Set / Allocate Leaves
                 </button>
               </>
             )}
             <button className="btn btn-primary" onClick={() => setShowApplyModal(true)}>
-              📝 Apply for Leave
+              Apply for Leave
             </button>
           </div>
         </div>
@@ -316,7 +316,7 @@ export function LeavesPage({ user }: { user: any }) {
         <div className="card" style={{ borderLeft: '4px solid #3b82f6' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>📋 Active Organization Leave Policies ({leaveTypes.length})</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Active Organization Leave Policies ({leaveTypes.length})</h3>
               <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
                 Managed policies configured for your organization. HR Admins and Super Admins can add new policies or credit days.
               </p>
@@ -326,12 +326,12 @@ export function LeavesPage({ user }: { user: any }) {
               style={{ fontSize: '12px', padding: '4px 10px' }}
               onClick={() => setShowAddPolicyModal(true)}
             >
-              ➕ Define New Policy
+              Define New Policy
             </button>
           </div>
 
           {leaveTypes.length === 0 ? (
-            <div style={{ color: '#64748b', fontSize: '13px' }}>No leave policies defined. Click '➕ Define New Policy' to add one.</div>
+            <div style={{ color: '#64748b', fontSize: '13px' }}>No leave policies defined. Click 'Define New Policy' to add one.</div>
           ) : (
             <table>
               <thead>
@@ -371,7 +371,7 @@ export function LeavesPage({ user }: { user: any }) {
       {isManagerOrAdmin && (
         <div className="card" style={{ borderLeft: '4px solid #f59e0b' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>📥 Pending Subordinate Approvals ({pendingRequests.length})</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Pending Subordinate Approvals ({pendingRequests.length})</h3>
             <span className="badge badge-role">APPROVAL QUEUE</span>
           </div>
           {pendingRequests.length === 0 ? (
@@ -495,7 +495,7 @@ export function LeavesPage({ user }: { user: any }) {
             <div className="card" style={{ width: '480px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
 
 
-            <h3 style={{ marginBottom: '14px' }}>📝 Apply for Leave</h3>
+            <h3 style={{ marginBottom: '14px' }}>Apply for Leave</h3>
             <form onSubmit={handleApply} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600 }}>Leave Type</label>
@@ -597,7 +597,7 @@ export function LeavesPage({ user }: { user: any }) {
             <div className="card" style={{ width: '520px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
 
 
-            <h3 style={{ marginBottom: '6px' }}>➕ Define New Leave Policy</h3>
+            <h3 style={{ marginBottom: '6px' }}>Define New Leave Policy</h3>
             <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
               Create a new leave category with annual allowance and carry-forward rules.
             </p>
@@ -730,7 +730,7 @@ export function LeavesPage({ user }: { user: any }) {
             <div className="card" style={{ width: '520px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
 
 
-            <h3 style={{ marginBottom: '6px' }}>⚙️ Set / Allocate Leave Balances</h3>
+            <h3 style={{ marginBottom: '6px' }}>Set / Allocate Leave Balances</h3>
             <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
               Bulk allocate leaves across an entire department or credit/adjust a specific employee's balance in the append-only ledger.
             </p>
@@ -755,7 +755,7 @@ export function LeavesPage({ user }: { user: any }) {
                       }}
                       onClick={() => setAllocateTarget('DEPARTMENT')}
                     >
-                      🏢 Entire Department
+                      Entire Department
                     </button>
                     <button
                       type="button"
@@ -769,7 +769,7 @@ export function LeavesPage({ user }: { user: any }) {
                       }}
                       onClick={() => setAllocateTarget('EMPLOYEE')}
                     >
-                      👤 Specific Employee
+                      Specific Employee
                     </button>
                   </div>
                 </div>

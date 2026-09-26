@@ -102,7 +102,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
       >
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>
-            📊 Reports & Dashboards Engine
+            Reports & Dashboards Engine
           </h2>
           <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
             Cross-module executive business intelligence, workforce demographics, statutory summaries, and CSV data exports.
@@ -155,13 +155,13 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
       {/* Sub Navigation Bar */}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
         {[
-          { key: 'overview', label: '📊 Executive Overview' },
-          { key: 'workforce', label: '👥 Workforce Demographics' },
-          { key: 'attendance', label: '📍 Attendance Patterns' },
-          { key: 'leaves', label: '🌴 Leave Utilization' },
-          ...(canSeePayroll ? [{ key: 'payroll', label: '💰 Payroll & Statutory' }] : []),
-          { key: 'lifecycle', label: '🚀 Talent Lifecycle' },
-          { key: 'exports', label: '📥 CSV Data Exports' },
+          { key: 'overview', label: 'Executive Overview' },
+          { key: 'workforce', label: 'Workforce Demographics' },
+          { key: 'attendance', label: 'Attendance Patterns' },
+          { key: 'leaves', label: 'Leave Utilization' },
+          ...(canSeePayroll ? [{ key: 'payroll', label: 'Payroll & Statutory' }] : []),
+          { key: 'lifecycle', label: 'Talent Lifecycle' },
+          { key: 'exports', label: 'CSV Data Exports' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -426,9 +426,9 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                         }}
                       >
                         <span style={{ width: '90px', fontWeight: 600 }}>{d.date}</span>
-                        <span style={{ color: '#15803d', width: '80px' }}>🟢 {d.present} Present</span>
-                        <span style={{ color: '#b91c1c', width: '80px' }}>🔴 {d.absent} Absent</span>
-                        <span style={{ color: '#6b21a8', width: '90px' }}>🟣 {d.onLeave} On Leave</span>
+                        <span style={{ color: '#15803d', width: '80px' }}>{d.present} Present</span>
+                        <span style={{ color: '#b91c1c', width: '80px' }}>{d.absent} Absent</span>
+                        <span style={{ color: '#6b21a8', width: '90px' }}>{d.onLeave} On Leave</span>
                       </div>
                     ))}
                   </div>
@@ -628,7 +628,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '16px' }}>
-                  <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>👥 Headcount Master</h4>
+                  <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>Headcount Master</h4>
                   <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
                     Complete employee register: Code, Name, Email, Department, Designation, Grade, Status, Joining Date.
                   </p>
@@ -642,7 +642,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                 </div>
 
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '16px' }}>
-                  <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>📍 Attendance Register</h4>
+                  <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>Attendance Register</h4>
                   <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
                     Selected month punches: Date, Employee, Check-In, Check-Out, Active Minutes, Lateness, Status.
                   </p>
@@ -657,7 +657,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
 
                 {canSeePayroll && (
                   <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '16px' }}>
-                    <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>💰 Payroll Batches</h4>
+                    <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>Payroll Batches</h4>
                     <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
                       Payroll history: Year, Month, Batch Name, Total Gross, Total Deductions, Total Net Pay.
                     </p>
@@ -672,7 +672,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                 )}
 
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '16px' }}>
-                  <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>🌴 Leave Applications</h4>
+                  <h4 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700 }}>Leave Applications</h4>
                   <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 14px' }}>
                     Annual leave records: Employee, Department, Leave Type, Dates, Total Days, Status, Reason.
                   </p>

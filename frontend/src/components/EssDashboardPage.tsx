@@ -175,7 +175,7 @@ export function EssDashboardPage() {
               Employee Self-Service
             </div>
             <h2 style={{ fontSize: '22px', fontWeight: 700, margin: '4px 0', color: 'white' }}>
-              Welcome back, {profile.firstName} {profile.lastName} 👋
+              Welcome back, {profile.firstName} {profile.lastName}
             </h2>
             <div style={{ fontSize: '14px', color: '#cbd5e1' }}>
               <strong>{profile.employeeCode}</strong> • {profile.designation} ({profile.department})
@@ -187,7 +187,7 @@ export function EssDashboardPage() {
             style={{ background: '#334155', color: '#f8fafc', borderColor: '#475569' }}
             onClick={() => setShowEditModal(true)}
           >
-            ✏️ Edit My Contact Info
+            Edit My Contact Info
           </button>
         </div>
       </div>
@@ -197,7 +197,7 @@ export function EssDashboardPage() {
         <div className="card" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <span style={{ fontWeight: 700, color: '#1e40af' }}>👔 Manager Workspace</span>
+              <span style={{ fontWeight: 700, color: '#1e40af' }}>Manager Workspace</span>
               <p style={{ fontSize: '13px', color: '#3b82f6', margin: '4px 0 0' }}>
                 You have <strong>{managerOverview.directReportsCount}</strong> direct reports and{' '}
                 <strong>{managerOverview.pendingLeaveApprovalsCount}</strong> pending leave approval requests.
@@ -250,7 +250,7 @@ export function EssDashboardPage() {
             </div>
             {todayAttendance.isLate && (
               <div style={{ color: '#dc2626', fontWeight: 600, fontSize: '12px' }}>
-                ⚠️ Marked Late (Punched after shift grace period)
+                Marked Late (Punched after shift grace period)
               </div>
             )}
           </div>
@@ -287,7 +287,7 @@ export function EssDashboardPage() {
         {/* Shift Card */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>📅 Assigned Shift</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Assigned Shift</h3>
             <span className="badge badge-role">{shift.shiftCode}</span>
           </div>
           <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: '#1e293b' }}>
@@ -312,7 +312,7 @@ export function EssDashboardPage() {
         {/* Latest Payslip Card */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>💰 Latest Payslip</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Latest Payslip</h3>
             {latestPayslip && <span className="badge badge-active">{latestPayslip.status}</span>}
           </div>
           {latestPayslip ? (
@@ -335,7 +335,7 @@ export function EssDashboardPage() {
                   className="btn btn-secondary"
                   style={{ flex: 1, fontSize: '12px', textAlign: 'center', padding: '6px 8px' }}
                 >
-                  📄 View Web
+                  View Web
                 </a>
                 <button
                   type="button"
@@ -343,7 +343,7 @@ export function EssDashboardPage() {
                   className="btn btn-primary"
                   style={{ flex: 1, fontSize: '12px', textAlign: 'center', padding: '6px 8px' }}
                 >
-                  📥 Download PDF
+                  Download PDF
                 </button>
               </div>
             </div>
@@ -358,13 +358,13 @@ export function EssDashboardPage() {
       {/* 4. Leave Balances Grid */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600 }}>🌴 My Leave Balances</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: 600 }}>My Leave Balances</h3>
           <button
             className="btn btn-primary"
             onClick={openApplyLeaveModal}
             style={{ padding: '6px 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <span>➕</span>
+            Apply
             <span>Apply for Leave</span>
           </button>
         </div>
@@ -394,7 +394,7 @@ export function EssDashboardPage() {
 
       {/* 5. Recent Leave Requests */}
       <div className="card">
-        <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>📝 Recent Leave Applications</h3>
+        <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px' }}>Recent Leave Applications</h3>
         {recentLeaveRequests.length === 0 ? (
           <div style={{ color: '#64748b', fontSize: '13px' }}>No leave applications recorded.</div>
         ) : (
@@ -456,7 +456,7 @@ export function EssDashboardPage() {
             <div className="card" style={{ width: '500px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
 
 
-            <h3 style={{ marginBottom: '12px' }}>✏️ Update Contact & Emergency Info</h3>
+            <h3 style={{ marginBottom: '12px' }}>Update Contact & Emergency Info</h3>
             <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px' }}>
               Per FR-EMP-006, employees may self-update low-risk personal contact details. Designation, salary, and statutory fields require HR Admin.
             </p>
@@ -567,12 +567,12 @@ export function EssDashboardPage() {
 
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: 700 }}>🌴 Apply for Leave</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 700 }}>Apply for Leave</h3>
               <button
                 onClick={() => setShowApplyModal(false)}
                 style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#64748b' }}
               >
-                ✕
+                Close
               </button>
             </div>
 

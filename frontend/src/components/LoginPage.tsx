@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../api';
+import { Icons } from './Icons';
 
 interface Props {
   onLoginSuccess: (user: any) => void;
@@ -9,7 +10,7 @@ interface DemoAccount {
   roleName: string;
   email: string;
   password: string;
-  icon: string;
+  icon: keyof typeof Icons;
   color: string;
   bg: string;
   border: string;
@@ -22,7 +23,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     roleName: 'Super Admin',
     email: 'admin@planetu.com',
     password: 'DevPassword123!',
-    icon: '👑',
+    icon: 'Shield',
     color: '#7c3aed',
     bg: '#f5f3ff',
     border: '#ddd6fe',
@@ -33,7 +34,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     roleName: 'HR Admin',
     email: 'hr@planetu.com',
     password: 'DevPassword123!',
-    icon: '💼',
+    icon: 'Briefcase',
     color: '#059669',
     bg: '#ecfdf5',
     border: '#a7f3d0',
@@ -44,7 +45,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     roleName: 'Manager',
     email: 'manager@planetu.com',
     password: 'DevPassword123!',
-    icon: '👔',
+    icon: 'Users',
     color: '#2563eb',
     bg: '#eff6ff',
     border: '#bfdbfe',
@@ -55,7 +56,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     roleName: 'Finance',
     email: 'finance@planetu.com',
     password: 'DevPassword123!',
-    icon: '💰',
+    icon: 'Dollar',
     color: '#d97706',
     bg: '#fffbeb',
     border: '#fde68a',
@@ -66,7 +67,7 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
     roleName: 'Employee',
     email: 'employee@planetu.com',
     password: 'DevPassword123!',
-    icon: '👤',
+    icon: 'User',
     color: '#0284c7',
     bg: '#f0f9ff',
     border: '#bae6fd',
@@ -114,12 +115,16 @@ export const LoginPage: React.FC<Props> = ({ onLoginSuccess }) => {
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '88vh', padding: '24px 16px' }}>
       <div style={{ width: '100%', maxWidth: '860px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
-        {/* Brand Header */}
+        {/* Brand Header with Logo */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '38px', marginBottom: '4px' }}>🪐</div>
-          <h1 style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', margin: 0 }}>PlanetU HRMS</h1>
-          <p style={{ color: '#64748b', fontSize: '14px', marginTop: '6px' }}>
-            Enterprise Human Resource Management Suite &amp; RBAC Portal
+          <img
+            src="/logo.png"
+            alt="PlanetU — Elevate your Ideas"
+            style={{ maxHeight: '68px', maxWidth: '280px', objectFit: 'contain', marginBottom: '8px' }}
+          />
+          <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Enterprise HRMS Portal</h1>
+          <p style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
+            Role-Based Access Control &amp; Human Resource Management Suite
           </p>
         </div>
 
@@ -130,7 +135,7 @@ export const LoginPage: React.FC<Props> = ({ onLoginSuccess }) => {
           <div className="card" style={{ border: '2px dashed #93c5fd', background: '#f8fafc' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '18px' }}>🧪</span>
+                <Icons.Shield size={16} color="#2563eb" />
                 <span style={{ fontWeight: 700, fontSize: '14px', color: '#1e293b' }}>
                   Testing Credentials (1-Click Fill)
                 </span>
@@ -164,7 +169,9 @@ export const LoginPage: React.FC<Props> = ({ onLoginSuccess }) => {
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
-                      <span style={{ fontSize: '20px' }}>{acc.icon}</span>
+                      <span style={{ display: 'flex', alignItems: 'center' }}>
+                        {React.createElement(Icons[acc.icon], { size: 18, color: acc.color })}
+                      </span>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>{acc.roleName}</span>
@@ -186,7 +193,7 @@ export const LoginPage: React.FC<Props> = ({ onLoginSuccess }) => {
                         handleSelectRole(acc, true);
                       }}
                       style={{
-                        padding: '5px 10px',
+                        padding: '5px 12px',
                         fontSize: '11px',
                         fontWeight: 700,
                         background: acc.color,
@@ -197,7 +204,7 @@ export const LoginPage: React.FC<Props> = ({ onLoginSuccess }) => {
                         whiteSpace: 'nowrap',
                       }}
                     >
-                      ⚡ Login
+                      Login
                     </button>
                   </div>
                 );
@@ -265,8 +272,9 @@ export const LoginPage: React.FC<Props> = ({ onLoginSuccess }) => {
               </button>
             </form>
 
-            <div style={{ marginTop: '20px', padding: '12px', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: '11px', color: '#94a3b8' }}>
-              🔒 HTTP-Only JWT Cookie Authentication &bull; AES-256 Passwords
+            <div style={{ marginTop: '20px', padding: '12px', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <Icons.Lock size={12} color="#94a3b8" />
+              <span>HTTP-Only JWT Cookie Authentication &bull; AES-256 Passwords</span>
             </div>
           </div>
 

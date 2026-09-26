@@ -33,7 +33,7 @@ function getBadgeStyle(type: string, metadata?: Record<string, any>): { bg: stri
     case 'PAYSLIP_RELEASED':
       return { bg: '#f0fdf4', text: '#166534', label: 'PAYSLIP PUBLISHED' };
     case 'BONUS_AWARDED':
-      return { bg: '#ecfdf5', text: '#065f46', label: '🎉 BONUS AWARDED' };
+      return { bg: '#ecfdf5', text: '#065f46', label: 'BONUS AWARDED' };
     case 'ATTENDANCE_ALERT':
       return { bg: '#fffbeb', text: '#92400e', label: 'ATTENDANCE ALERT' };
     case 'SHIFT_ASSIGNED':

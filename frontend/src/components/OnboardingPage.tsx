@@ -244,13 +244,13 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>🚀 Employee Onboarding</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Employee Onboarding</h2>
             <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
               Manages candidate pre-boarding forms, verification checklists, and atomic conversion into official Employee profiles & User logins.
             </p>
           </div>
           <button className="btn btn-primary" onClick={() => setShowInviteModal(true)}>
-            ➕ Invite New Candidate
+            Invite New Candidate
           </button>
         </div>
 
@@ -300,7 +300,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <h4 style={{ color: '#065f46', fontSize: '14px', fontWeight: 700, margin: 0 }}>
-                  🎉 Successfully Converted to Official Employee!
+                  Successfully Converted to Official Employee!
                 </h4>
                 <div style={{ fontSize: '12px', color: '#047857', marginTop: '8px', lineHeight: 1.6 }}>
                   <div><strong>Employee Name:</strong> {conversionResult.employee?.name}</div>
@@ -318,7 +318,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                 onClick={() => setConversionResult(null)}
                 style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#065f46' }}
               >
-                ✕
+                Close
               </button>
             </div>
           </div>
@@ -330,7 +330,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
             <div>Loading onboarding candidates...</div>
           ) : candidates.length === 0 ? (
             <div style={{ color: '#64748b', fontStyle: 'italic', padding: '20px 0' }}>
-              No candidates found in the onboarding pipeline. Click "➕ Invite New Candidate" to initiate onboarding.
+              No candidates found in the onboarding pipeline. Click "Invite New Candidate" to initiate onboarding.
             </div>
           ) : (
             <table>
@@ -392,7 +392,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                             style={{ padding: '4px 8px', fontSize: '11px' }}
                             onClick={() => handleOpenDetails(c.id)}
                           >
-                            📋 Checklist
+                            Checklist
                           </button>
 
                           {c.status !== 'CONVERTED' && (
@@ -403,7 +403,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                                 style={{ padding: '4px 8px', fontSize: '11px' }}
                                 onClick={() => handleOpenPreboarding(c)}
                               >
-                                📝 Form
+                                Form
                               </button>
                               <button
                                 type="button"
@@ -412,7 +412,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                                 onClick={() => handleConvert(c)}
                                 disabled={submitting}
                               >
-                                ⚡ Convert
+                                Convert
                               </button>
                             </>
                           )}
@@ -676,7 +676,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                       color: task.status === 'COMPLETED' ? 'white' : '#475569',
                     }}
                   >
-                    {task.status === 'COMPLETED' ? '✓ Completed' : 'Mark Done'}
+                    {task.status === 'COMPLETED' ? 'Completed' : 'Mark Done'}
                   </button>
                 </div>
               ))}
@@ -694,7 +694,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                   onClick={() => handleConvert(selectedCandidate)}
                   disabled={submitting}
                 >
-                  {submitting ? 'Converting...' : '⚡ Complete Onboarding & Convert to Employee'}
+                  {submitting ? 'Converting...' : 'Complete Onboarding & Convert to Employee'}
                 </button>
               )}
             </div>

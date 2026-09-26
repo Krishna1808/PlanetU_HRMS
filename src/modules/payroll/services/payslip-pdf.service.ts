@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface PayslipPdfData {
   organizationName: string;
@@ -77,19 +79,28 @@ export class PayslipPdfService {
         // 1. BRAND HEADER
         doc
           .rect(40, 40, 515, 60)
-          .fill('#1e1b4b');
+          .fillAndStroke('#ffffff', '#cbd5e1');
+
+        const logoPath = path.resolve(process.cwd(), 'src/assets/logo.png');
+        if (fs.existsSync(logoPath)) {
+          try {
+            doc.image(logoPath, 50, 47, { height: 46 });
+          } catch (e) {
+            // fallback
+          }
+        }
 
         doc
-          .fillColor('#ffffff')
-          .fontSize(18)
+          .fillColor('#0f172a')
+          .fontSize(16)
           .font('Helvetica-Bold')
-          .text(data.organizationName || 'PlanetU HRMS', 55, 52);
+          .text(data.organizationName || 'PlanetU HRMS', 210, 50, { align: 'right', width: 330 });
 
         doc
-          .fillColor('#a5b4fc')
-          .fontSize(10)
-          .font('Helvetica')
-          .text(`SALARY PAYSLIP — ${monthName.toUpperCase()} ${data.year}`, 55, 75);
+          .fillColor('#2563eb')
+          .fontSize(9.5)
+          .font('Helvetica-Bold')
+          .text(`SALARY PAYSLIP — ${monthName.toUpperCase()} ${data.year}`, 210, 72, { align: 'right', width: 330 });
 
         // 2. EMPLOYEE DETAILS GRID (Card Box)
         doc

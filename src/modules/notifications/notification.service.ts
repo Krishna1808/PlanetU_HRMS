@@ -121,8 +121,8 @@ export class NotificationService implements OnModuleInit {
         await this.createNotification(payload.organizationId, {
           recipientUserId: payload.recipientUserId,
           type: 'BONUS_AWARDED' as any,
-          title: `🎉 ${typeLabel} Awarded: ₹${Number(payload.amount).toLocaleString('en-IN')}`,
-          message: `Good news! An adjustment of ₹${Number(payload.amount).toLocaleString('en-IN')} (${payload.type}) has been credited to your upcoming ${payload.month}/${payload.year} payroll.${payload.reason ? ` Reason: ${payload.reason}` : ''}`,
+          title: `${typeLabel} Awarded: ₹${Number(payload.amount).toLocaleString('en-IN')}`,
+          message: `An adjustment of ₹${Number(payload.amount).toLocaleString('en-IN')} (${payload.type}) has been credited to your upcoming ${payload.month}/${payload.year} payroll.${payload.reason ? ` Reason: ${payload.reason}` : ''}`,
           actionUrl: '/ess',
           metadata: { amount: payload.amount, type: payload.type, month: payload.month, year: payload.year },
         });
@@ -472,7 +472,7 @@ export class NotificationService implements OnModuleInit {
               to: u.email,
               recipientName,
               type: 'ANNOUNCEMENT',
-              title: `📢 Announcement: ${dto.title}`,
+              title: `Announcement: ${dto.title}`,
               message: dto.content,
               actionUrl: frontendBaseUrl,
               metadata: {

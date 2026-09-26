@@ -176,7 +176,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {terminateSuccess && (
         <div className="alert-success" style={{ margin: 0 }}>
-          <span>✅</span> {terminateSuccess}
+          {terminateSuccess}
         </div>
       )}
 
@@ -294,7 +294,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
                   }}
                 >
                   {employee.employmentStatus === 'TERMINATED'
-                    ? '🛑 TERMINATED'
+                    ? 'TERMINATED'
                     : employee.employmentStatus === 'NOTICE_PERIOD'
                     ? '⏳ NOTICE PERIOD'
                     : employee.employmentStatus}
@@ -328,7 +328,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
                 onClick={openEditPositionModal}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', padding: '8px 14px' }}
               >
-                <span>✏️</span> Change Designation / Position
+                Change Designation / Position
               </button>
             )}
             {canTerminate && (
@@ -343,7 +343,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
                 }}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', padding: '8px 14px' }}
               >
-                <span>🛑</span> {employee.employmentStatus === 'NOTICE_PERIOD' ? 'Update Notice / Immediate Exit' : 'Issue Termination Notice'}
+                {employee.employmentStatus === 'NOTICE_PERIOD' ? 'Update Notice / Immediate Exit' : 'Issue Termination Notice'}
               </button>
             )}
             <button className="btn btn-secondary" onClick={onBack} style={{ fontSize: '13px', padding: '8px 14px' }}>
@@ -358,7 +358,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
           <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
-                💼 Position & Employment Details
+                Position & Employment Details
               </h3>
               {canEditPosition && (
                 <button
@@ -443,7 +443,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
           {/* Personal & Contact Details */}
           <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              👤 Personal & Contact Details
+              Personal & Contact Details
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
@@ -523,7 +523,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
             >
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#f8fafc' }}>
-                  ✏️ Change Position & Designation
+                  Change Position & Designation
                 </h3>
                 <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94a3b8' }}>
                   {employee.firstName} {employee.lastName} ({employee.employeeCode})
@@ -546,7 +546,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
                   cursor: 'pointer',
                 }}
               >
-                ✕
+                Close
               </button>
             </div>
 
@@ -554,12 +554,12 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
             <form onSubmit={handleSavePosition} style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {positionSuccessMsg && (
                 <div style={{ padding: '10px 14px', background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', borderRadius: '6px', fontSize: '13px', fontWeight: 600 }}>
-                  ✅ {positionSuccessMsg}
+                  {positionSuccessMsg}
                 </div>
               )}
               {positionErrorMsg && (
                 <div style={{ padding: '10px 14px', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '13px' }}>
-                  ⚠️ {positionErrorMsg}
+                  {positionErrorMsg}
                 </div>
               )}
 
@@ -750,7 +750,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
             >
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#f8fafc' }}>
-                  🛑 Issue Termination Notice
+                  Issue Termination Notice
                 </h3>
                 <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#fecaca' }}>
                   {employee.firstName} {employee.lastName} ({employee.employeeCode}) &bull; {employee.designation?.name || 'Employee'}
@@ -773,7 +773,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
                   cursor: 'pointer',
                 }}
               >
-                ✕
+                Close
               </button>
             </div>
 
@@ -843,7 +843,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
                   }}
                 >
                   <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>📅</span> Effective Last Working Day: <strong>{calculateEffectiveExitDate(noticePeriodDays)}</strong> ({noticePeriodDays} days notice)
+                    Effective Last Working Day: <strong>{calculateEffectiveExitDate(noticePeriodDays)}</strong> ({noticePeriodDays} days notice)
                   </div>
                   <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#1e3a8a' }}>
                     The employee will be placed on <strong>NOTICE_PERIOD</strong>. An official notification will be dispatched informing them of this termination notice, the {noticePeriodDays}-day notice period, and their scheduled last working day. Platform login credentials remain active until their exit date.
@@ -861,7 +861,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
                     lineHeight: 1.5,
                   }}
                 >
-                  <strong>⚠️ Immediate Separation (0 Days Notice)</strong>
+                  <strong>Immediate Separation (0 Days Notice)</strong>
                   <p style={{ margin: '4px 0 0', fontSize: '12px' }}>
                     This will immediately revoke login credentials, set status to <strong>TERMINATED</strong>, record today as the exit date, and send an immediate separation notification to the employee.
                   </p>
@@ -870,7 +870,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
 
               {terminateError && (
                 <div style={{ padding: '10px 14px', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '13px' }}>
-                  ⚠️ {terminateError}
+                  {terminateError}
                 </div>
               )}
 

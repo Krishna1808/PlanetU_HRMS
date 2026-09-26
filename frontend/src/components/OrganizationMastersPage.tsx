@@ -322,7 +322,7 @@ export function OrganizationMastersPage() {
       <div className="card" style={{ background: '#0f172a', color: '#f8fafc', border: '1px solid #1e293b' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#38bdf8' }}>🏢 Organization & Masters Management</h2>
+            <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#38bdf8' }}>Organization & Masters Management</h2>
             <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
               Configure company departments, designations, job grades, and office locations. Click on any department to view its profile and team roster.
             </p>
@@ -336,10 +336,10 @@ export function OrganizationMastersPage() {
       {/* Navigation Subtabs */}
       <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', background: '#ffffff', padding: '8px 16px', borderRadius: '8px', flexWrap: 'wrap' }}>
         {[
-          { key: 'departments', label: `Departments (${departments.length})`, icon: '🏢' },
-          { key: 'designations', label: `Designations / Job Roles (${designations.length})`, icon: '💼' },
-          { key: 'grades', label: `Grades & Levels (${grades.length})`, icon: '🎖️' },
-          { key: 'locations', label: `Locations (${locations.length})`, icon: '📍' },
+          { key: 'departments', label: `Departments (${departments.length})`, icon: '' },
+          { key: 'designations', label: `Designations / Job Roles (${designations.length})`, icon: '' },
+          { key: 'grades', label: `Grades & Levels (${grades.length})`, icon: '' },
+          { key: 'locations', label: `Locations (${locations.length})`, icon: '' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -368,12 +368,12 @@ export function OrganizationMastersPage() {
       {/* Status Alerts */}
       {successMsg && (
         <div style={{ padding: '12px 16px', background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', borderRadius: '6px', fontSize: '13px', fontWeight: 600 }}>
-          ✅ {successMsg}
+          {successMsg}
         </div>
       )}
       {error && (
         <div style={{ padding: '12px 16px', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '13px' }}>
-          ⚠️ {error}
+          {error}
         </div>
       )}
 
@@ -383,7 +383,7 @@ export function OrganizationMastersPage() {
           <div className="card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>🏢 Active Departments</h3>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Active Departments</h3>
                 <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', margin: 0 }}>
                   Departments with their designated Heads and active employee counts
                 </p>
@@ -473,7 +473,7 @@ export function OrganizationMastersPage() {
                               gap: '4px',
                             }}
                           >
-                            👥 {d._count?.employees ?? 0}
+                            {d._count?.employees ?? 0}
                           </span>
                         </td>
                         <td style={{ textAlign: 'right' }}>
@@ -491,7 +491,7 @@ export function OrganizationMastersPage() {
                             }}
                             onClick={() => handleOpenDepartmentProfile(d.id)}
                           >
-                            👁️ View Profile
+                            View Profile
                           </button>
                         </td>
                       </tr>
@@ -503,7 +503,7 @@ export function OrganizationMastersPage() {
           </div>
 
           <div className="card" style={{ background: '#f8fafc' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>➕ Add New Department</h3>
+            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Add New Department</h3>
             <form onSubmit={handleAddDepartment} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
@@ -586,7 +586,7 @@ export function OrganizationMastersPage() {
       {activeTab === 'designations' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' }}>
           <div className="card">
-            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>💼 Designations & Job Roles</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Designations & Job Roles</h3>
             {loading ? (
               <div style={{ color: '#94a3b8' }}>Loading designations...</div>
             ) : designations.length === 0 ? (
@@ -614,7 +614,7 @@ export function OrganizationMastersPage() {
                           style={{ fontSize: '12px', padding: '4px 8px' }}
                           onClick={() => handleStartEditDesig(d)}
                         >
-                          ✏️ Edit
+                          Edit
                         </button>
                       </td>
                     </tr>
@@ -626,7 +626,7 @@ export function OrganizationMastersPage() {
 
           <div className="card" style={{ background: editingDesig ? '#f0f9ff' : '#f8fafc', border: editingDesig ? '1px solid #bae6fd' : undefined }}>
             <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px', color: editingDesig ? '#0369a1' : undefined }}>
-              {editingDesig ? '✏️ Edit Designation / Role' : '➕ Add New Designation / Role'}
+              {editingDesig ? 'Edit Designation / Role' : 'Add New Designation / Role'}
             </h3>
             {editingDesig ? (
               <form onSubmit={handleUpdateDesignation} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -708,7 +708,7 @@ export function OrganizationMastersPage() {
       {activeTab === 'grades' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' }}>
           <div className="card">
-            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>🎖️ Job Grades & Levels</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Job Grades & Levels</h3>
             {loading ? (
               <div style={{ color: '#94a3b8' }}>Loading grades...</div>
             ) : grades.length === 0 ? (
@@ -736,7 +736,7 @@ export function OrganizationMastersPage() {
           </div>
 
           <div className="card" style={{ background: '#f8fafc' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>➕ Add New Grade</h3>
+            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Add New Grade</h3>
             <form onSubmit={handleAddGrade} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
@@ -791,7 +791,7 @@ export function OrganizationMastersPage() {
       {activeTab === 'locations' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' }}>
           <div className="card">
-            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>📍 Office Locations</h3>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Office Locations</h3>
             {loading ? (
               <div style={{ color: '#94a3b8' }}>Loading locations...</div>
             ) : locations.length === 0 ? (
@@ -821,7 +821,7 @@ export function OrganizationMastersPage() {
           </div>
 
           <div className="card" style={{ background: '#f8fafc' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>➕ Add New Location</h3>
+            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>Add New Location</h3>
             <form onSubmit={handleAddLocation} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
@@ -988,7 +988,7 @@ export function OrganizationMastersPage() {
                   cursor: 'pointer',
                 }}
               >
-                ✕
+                Close
               </button>
             </div>
 
@@ -996,12 +996,12 @@ export function OrganizationMastersPage() {
             <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {profileSuccessMsg && (
                 <div style={{ padding: '10px 14px', background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', borderRadius: '6px', fontSize: '13px', fontWeight: 600 }}>
-                  ✅ {profileSuccessMsg}
+                  {profileSuccessMsg}
                 </div>
               )}
               {profileErrorMsg && (
                 <div style={{ padding: '10px 14px', background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '13px' }}>
-                  ⚠️ {profileErrorMsg}
+                  {profileErrorMsg}
                 </div>
               )}
 
@@ -1056,7 +1056,7 @@ export function OrganizationMastersPage() {
                   <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '16px' }}>👑</span>
+                        
                         <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
                           Department Head / Manager Profile
                         </h4>
@@ -1134,7 +1134,7 @@ export function OrganizationMastersPage() {
                       </div>
                     ) : (
                       <div style={{ padding: '12px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '8px', color: '#92400e', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>⚠️</span>
+                        
                         <span>No Department Head has been assigned yet. You can assign any employee as the Head using the selector below.</span>
                       </div>
                     )}
@@ -1185,7 +1185,7 @@ export function OrganizationMastersPage() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
                       <div>
                         <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
-                          👥 Employees Working in this Department
+                          Employees Working in this Department
                         </h4>
                         <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>
                           Showing {filteredDeptEmployees.length} of {selectedDeptProfile.employees?.length ?? 0} members
@@ -1194,7 +1194,7 @@ export function OrganizationMastersPage() {
                       {selectedDeptProfile.employees?.length > 0 && (
                         <input
                           type="text"
-                          placeholder="🔍 Filter employees..."
+                          placeholder="Filter employees..."
                           value={employeeSearchTerm}
                           onChange={(e) => setEmployeeSearchTerm(e.target.value)}
                           style={{
@@ -1219,7 +1219,7 @@ export function OrganizationMastersPage() {
                           color: '#64748b',
                         }}
                       >
-                        <div style={{ fontSize: '28px', marginBottom: '8px' }}>👤</div>
+                        
                         <strong style={{ display: 'block', fontSize: '14px', color: '#334155' }}>
                           No Employees Currently in this Department
                         </strong>
@@ -1332,7 +1332,7 @@ export function OrganizationMastersPage() {
                                       style={{ fontSize: '12px', padding: '4px 8px' }}
                                       onClick={() => handleOpenEmpPositionModal(emp)}
                                     >
-                                      ✏️ Change Position
+                                      Change Position
                                     </button>
                                   </td>
                                 </tr>
@@ -1418,7 +1418,7 @@ export function OrganizationMastersPage() {
             >
               <div>
                 <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700 }}>
-                  ✏️ Change Designation / Position
+                  Change Designation / Position
                 </h3>
                 <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
                   {positionModalEmployee.firstName} {positionModalEmployee.lastName} ({positionModalEmployee.employeeCode})
@@ -1436,7 +1436,7 @@ export function OrganizationMastersPage() {
                   padding: '4px 8px',
                 }}
               >
-                ✕
+                Close
               </button>
             </div>
 

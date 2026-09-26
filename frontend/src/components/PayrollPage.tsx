@@ -197,7 +197,7 @@ export function PayrollPage({ user }: { user: any }) {
   if (!isAdminOrFinance) {
     return (
       <div className="card" style={{ borderLeft: '4px solid #f59e0b' }}>
-        <h3 style={{ fontSize: '16px', fontWeight: 600 }}>🔒 Payroll Console Restricted</h3>
+        <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Payroll Console Restricted</h3>
         <p style={{ color: '#64748b', marginTop: '8px', fontSize: '13px' }}>
           Payroll configuration, salary structures, and batch calculations are restricted to the <strong>Finance</strong> role and HR Administrators.
         </p>
@@ -214,7 +214,7 @@ export function PayrollPage({ user }: { user: any }) {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>💰 Payroll Management Engine</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Payroll Management Engine</h2>
             <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
               Option A (Indian Reference Model): Prorated-then-PF math, configurable PF ceiling, PT threshold, immutable batch lifecycle, and bank advice.
             </p>
@@ -222,10 +222,10 @@ export function PayrollPage({ user }: { user: any }) {
           {isFinance && (
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary" onClick={() => setShowAdjModal(true)}>
-                ➕ Add Bonus / Adjustment
+                Add Bonus / Adjustment
               </button>
               <button className="btn btn-primary" onClick={() => setShowSalaryModal(true)}>
-                💵 Define / Revise Salary Structure
+                Define / Revise Salary Structure
               </button>
             </div>
           )}
@@ -238,7 +238,7 @@ export function PayrollPage({ user }: { user: any }) {
       {config && (
         <div className="card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
           <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#475569', marginBottom: '10px' }}>
-            ⚙️ Statutory & Compliance Configuration
+            Statutory & Compliance Configuration
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', fontSize: '12px' }}>
             <div><span style={{ color: '#64748b' }}>Salary Formula:</span> <strong>50% Basic / 25% HRA / 25% Spl</strong></div>
@@ -309,7 +309,7 @@ export function PayrollPage({ user }: { user: any }) {
                 onClick={handleDownloadBankAdvice}
                 style={{ fontSize: '12px' }}
               >
-                📥 Download Bank Advice (CSV)
+                Download Bank Advice (CSV)
               </button>
 
               {selectedBatch.status === 'DRAFT' && (
@@ -318,7 +318,7 @@ export function PayrollPage({ user }: { user: any }) {
                   onClick={handleLockBatch}
                   style={{ background: '#f59e0b', borderColor: '#d97706', fontSize: '12px' }}
                 >
-                  🔒 Lock Batch (Freeze)
+                  Lock Batch (Freeze)
                 </button>
               )}
 
@@ -328,7 +328,7 @@ export function PayrollPage({ user }: { user: any }) {
                   onClick={() => setShowDisburseModal(true)}
                   style={{ background: '#16a34a', borderColor: '#15803d', fontSize: '12px' }}
                 >
-                  💳 Disburse Batch
+                  Disburse Batch
                 </button>
               )}
             </div>
@@ -433,7 +433,7 @@ export function PayrollPage({ user }: { user: any }) {
                                   }
                                 }}
                               >
-                                🗑️ Remove
+                                Remove
                               </button>
                             </td>
                           )}
@@ -494,7 +494,7 @@ export function PayrollPage({ user }: { user: any }) {
                             className="btn btn-secondary"
                             style={{ padding: '3px 8px', fontSize: '11px' }}
                           >
-                            📄 Web
+                            Web
                           </a>
                           <button
                             type="button"
@@ -502,7 +502,7 @@ export function PayrollPage({ user }: { user: any }) {
                             className="btn btn-primary"
                             style={{ padding: '3px 8px', fontSize: '11px' }}
                           >
-                            📥 PDF
+                            PDF
                           </button>
                         </div>
                       </td>
@@ -530,7 +530,7 @@ export function PayrollPage({ user }: { user: any }) {
           }}>
             <div className="card" style={{ width: '500px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
 
-              <h3 style={{ marginBottom: '14px' }}>💵 Set / Revise Salary Structure</h3>
+              <h3 style={{ marginBottom: '14px' }}>Set / Revise Salary Structure</h3>
               <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
                 Append-Only Ledger (Rule #4): Updates close previous active row with <code>effectiveTo</code> and creates a new active version.
               </p>
@@ -626,7 +626,7 @@ export function PayrollPage({ user }: { user: any }) {
             zIndex: 1000, padding: '20px', boxSizing: 'border-box',
           }}>
             <div className="card" style={{ width: '450px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-              <h3 style={{ marginBottom: '14px' }}>💳 Disburse Payroll Batch</h3>
+              <h3 style={{ marginBottom: '14px' }}>Disburse Payroll Batch</h3>
               <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
                 Confirm corporate bank disbursal and record the transaction reference identifier.
               </p>
@@ -677,7 +677,7 @@ export function PayrollPage({ user }: { user: any }) {
             zIndex: 1000, padding: '20px', boxSizing: 'border-box',
           }}>
             <div className="card" style={{ width: '500px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-              <h3 style={{ marginBottom: '14px' }}>➕ Add One-Time Adjustment or Bonus</h3>
+              <h3 style={{ marginBottom: '14px' }}>Add One-Time Adjustment or Bonus</h3>
               <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
                 Append an adjustment (Bonus, Arrears, Overtime, Reimbursement, TDS, or Deduction) to an employee for a specific pay period.
               </p>

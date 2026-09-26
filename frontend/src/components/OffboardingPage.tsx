@@ -231,7 +231,7 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
       >
         <div>
           <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>
-            🚪 Offboarding & Exit Management Engine
+            Offboarding & Exit Management Engine
           </h2>
           <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#64748b' }}>
             Manage employee separations, multi-department clearance checklists, and statutory Full & Final (FnF) settlements.
@@ -445,7 +445,7 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
                         style={{ padding: '4px 10px', fontSize: '11px' }}
                         onClick={() => setShowInterviewModal(req)}
                       >
-                        {req.exitInterview ? '⭐ Interview Done' : '📝 Interview'}
+                        {req.exitInterview ? 'Interview Done' : 'Interview'}
                       </button>
 
                       {/* FnF Settlement */}
@@ -461,7 +461,7 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
                             }
                           }}
                         >
-                          💰 FnF {req.fnfSettlement ? `(${req.fnfSettlement.status})` : 'Calc'}
+                          FnF {req.fnfSettlement ? `(${req.fnfSettlement.status})` : 'Calc'}
                         </button>
                       )}
 
@@ -732,7 +732,7 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
                 style={{ padding: '4px 8px', fontSize: '12px' }}
                 onClick={() => setShowTasksModal(null)}
               >
-                ✕ Close
+                Close
               </button>
             </div>
 
@@ -1000,7 +1000,7 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
                 style={{ padding: '4px 8px', fontSize: '12px' }}
                 onClick={() => setShowFnFModal(null)}
               >
-                ✕ Close
+                Close
               </button>
             </div>
 
