@@ -8,7 +8,7 @@ interface NotificationBellProps {
 
 export function NotificationBell({ user, onNavigateTab }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'notifications' | 'announcements'>('notifications');
+  const [activeSubTab, setActiveSubTab] = useState<'notifications' | 'announcements' | 'emailTest'>('notifications');
   const [notifications, setNotifications] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -16,18 +16,33 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Announcement compose form state (Admin / HR)
+  // Email Test state
+  const [testEmailAddress, setTestEmailAddress] = useState(user?.email || '');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [testEmailResult, setTestEmailResult] = useState<{ success: boolean; message: string; mode?: string } | null>(null);
+
+  // Announcement compose form state (Admin / HR / Manager / Dept Head)
   const [departments, setDepartments] = useState<any[]>([]);
   const [showCompose, setShowCompose] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [newPriority, setNewPriority] = useState<'NORMAL' | 'HIGH' | 'URGENT'>('NORMAL');
   const [newDeptId, setNewDeptId] = useState<string>('');
+  const [newDurationHours, setNewDurationHours] = useState<number>(24);
+  const [sendEmail, setSendEmail] = useState(true);
   const [fanOut, setFanOut] = useState(true);
   const [publishing, setPublishing] = useState(false);
 
   const drawerRef = useRef<HTMLDivElement>(null);
-  const canPublish = user?.role === 'CLIENT_SUPER_ADMIN' || user?.role === 'HR_ADMIN';
+  const isAdmin = user?.role === 'CLIENT_SUPER_ADMIN' || user?.role === 'HR_ADMIN';
+  const isManager = user?.role === 'MANAGER';
+  const isDeptHead = departments.some((d) => d.headId && user?.employeeId && d.headId === user?.employeeId);
+  const userManagedDept = departments.find(
+    (d) =>
+      (d.headId && user?.employeeId && d.headId === user?.employeeId) ||
+      d.id === user?.employee?.departmentId,
+  );
+  const canPublish = isAdmin || isManager || isDeptHead;
 
   const fetchUnreadCount = async () => {
     try {
@@ -78,12 +93,41 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
     }
   }, [canPublish]);
 
+  // Sync logged in user email to test form
+  useEffect(() => {
+    if (user?.email && !testEmailAddress) {
+      setTestEmailAddress(user.email);
+    }
+  }, [user]);
+
+  const handleSendTestEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testEmailAddress.trim()) return;
+    setSendingEmail(true);
+    setTestEmailResult(null);
+    try {
+      const res = await api.sendTestEmail(testEmailAddress.trim());
+      setTestEmailResult({
+        success: res.success,
+        message: res.message,
+        mode: res.details?.mode,
+      });
+    } catch (err: any) {
+      setTestEmailResult({
+        success: false,
+        message: err.message || 'Failed to dispatch test email',
+      });
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   // Load data when opening drawer or changing subtab/filter
   useEffect(() => {
     if (isOpen) {
       if (activeSubTab === 'notifications') {
         fetchNotifications();
-      } else {
+      } else if (activeSubTab === 'announcements') {
         fetchAnnouncements();
       }
     }
@@ -138,6 +182,8 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
         content: newContent.trim(),
         priority: newPriority,
         targetDepartmentId: newDeptId || undefined,
+        durationHours: newDurationHours,
+        sendEmail,
         fanOutNotifications: fanOut,
       });
 
@@ -145,6 +191,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
       setNewContent('');
       setNewPriority('NORMAL');
       setNewDeptId('');
+      setNewDurationHours(24);
       setShowCompose(false);
       fetchAnnouncements();
       fetchUnreadCount();
@@ -418,6 +465,27 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                 </span>
               )}
             </button>
+
+            <button
+              onClick={() => setActiveSubTab('emailTest')}
+              style={{
+                flex: 1,
+                padding: '12px 8px',
+                border: 'none',
+                background: 'none',
+                borderBottom: activeSubTab === 'emailTest' ? '2px solid #2563eb' : '2px solid transparent',
+                color: activeSubTab === 'emailTest' ? '#2563eb' : '#64748b',
+                fontWeight: activeSubTab === 'emailTest' ? 700 : 500,
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>✉️ Test Email</span>
+            </button>
           </div>
 
           {/* Body Content */}
@@ -554,12 +622,17 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
             {/* SUBTAB 2: ANNOUNCEMENTS */}
             {activeSubTab === 'announcements' && (
               <div>
-                {/* Admin/HR Broadcast composer toggle */}
+                {/* Broadcast composer toggle */}
                 {canPublish && (
                   <div style={{ marginBottom: '16px' }}>
                     {!showCompose ? (
                       <button
-                        onClick={() => setShowCompose(true)}
+                        onClick={() => {
+                          setShowCompose(true);
+                          if (!isAdmin && userManagedDept) {
+                            setNewDeptId(userManagedDept.id);
+                          }
+                        }}
                         style={{
                           width: '100%',
                           padding: '8px 12px',
@@ -609,7 +682,7 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                           <input
                             type="text"
                             required
-                            placeholder="e.g., Company Town Hall or Holiday Notice"
+                            placeholder="e.g., Department Sprint Review or Team Notice"
                             value={newTitle}
                             onChange={(e) => setNewTitle(e.target.value)}
                             style={{
@@ -647,27 +720,79 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
 
                           <div>
                             <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
-                              Target Scope
+                              {isAdmin ? 'Target Scope' : 'Target Department'}
                             </label>
-                            <select
-                              value={newDeptId}
-                              onChange={(e) => setNewDeptId(e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '6px',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '4px',
-                                fontSize: '12px',
-                              }}
-                            >
-                              <option value="">All Company</option>
-                              {departments.map((d) => (
-                                <option key={d.id} value={d.id}>
-                                  {d.name}
-                                </option>
-                              ))}
-                            </select>
+                            {isAdmin ? (
+                              <select
+                                value={newDeptId}
+                                onChange={(e) => setNewDeptId(e.target.value)}
+                                style={{
+                                  width: '100%',
+                                  padding: '6px',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                }}
+                              >
+                                <option value="">🌐 All Company</option>
+                                {departments.map((d) => (
+                                  <option key={d.id} value={d.id}>
+                                    🏢 {d.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <select
+                                value={newDeptId}
+                                onChange={(e) => setNewDeptId(e.target.value)}
+                                required
+                                style={{
+                                  width: '100%',
+                                  padding: '6px',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                  background: '#f1f5f9',
+                                }}
+                              >
+                                {departments
+                                  .filter(
+                                    (d) =>
+                                      (d.headId && user?.employeeId && d.headId === user?.employeeId) ||
+                                      d.id === user?.employee?.departmentId,
+                                  )
+                                  .map((d) => (
+                                    <option key={d.id} value={d.id}>
+                                      🏢 {d.name} (My Department)
+                                    </option>
+                                  ))}
+                              </select>
+                            )}
                           </div>
+                        </div>
+
+                        {/* Duration / Auto-Expiration */}
+                        <div style={{ marginBottom: '8px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
+                            ⏰ Auto-Deactivate Notice After
+                          </label>
+                          <select
+                            value={newDurationHours}
+                            onChange={(e) => setNewDurationHours(Number(e.target.value))}
+                            style={{
+                              width: '100%',
+                              padding: '6px',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                            }}
+                          >
+                            <option value={12}>12 Hours</option>
+                            <option value={24}>24 Hours (Default)</option>
+                            <option value={48}>48 Hours (2 Days)</option>
+                            <option value={168}>7 Days (1 Week)</option>
+                            <option value={720}>30 Days</option>
+                          </select>
                         </div>
 
                         <div style={{ marginBottom: '8px' }}>
@@ -691,14 +816,25 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                           />
                         </div>
 
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#475569', marginBottom: '10px', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={fanOut}
-                            onChange={(e) => setFanOut(e.target.checked)}
-                          />
-                          <span>Fan out in-app notifications to eligible employees</span>
-                        </label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#475569', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={sendEmail}
+                              onChange={(e) => setSendEmail(e.target.checked)}
+                            />
+                            <span>📧 Send real-time announcement email to targeted members</span>
+                          </label>
+
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#475569', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={fanOut}
+                              onChange={(e) => setFanOut(e.target.checked)}
+                            />
+                            <span>🔔 Fan out in-app notifications to eligible employees</span>
+                          </label>
+                        </div>
 
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                           <button
@@ -786,6 +922,20 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                           <span style={{ fontSize: '11px', color: '#64748b' }}>
                             {a.targetDepartment ? `🏢 ${a.targetDepartment.name}` : '🌐 Company-wide'}
                           </span>
+                          {a.expiresAt && (
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: new Date(a.expiresAt) > new Date() ? '#f0f9ff' : '#fef2f2',
+                                color: new Date(a.expiresAt) > new Date() ? '#0369a1' : '#b91c1c',
+                                fontWeight: 600,
+                              }}
+                            >
+                              ⏰ {new Date(a.expiresAt) > new Date() ? `Expires in ${Math.max(1, Math.ceil((new Date(a.expiresAt).getTime() - Date.now()) / (1000 * 3600)))}h` : 'Expired'}
+                            </span>
+                          )}
                         </div>
 
                         <span style={{ fontSize: '11px', color: '#94a3b8' }}>
@@ -829,6 +979,165 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* SUBTAB 3: LIVE EMAIL DISPATCH TESTER */}
+            {activeSubTab === 'emailTest' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div
+                  style={{
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '16px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '20px' }}>⚡</span>
+                    <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+                      Live Email Engine
+                    </h4>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: 1.5 }}>
+                    Test real-time delivery to your actual inbox powered by BullMQ background queues &amp; Redis.
+                  </p>
+                </div>
+
+                <form onSubmit={handleSendTestEmail} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#334155',
+                        marginBottom: '6px',
+                      }}
+                    >
+                      Target Email Address:
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={testEmailAddress}
+                      onChange={(e) => setTestEmailAddress(e.target.value)}
+                      placeholder="your.email@gmail.com"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '13px',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={sendingEmail}
+                    style={{
+                      padding: '11px 16px',
+                      background: sendingEmail
+                        ? '#94a3b8'
+                        : 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontWeight: 600,
+                      fontSize: '13px',
+                      cursor: sendingEmail ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      boxShadow: '0 2px 4px rgba(79, 70, 229, 0.2)',
+                    }}
+                  >
+                    {sendingEmail ? (
+                      <>
+                        <span>⏳</span>
+                        <span>Dispatching Live Email...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>✉️</span>
+                        <span>Send Live Test Email</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                {testEmailResult && (
+                  <div
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      border: testEmailResult.success
+                        ? testEmailResult.mode === 'live_smtp'
+                          ? '1px solid #86efac'
+                          : '1px solid #93c5fd'
+                        : '1px solid #fca5a5',
+                      background: testEmailResult.success
+                        ? testEmailResult.mode === 'live_smtp'
+                          ? '#f0fdf4'
+                          : '#eff6ff'
+                        : '#fef2f2',
+                      fontSize: '12px',
+                      lineHeight: 1.5,
+                      color: testEmailResult.success
+                        ? testEmailResult.mode === 'live_smtp'
+                          ? '#166534'
+                          : '#1e40af'
+                        : '#991b1b',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        marginBottom: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                      }}
+                    >
+                      {testEmailResult.success
+                        ? testEmailResult.mode === 'live_smtp'
+                          ? '🎉 Delivered to Live Inbox!'
+                          : 'ℹ️ Local Simulation Mode'
+                        : '❌ Delivery Failed'}
+                    </div>
+                    <div>{testEmailResult.message}</div>
+                  </div>
+                )}
+
+                {/* Configuration status tip */}
+                <div
+                  style={{
+                    padding: '14px',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    color: '#475569',
+                    lineHeight: 1.6,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
+                    🛠️ Email Engine Providers:
+                  </div>
+                  <div>
+                    • <strong>Resend:</strong> In <code>.env</code>, set <code>SMTP_USER="resend"</code> &amp; <code>SMTP_PASS="re_..."</code>
+                  </div>
+                  <div>
+                    • <strong>Gmail:</strong> In <code>.env</code>, set <code>SMTP_USER="you@gmail.com"</code> &amp; <code>SMTP_PASS="16-char-app-pass"</code>
+                  </div>
+                  <div style={{ marginTop: '6px', color: '#64748b' }}>
+                    Every real HR action (leave approvals, payslips, circulars) will automatically dispatch to employees in real time!
+                  </div>
                 </div>
               </div>
             )}

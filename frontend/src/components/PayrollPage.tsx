@@ -23,6 +23,16 @@ export function PayrollPage({ user }: { user: any }) {
   const [salReason, setSalReason] = useState('Initial Structure or Appraisal');
   const [salSubmitting, setSalSubmitting] = useState(false);
 
+  // Bonus & Adjustment Modal
+  const [showAdjModal, setShowAdjModal] = useState(false);
+  const [adjEmpId, setAdjEmpId] = useState('');
+  const [adjYear, setAdjYear] = useState(new Date().getFullYear());
+  const [adjMonth, setAdjMonth] = useState(new Date().getMonth() + 1);
+  const [adjType, setAdjType] = useState('BONUS');
+  const [adjAmount, setAdjAmount] = useState<number>(5000);
+  const [adjReason, setAdjReason] = useState('Performance Bonus');
+  const [adjSubmitting, setAdjSubmitting] = useState(false);
+
   // Disburse Modal
   const [showDisburseModal, setShowDisburseModal] = useState(false);
   const [paymentRef, setPaymentRef] = useState('UTR-NEFT-' + Date.now().toString().slice(-6));
@@ -44,7 +54,10 @@ export function PayrollPage({ user }: { user: any }) {
       setConfig(cfgRes);
       setBatches(batchesRes || []);
       setEmployees(empsRes.data || []);
-      if (empsRes.data?.length > 0) setSalEmpId(empsRes.data[0].id);
+      if (empsRes.data?.length > 0) {
+        setSalEmpId(empsRes.data[0].id);
+        setAdjEmpId(empsRes.data[0].id);
+      }
       if (batchesRes.length > 0 && !selectedBatch) {
         loadBatchDetails(batchesRes[0].id);
       }
@@ -131,6 +144,32 @@ export function PayrollPage({ user }: { user: any }) {
     }
   };
 
+  const handleCreateAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setAdjSubmitting(true);
+      await api.createPayrollAdjustment({
+        employeeId: adjEmpId,
+        year: Number(adjYear),
+        month: Number(adjMonth),
+        type: adjType,
+        amount: Number(adjAmount),
+        reason: adjReason,
+      });
+      alert('Adjustment created successfully! Recalculate draft batch to include it.');
+      setShowAdjModal(false);
+      setAdjReason('Performance Bonus');
+      setAdjAmount(5000);
+      if (selectedBatch && selectedBatch.year === Number(adjYear) && selectedBatch.month === Number(adjMonth)) {
+        await loadBatchDetails(selectedBatch.id);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to create adjustment');
+    } finally {
+      setAdjSubmitting(false);
+    }
+  };
+
   const handleDownloadBankAdvice = async () => {
     if (!selectedBatch) return;
     try {
@@ -181,9 +220,14 @@ export function PayrollPage({ user }: { user: any }) {
             </p>
           </div>
           {isFinance && (
-            <button className="btn btn-primary" onClick={() => setShowSalaryModal(true)}>
-              💵 Define / Revise Salary Structure
-            </button>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button className="btn btn-secondary" onClick={() => setShowAdjModal(true)}>
+                ➕ Add Bonus / Adjustment
+              </button>
+              <button className="btn btn-primary" onClick={() => setShowSalaryModal(true)}>
+                💵 Define / Revise Salary Structure
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -200,6 +244,7 @@ export function PayrollPage({ user }: { user: any }) {
             <div><span style={{ color: '#64748b' }}>Salary Formula:</span> <strong>50% Basic / 25% HRA / 25% Spl</strong></div>
             <div><span style={{ color: '#64748b' }}>PF Wage Ceiling:</span> <strong>₹{config.pfCeilingAmount}</strong> {config.applyPfCeiling ? '(Active)' : '(Uncapped)'}</div>
             <div><span style={{ color: '#64748b' }}>PF Rates:</span> <strong>{config.pfEmployeeRate}% Emp / {config.pfEmployerRate}% Empr</strong></div>
+            <div><span style={{ color: '#64748b' }}>ESI Compliance:</span> <strong>{config.applyEsi ? `${config.esiEmployeeRate}% Emp / ${config.esiEmployerRate}% Empr (≤₹${config.esiThresholdAmount})` : 'Disabled'}</strong></div>
             <div><span style={{ color: '#64748b' }}>Professional Tax:</span> <strong>₹{config.ptAmount}/mo</strong> (Threshold: ₹{config.ptSalaryThreshold})</div>
             <div><span style={{ color: '#64748b' }}>Rounding Rule:</span> <strong>{config.roundToWholeRupee ? 'Whole Rupee at Net Pay' : 'Double Precision'}</strong></div>
           </div>
@@ -330,6 +375,76 @@ export function PayrollPage({ user }: { user: any }) {
               </div>
             </div>
 
+            {/* Batch Adjustments & Bonuses (if any) */}
+            {selectedBatch.adjustments && selectedBatch.adjustments.length > 0 && (
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px' }}>
+                  Adjustments & Bonuses ({selectedBatch.adjustments.length})
+                </h4>
+                <table style={{ marginBottom: '16px' }}>
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Type</th>
+                      <th>Amount</th>
+                      <th>Reason / Note</th>
+                      <th>Status</th>
+                      {isFinance && selectedBatch.status === 'DRAFT' && <th>Action</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedBatch.adjustments.map((adj: any) => {
+                      const isAddition = ['BONUS', 'ARREARS', 'OVERTIME', 'REIMBURSEMENT'].includes(adj.type);
+                      return (
+                        <tr key={adj.id}>
+                          <td><strong>{adj.employee?.employeeCode}</strong> — {adj.employee?.firstName} {adj.employee?.lastName}</td>
+                          <td>
+                            <span className="badge" style={{
+                              background: isAddition ? '#dcfce7' : '#fee2e2',
+                              color: isAddition ? '#166534' : '#991b1b',
+                              fontSize: '11px',
+                            }}>
+                              {adj.type}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: 700, color: isAddition ? '#16a34a' : '#dc2626' }}>
+                            {isAddition ? '+' : '-'}₹{Number(adj.amount).toFixed(2)}
+                          </td>
+                          <td style={{ fontSize: '12px' }}>{adj.description || '—'}</td>
+                          <td>
+                            <span className={`badge ${adj.isProcessed ? 'badge-active' : 'badge-inactive'}`}>
+                              {adj.isProcessed ? 'Included in Batch' : 'Pending'}
+                            </span>
+                          </td>
+                          {isFinance && selectedBatch.status === 'DRAFT' && (
+                            <td>
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                style={{ padding: '2px 8px', fontSize: '11px', color: '#dc2626', borderColor: '#fca5a5' }}
+                                onClick={async () => {
+                                  if (!confirm(`Delete adjustment ${adj.type} of ₹${adj.amount}?`)) return;
+                                  try {
+                                    await api.deletePayrollAdjustment(adj.id);
+                                    alert('Adjustment deleted! Recalculate draft batch to update payroll totals.');
+                                    loadBatchDetails(selectedBatch.id);
+                                  } catch (err: any) {
+                                    alert(err.message || 'Failed to delete adjustment');
+                                  }
+                                }}
+                              >
+                                🗑️ Remove
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             {/* Payslips Table */}
             <h4 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px' }}>
               Individual Employee Payslips ({selectedBatch.payslips?.length || 0})
@@ -343,38 +458,57 @@ export function PayrollPage({ user }: { user: any }) {
                   <th>Payable Days</th>
                   <th>Earned Basic</th>
                   <th>Earned Gross</th>
+                  <th>Bonus/Add.</th>
                   <th>PF (Emp)</th>
+                  <th>ESI (Emp)</th>
                   <th>PT</th>
                   <th>Total Deductions</th>
                   <th>Net Take-Home</th>
-                  <th>Payslip View</th>
+                  <th>Payslip Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {(selectedBatch.payslips || []).map((ps: any) => (
-                  <tr key={ps.id}>
-                    <td><strong>{ps.employee?.employeeCode}</strong></td>
-                    <td>{ps.employee?.firstName} {ps.employee?.lastName}</td>
-                    <td>{ps.payableDays} / {ps.totalMonthDays}</td>
-                    <td>₹{Number(ps.earnedBasic).toFixed(2)}</td>
-                    <td>₹{Number(ps.earnedGross).toFixed(2)}</td>
-                    <td>₹{Number(ps.employeePf).toFixed(2)}</td>
-                    <td>₹{Number(ps.professionalTax).toFixed(2)}</td>
-                    <td style={{ color: '#dc2626' }}>₹{Number(ps.totalDeductions).toFixed(2)}</td>
-                    <td style={{ fontWeight: 800, color: '#16a34a' }}>₹{Number(ps.netPay).toFixed(2)}</td>
-                    <td>
-                      <a
-                        href={api.getPayslipViewHtmlUrl(ps.id)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-secondary"
-                        style={{ padding: '3px 8px', fontSize: '11px' }}
-                      >
-                        📄 Printable View
-                      </a>
-                    </td>
-                  </tr>
-                ))}
+                {(selectedBatch.payslips || []).map((ps: any) => {
+                  const additions = Number(ps.bonusAmount || 0) + Number(ps.arrearsAmount || 0) + Number(ps.otherAdditions || 0);
+                  return (
+                    <tr key={ps.id}>
+                      <td><strong>{ps.employee?.employeeCode}</strong></td>
+                      <td>{ps.employee?.firstName} {ps.employee?.lastName}</td>
+                      <td>{ps.payableDays} / {ps.totalMonthDays}</td>
+                      <td>₹{Number(ps.earnedBasic).toFixed(2)}</td>
+                      <td>₹{Number(ps.earnedGross).toFixed(2)}</td>
+                      <td style={{ color: additions > 0 ? '#16a34a' : 'inherit', fontWeight: additions > 0 ? 600 : 'normal' }}>
+                        ₹{additions.toFixed(2)}
+                      </td>
+                      <td>₹{Number(ps.employeePf).toFixed(2)}</td>
+                      <td>₹{Number(ps.employeeEsi || 0).toFixed(2)}</td>
+                      <td>₹{Number(ps.professionalTax).toFixed(2)}</td>
+                      <td style={{ color: '#dc2626' }}>₹{Number(ps.totalDeductions).toFixed(2)}</td>
+                      <td style={{ fontWeight: 800, color: '#16a34a' }}>₹{Number(ps.netPay).toFixed(2)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <a
+                            href={api.getPayslipViewHtmlUrl(ps.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-secondary"
+                            style={{ padding: '3px 8px', fontSize: '11px' }}
+                          >
+                            📄 Web
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => api.downloadPayslipPdf(ps.id, `Payslip-${ps.employee?.employeeCode || ps.id}-${selectedBatch.month}-${selectedBatch.year}.pdf`)}
+                            className="btn btn-primary"
+                            style={{ padding: '3px 8px', fontSize: '11px' }}
+                          >
+                            📥 PDF
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -525,6 +659,123 @@ export function PayrollPage({ user }: { user: any }) {
                   </button>
                   <button type="submit" className="btn btn-primary" disabled={disburseLoading} style={{ background: '#16a34a' }}>
                     {disburseLoading ? 'Disbursing...' : 'Confirm Disbursal'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Bonus & Adjustment Modal */}
+      {showAdjModal && (
+        <Modal onClose={() => setShowAdjModal(false)}>
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: 1000, padding: '20px', boxSizing: 'border-box',
+          }}>
+            <div className="card" style={{ width: '500px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+              <h3 style={{ marginBottom: '14px' }}>➕ Add One-Time Adjustment or Bonus</h3>
+              <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
+                Append an adjustment (Bonus, Arrears, Overtime, Reimbursement, TDS, or Deduction) to an employee for a specific pay period.
+              </p>
+
+              <form onSubmit={handleCreateAdjustment} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Employee</label>
+                  <select
+                    value={adjEmpId}
+                    onChange={(e) => setAdjEmpId(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                  >
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.employeeCode} — {emp.firstName} {emp.lastName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Year</label>
+                    <input
+                      type="number"
+                      value={adjYear}
+                      onChange={(e) => setAdjYear(Number(e.target.value))}
+                      required
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600 }}>Month (1-12)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={adjMonth}
+                      onChange={(e) => setAdjMonth(Number(e.target.value))}
+                      required
+                      style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Adjustment Type</label>
+                  <select
+                    value={adjType}
+                    onChange={(e) => setAdjType(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                  >
+                    <optgroup label="Earnings / Additions">
+                      <option value="BONUS">Bonus (Performance, Festive, etc.)</option>
+                      <option value="ARREARS">Arrears (Past adjustment)</option>
+                      <option value="OVERTIME">Overtime</option>
+                      <option value="REIMBURSEMENT">Reimbursement</option>
+                    </optgroup>
+                    <optgroup label="Deductions">
+                      <option value="TDS">TDS (Income Tax)</option>
+                      <option value="OTHER_DEDUCTION">Other Custom Deduction</option>
+                    </optgroup>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Amount (₹ INR)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    step="0.01"
+                    value={adjAmount}
+                    onChange={(e) => setAdjAmount(Number(e.target.value))}
+                    required
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Reason / Description</label>
+                  <input
+                    type="text"
+                    value={adjReason}
+                    onChange={(e) => setAdjReason(e.target.value)}
+                    placeholder="e.g. Q3 Performance Incentive"
+                    required
+                    style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', marginTop: '4px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowAdjModal(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={adjSubmitting}>
+                    {adjSubmitting ? 'Saving...' : 'Add Adjustment'}
                   </button>
                 </div>
               </form>

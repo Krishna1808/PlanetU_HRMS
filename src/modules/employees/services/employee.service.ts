@@ -143,10 +143,11 @@ export class EmployeeService {
         },
       });
 
-      // 7. If workEmail and initialPassword supplied, create auth login account
-      if (dto.workEmail && dto.initialPassword) {
+      // 7. If workEmail supplied, create auth login account
+      if (dto.workEmail) {
+        const rawPassword = dto.initialPassword?.trim() || 'Password@123';
         const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(dto.initialPassword, salt);
+        const passwordHash = await bcrypt.hash(rawPassword, salt);
 
         await tx.user.create({
           data: {

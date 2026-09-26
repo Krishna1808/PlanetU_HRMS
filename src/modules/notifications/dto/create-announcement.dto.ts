@@ -21,7 +21,14 @@ export class CreateAnnouncementDto {
   @IsOptional()
   expiresAt?: string;
 
+  @IsOptional()
+  durationHours?: number;
+
   @IsBoolean()
   @IsOptional()
   fanOutNotifications?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  sendEmail?: boolean;
 }

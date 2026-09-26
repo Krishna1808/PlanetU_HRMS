@@ -37,6 +37,7 @@ describe('NotificationService (Module 11: Notification Engine & Announcements)',
       },
       department: {
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       employee: {
         findUnique: jest.fn(),
@@ -96,6 +97,11 @@ describe('NotificationService (Module 11: Notification Engine & Announcements)',
 
       expect(mockPrisma.user.findFirst).toHaveBeenCalledWith({
         where: { id: mockEmployeeUser.id, organizationId: orgId },
+        include: {
+          employee: {
+            select: { firstName: true, lastName: true },
+          },
+        },
       });
       expect(mockPrisma.notification.create).toHaveBeenCalled();
       expect(result.id).toBe('notif-1');
@@ -234,7 +240,7 @@ describe('NotificationService (Module 11: Notification Engine & Announcements)',
       expect(announcement.id).toBe('ann-1');
       expect(mockPrisma.user.findMany).toHaveBeenCalledWith({
         where: { organizationId: orgId, isActive: true },
-        select: { id: true, email: true },
+        select: expect.objectContaining({ id: true, email: true }),
       });
       expect(mockPrisma.notification.createMany).toHaveBeenCalled();
     });

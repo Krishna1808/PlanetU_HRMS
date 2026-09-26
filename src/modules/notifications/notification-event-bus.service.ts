@@ -52,6 +52,17 @@ export interface AnnouncementPublishedEventPayload {
   createdByUserId: string;
 }
 
+export interface BonusAwardedEventPayload {
+  organizationId: string;
+  recipientUserId: string;
+  employeeName: string;
+  amount: number;
+  type: string;
+  month: number;
+  year: number;
+  reason?: string;
+}
+
 @Injectable()
 export class NotificationEventBusService {
   private readonly logger = new Logger(NotificationEventBusService.name);
@@ -75,6 +86,11 @@ export class NotificationEventBusService {
   emitPayslipReleased(payload: PayslipReleasedEventPayload) {
     this.logger.log(`Domain Event Emitted: payroll.payslip_released for user ${payload.recipientUserId}`);
     this.emitter.emit('payroll.payslip_released', payload);
+  }
+
+  emitBonusAwarded(payload: BonusAwardedEventPayload) {
+    this.logger.log(`Domain Event Emitted: payroll.bonus_awarded for user ${payload.recipientUserId} (₹${payload.amount})`);
+    this.emitter.emit('payroll.bonus_awarded', payload);
   }
 
   emitShiftAssigned(payload: ShiftAssignedEventPayload) {

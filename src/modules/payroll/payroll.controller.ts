@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -17,6 +18,7 @@ import { SetSalaryStructureDto } from './dto/set-salary-structure.dto';
 import { UpdatePayrollConfigDto } from './dto/update-payroll-config.dto';
 import { CalculatePayrollBatchDto } from './dto/calculate-payroll-batch.dto';
 import { DisburseBatchDto } from './dto/disburse-batch.dto';
+import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -216,5 +218,77 @@ export class PayrollController {
     @Param('id') id: string,
   ) {
     return this.payrollService.renderPrintablePayslip(user.organizationId, id, user);
+  }
+
+  /**
+   * GET /api/v1/payroll/payslips/:id/pdf
+   * Download binary PDF payslip document (pdfkit)
+   */
+  @Get('payslips/:id/pdf')
+  async downloadPayslipPdf(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const pdfBuffer = await this.payrollService.generatePayslipPdf(
+      user.organizationId,
+      id,
+      user,
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="payslip-${id}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+
+    res.end(pdfBuffer);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 5. One-Time Adjustments & Bonuses Endpoints
+  // ---------------------------------------------------------------------------
+
+  /**
+   * POST /api/v1/payroll/adjustments
+   * Add bonus, arrears, or deduction to an employee for a specific pay period
+   */
+  @Post('adjustments')
+  @Roles(Role.FINANCE, Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  async createAdjustment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateAdjustmentDto,
+  ) {
+    return this.payrollService.createAdjustment(user.organizationId, user.id, dto);
+  }
+
+  /**
+   * GET /api/v1/payroll/adjustments
+   * List adjustments for a cycle
+   */
+  @Get('adjustments')
+  @Roles(Role.FINANCE, Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  async getAdjustments(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('year') year: string,
+    @Query('month') month: string,
+    @Query('employeeId') employeeId?: string,
+  ) {
+    const y = Number(year) || new Date().getFullYear();
+    const m = Number(month) || new Date().getMonth() + 1;
+    return this.payrollService.getAdjustments(user.organizationId, y, m, employeeId);
+  }
+
+  /**
+   * DELETE /api/v1/payroll/adjustments/:id
+   * Delete an unprocessed adjustment
+   */
+  @Delete('adjustments/:id')
+  @Roles(Role.FINANCE, Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  async deleteAdjustment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return this.payrollService.deleteAdjustment(user.organizationId, id);
   }
 }

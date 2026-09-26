@@ -224,6 +224,46 @@ export const api = {
     return res.text();
   },
   getPayslipViewHtmlUrl: (payslipId: string) => `${BASE_URL}/payroll/payslips/${payslipId}/view`,
+  getPayslipPdfUrl: (payslipId: string) => `${BASE_URL}/payroll/payslips/${payslipId}/pdf`,
+  downloadPayslipPdf: async (payslipId: string, filename = 'Payslip.pdf') => {
+    const res = await fetch(`${BASE_URL}/payroll/payslips/${payslipId}/pdf`, {
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      throw new Error(err?.message || 'Failed to download payslip PDF');
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
+  createPayrollAdjustment: (data: {
+    employeeId: string;
+    year: number;
+    month: number;
+    type: string;
+    amount: number;
+    reason: string;
+  }) =>
+    fetchJson<any>('/payroll/adjustments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getPayrollAdjustments: (year: number, month: number, employeeId?: string) => {
+    const params = new URLSearchParams({ year: String(year), month: String(month) });
+    if (employeeId) params.append('employeeId', employeeId);
+    return fetchJson<any[]>(`/payroll/adjustments?${params.toString()}`);
+  },
+  deletePayrollAdjustment: (id: string) =>
+    fetchJson<any>(`/payroll/adjustments/${id}`, {
+      method: 'DELETE',
+    }),
 
   // 8. Module 7: Employee Self-Service (ESS)
   getEssDashboard: () => fetchJson<any>('/ess/dashboard'),
@@ -399,7 +439,9 @@ export const api = {
     priority?: string;
     targetDepartmentId?: string;
     expiresAt?: string;
+    durationHours?: number;
     fanOutNotifications?: boolean;
+    sendEmail?: boolean;
   }) =>
     fetchJson<any>('/notifications/announcements', {
       method: 'POST',
@@ -409,6 +451,12 @@ export const api = {
   deactivateAnnouncement: (id: string) =>
     fetchJson<any>(`/notifications/announcements/${id}/deactivate`, {
       method: 'PATCH',
+    }),
+
+  sendTestEmail: (targetEmail?: string) =>
+    fetchJson<{ success: boolean; message: string; details?: any }>('/notifications/test-email', {
+      method: 'POST',
+      body: JSON.stringify({ targetEmail }),
     }),
 };
 

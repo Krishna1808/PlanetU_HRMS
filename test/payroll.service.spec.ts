@@ -22,6 +22,10 @@ describe('PayrollService (Module 6: Payroll Engine & Statutory Compliance)', () 
     applyPfCeiling: true,
     pfEmployeeRate: 12.0,
     pfEmployerRate: 12.0,
+    applyEsi: true,
+    esiThresholdAmount: 21000.0,
+    esiEmployeeRate: 0.75,
+    esiEmployerRate: 3.25,
     ptAmount: 200.0,
     ptSalaryThreshold: 10000.0,
     roundToWholeRupee: true,
@@ -41,6 +45,18 @@ describe('PayrollService (Module 6: Payroll Engine & Statutory Compliance)', () 
         update: jest.fn().mockImplementation(async (args: any) => ({
           ...defaultPayrollConfig,
           ...args.data,
+        })),
+      },
+      payrollAdjustment: {
+        findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockImplementation(async (args: any) => ({
+          id: 'adj-new',
+          ...args.data,
+        })),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        delete: jest.fn().mockImplementation(async (args: any) => ({
+          id: args.where.id,
         })),
       },
       salaryStructure: {
@@ -733,6 +749,147 @@ describe('PayrollService (Module 6: Payroll Engine & Statutory Compliance)', () 
       await expect(
         service.getPayslipById(orgId, 'ps-other', unauthorizedEmployee),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 6. Statutory Compliance — ESI (Employee State Insurance)
+  // ---------------------------------------------------------------------------
+  describe('ESI Statutory Deductions', () => {
+    it('should compute zero ESI for employees earning above the Rs 21,000 threshold', async () => {
+      // Default mock has Gross = 50,000 > 21,000 threshold
+      await service.calculateBatch(orgId, { year: 2026, month: 9 }, userId);
+
+      const payslipCalls = mockPrisma.payslip.createMany.mock.calls;
+      expect(payslipCalls.length).toBeGreaterThan(0);
+      const createdPayslips = payslipCalls[0][0].data;
+      expect(createdPayslips[0].employeeEsi).toBe(0);
+      expect(createdPayslips[0].employerEsi).toBe(0);
+    });
+
+    it('should compute 0.75% employee and 3.25% employer ESI when gross is <= Rs 21,000', async () => {
+      // Set employee with monthly gross = 20,000 <= 21,000 threshold
+      mockPrisma.employee.findMany.mockResolvedValue([
+        {
+          id: empId,
+          organizationId: orgId,
+          employeeCode: 'ENG-0002',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          salaryStructures: [
+            {
+              id: 'sal-low',
+              organizationId: orgId,
+              employeeId: empId,
+              annualCtc: 240000.0,
+              monthlyGross: 20000.0,
+              basicSalary: 10000.0,
+              hra: 5000.0,
+              specialAllowance: 5000.0,
+              effectiveFrom: new Date('2026-01-01'),
+              effectiveTo: null,
+            },
+          ],
+        },
+      ]);
+
+      await service.calculateBatch(orgId, { year: 2026, month: 9 }, userId);
+
+      const payslipCalls = mockPrisma.payslip.createMany.mock.calls;
+      const createdPayslip = payslipCalls[0][0].data[0];
+
+      // 20000 * 0.0075 = 150.00
+      expect(createdPayslip.employeeEsi).toBe(150.0);
+      // 20000 * 0.0325 = 650.00
+      expect(createdPayslip.employerEsi).toBe(650.0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 7. One-Time Payroll Adjustments & Bonuses
+  // ---------------------------------------------------------------------------
+  describe('One-Time Payroll Adjustments & Bonuses', () => {
+    it('should create an adjustment in the ledger', async () => {
+      const dto = {
+        employeeId: empId,
+        year: 2026,
+        month: 9,
+        type: 'BONUS' as any,
+        amount: 5000,
+        reason: 'Q3 Performance Bonus',
+      };
+
+      const result = await service.createAdjustment(orgId, userId, dto);
+      expect(mockPrisma.payrollAdjustment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            organizationId: orgId,
+            employeeId: empId,
+            year: 2026,
+            month: 9,
+            type: 'BONUS',
+            amount: 5000,
+            description: 'Q3 Performance Bonus',
+            createdByUserId: userId,
+          }),
+        }),
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('should include pending bonuses in batch calculation and net pay', async () => {
+      // Mock adjustment for the month
+      mockPrisma.payrollAdjustment.findMany.mockResolvedValue([
+        {
+          id: 'adj-bonus-1',
+          employeeId: empId,
+          type: 'BONUS',
+          amount: 5000.0,
+          year: 2026,
+          month: 9,
+          isProcessed: false,
+        },
+      ]);
+
+      await service.calculateBatch(orgId, { year: 2026, month: 9 }, userId);
+
+      const payslipCalls = mockPrisma.payslip.createMany.mock.calls;
+      const createdPayslip = payslipCalls[0][0].data[0];
+
+      expect(createdPayslip.bonusAmount).toBe(5000.0);
+      // Earned gross (50000) + bonus (5000) - PF (1800) - PT (200) = 53000
+      expect(createdPayslip.netPay).toBe(53000.0);
+      // Adjustments should be marked processed
+      expect(mockPrisma.payrollAdjustment.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ isProcessed: true }),
+        }),
+      );
+    });
+
+    it('should allow deleting an adjustment if the batch is in DRAFT', async () => {
+      mockPrisma.payrollAdjustment.findFirst.mockResolvedValue({
+        id: 'adj-1',
+        organizationId: orgId,
+        payrollBatch: { status: PayrollBatchStatus.DRAFT },
+      });
+
+      await service.deleteAdjustment(orgId, 'adj-1');
+      expect(mockPrisma.payrollAdjustment.delete).toHaveBeenCalledWith({
+        where: { id: 'adj-1' },
+      });
+    });
+
+    it('should reject deleting an adjustment if the batch is LOCKED', async () => {
+      mockPrisma.payrollAdjustment.findFirst.mockResolvedValue({
+        id: 'adj-1',
+        organizationId: orgId,
+        payrollBatch: { status: PayrollBatchStatus.LOCKED },
+      });
+
+      await expect(
+        service.deleteAdjustment(orgId, 'adj-1'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

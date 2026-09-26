@@ -4,10 +4,14 @@ import {
   NotFoundException,
   ForbiddenException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationEventBusService } from './notification-event-bus.service';
+import { MailService } from '../mail/mail.service';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { QueryNotificationsDto } from './dto/query-notifications.dto';
@@ -21,6 +25,8 @@ export class NotificationService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventBus: NotificationEventBusService,
+    @Optional() @InjectQueue('mail-queue') private readonly mailQueue?: Queue,
+    @Optional() private readonly mailService?: MailService,
   ) {}
 
   onModuleInit() {
@@ -107,6 +113,23 @@ export class NotificationService implements OnModuleInit {
         this.logger.error(`Failed to handle clearance.task_assigned: ${err?.message}`);
       }
     });
+
+    // 6. Bonus / Adjustment Awarded
+    this.eventBus.on('payroll.bonus_awarded', async (payload) => {
+      try {
+        const typeLabel = payload.type === 'BONUS' ? 'Performance Bonus' : payload.type.replace('_', ' ');
+        await this.createNotification(payload.organizationId, {
+          recipientUserId: payload.recipientUserId,
+          type: 'BONUS_AWARDED' as any,
+          title: `🎉 ${typeLabel} Awarded: ₹${Number(payload.amount).toLocaleString('en-IN')}`,
+          message: `Good news! An adjustment of ₹${Number(payload.amount).toLocaleString('en-IN')} (${payload.type}) has been credited to your upcoming ${payload.month}/${payload.year} payroll.${payload.reason ? ` Reason: ${payload.reason}` : ''}`,
+          actionUrl: '/ess',
+          metadata: { amount: payload.amount, type: payload.type, month: payload.month, year: payload.year },
+        });
+      } catch (err: any) {
+        this.logger.error(`Failed to handle payroll.bonus_awarded: ${err?.message}`);
+      }
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -116,6 +139,11 @@ export class NotificationService implements OnModuleInit {
   async createNotification(organizationId: string, dto: CreateNotificationDto) {
     const recipient = await this.prisma.user.findFirst({
       where: { id: dto.recipientUserId, organizationId },
+      include: {
+        employee: {
+          select: { firstName: true, lastName: true },
+        },
+      },
     });
 
     if (!recipient) {
@@ -135,10 +163,75 @@ export class NotificationService implements OnModuleInit {
       },
     });
 
-    // Zero external API cost - simulate delivery in console envelope
-    this.simulateEmailDispatch(notification, recipient.email);
+    // Real-time asynchronous email notification via BullMQ + Redis
+    const recipientName = recipient.employee
+      ? `${recipient.employee.firstName} ${recipient.employee.lastName}`.trim()
+      : recipient.email.split('@')[0];
+
+    const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const actionUrl = dto.actionUrl ? `${frontendBaseUrl}${dto.actionUrl}` : undefined;
+
+    await this.dispatchEmailNotification(
+      {
+        to: recipient.email,
+        recipientName,
+        type: dto.type,
+        title: dto.title,
+        message: dto.message,
+        actionUrl,
+        metadata: (dto.metadata as Record<string, any>) || undefined,
+      },
+      notification,
+    );
 
     return notification;
+  }
+
+  private async dispatchEmailNotification(
+    payload: {
+      to: string;
+      recipientName: string;
+      type: string;
+      title: string;
+      message: string;
+      actionUrl?: string;
+      metadata?: Record<string, any>;
+    },
+    fallbackNotification?: any,
+  ) {
+    if (this.mailQueue) {
+      try {
+        await this.mailQueue.add('send-notification-email', payload, {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        });
+        this.logger.log(`Email job queued in Redis for ${payload.to}`);
+        return;
+      } catch (err: any) {
+        this.logger.warn(
+          `BullMQ queueing unavailable (${err.message}). Attempting direct mail dispatch.`,
+        );
+      }
+    }
+
+    if (this.mailService) {
+      await this.mailService.sendNotificationEmail(payload);
+    } else if (fallbackNotification) {
+      this.simulateEmailDispatch(fallbackNotification, payload.to);
+    }
+  }
+
+  async sendTestEmail(toEmail: string) {
+    if (this.mailService) {
+      return this.mailService.sendTestEmail(toEmail);
+    }
+    return {
+      success: true,
+      message: 'Mail service not active. Local simulated envelope logged.',
+      mode: 'simulation',
+    };
   }
 
   async getUserNotifications(userId: string, organizationId: string, query: QueryNotificationsDto) {
@@ -245,8 +338,55 @@ export class NotificationService implements OnModuleInit {
     user: AuthenticatedUser,
     dto: CreateAnnouncementDto,
   ) {
-    if (user.role !== Role.CLIENT_SUPER_ADMIN && user.role !== Role.HR_ADMIN) {
-      throw new ForbiddenException('Only HR Admins or Super Admins can publish broadcast announcements.');
+    const isAdmin =
+      user.role === Role.CLIENT_SUPER_ADMIN || user.role === Role.HR_ADMIN;
+
+    let isManagerOrHead = false;
+    const allowedDepartmentIds: string[] = [];
+
+    if (!isAdmin) {
+      if (user.role === Role.MANAGER) {
+        isManagerOrHead = true;
+      }
+
+      if (user.employeeId) {
+        const [emp, headedDepts] = await Promise.all([
+          this.prisma.employee.findUnique({
+            where: { id: user.employeeId },
+            select: { departmentId: true },
+          }),
+          this.prisma.department.findMany({
+            where: { organizationId, headId: user.employeeId },
+            select: { id: true },
+          }),
+        ]);
+
+        if (headedDepts.length > 0) {
+          isManagerOrHead = true;
+          allowedDepartmentIds.push(...headedDepts.map((d) => d.id));
+        }
+        if (emp?.departmentId) {
+          allowedDepartmentIds.push(emp.departmentId);
+        }
+      }
+
+      if (!isManagerOrHead) {
+        throw new ForbiddenException(
+          'Only HR Admins, Super Admins, Managers, or Department Heads can publish announcements.',
+        );
+      }
+
+      if (!dto.targetDepartmentId) {
+        throw new ForbiddenException(
+          'Managers and Department Heads can only publish announcements specific to their department.',
+        );
+      }
+
+      if (!allowedDepartmentIds.includes(dto.targetDepartmentId)) {
+        throw new ForbiddenException(
+          'You are not authorized to publish announcements for this department.',
+        );
+      }
     }
 
     if (dto.targetDepartmentId) {
@@ -258,6 +398,15 @@ export class NotificationService implements OnModuleInit {
       }
     }
 
+    // Auto-expiration calculation (default: 24 hours)
+    let expiresAt: Date;
+    if (dto.expiresAt) {
+      expiresAt = new Date(dto.expiresAt);
+    } else {
+      const hours = dto.durationHours && dto.durationHours > 0 ? dto.durationHours : 24;
+      expiresAt = new Date(Date.now() + hours * 3600 * 1000);
+    }
+
     const announcement = await this.prisma.announcement.create({
       data: {
         organizationId,
@@ -266,7 +415,7 @@ export class NotificationService implements OnModuleInit {
         content: dto.content,
         priority: dto.priority || 'NORMAL',
         targetDepartmentId: dto.targetDepartmentId || null,
-        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+        expiresAt,
       },
       include: {
         targetDepartment: { select: { id: true, name: true, codePrefix: true } },
@@ -274,20 +423,24 @@ export class NotificationService implements OnModuleInit {
       },
     });
 
-    // Fan-out notifications to users if requested
-    if (dto.fanOutNotifications !== false) {
-      const targetUsers = await this.prisma.user.findMany({
-        where: {
-          organizationId,
-          isActive: true,
-          ...(dto.targetDepartmentId
-            ? { employee: { departmentId: dto.targetDepartmentId } }
-            : {}),
-        },
-        select: { id: true, email: true },
-      });
+    // Fan-out notifications to users
+    const targetUsers = await this.prisma.user.findMany({
+      where: {
+        organizationId,
+        isActive: true,
+        ...(dto.targetDepartmentId
+          ? { employee: { departmentId: dto.targetDepartmentId } }
+          : {}),
+      },
+      select: {
+        id: true,
+        email: true,
+        employee: { select: { firstName: true, lastName: true } },
+      },
+    });
 
-      if (targetUsers.length > 0) {
+    if (targetUsers.length > 0) {
+      if (dto.fanOutNotifications !== false) {
         await this.prisma.notification.createMany({
           data: targetUsers.map((u) => ({
             organizationId,
@@ -302,8 +455,35 @@ export class NotificationService implements OnModuleInit {
         });
 
         this.logger.log(
-          `Broadcast announcement fanned out to ${targetUsers.length} in-app notification recipients ($0 cost).`,
+          `Announcement fanned out to ${targetUsers.length} in-app notification recipients.`,
         );
+      }
+
+      // Email Broadcast (default: enabled)
+      if (dto.sendEmail !== false) {
+        const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        for (const u of targetUsers) {
+          const recipientName = u.employee
+            ? `${u.employee.firstName} ${u.employee.lastName}`.trim()
+            : u.email.split('@')[0];
+
+          await this.dispatchEmailNotification(
+            {
+              to: u.email,
+              recipientName,
+              type: 'ANNOUNCEMENT',
+              title: `📢 Announcement: ${dto.title}`,
+              message: dto.content,
+              actionUrl: frontendBaseUrl,
+              metadata: {
+                announcementId: announcement.id,
+                priority: announcement.priority,
+                expiresAt: expiresAt.toISOString(),
+              },
+            },
+            null,
+          );
+        }
       }
     }
 
@@ -327,12 +507,35 @@ export class NotificationService implements OnModuleInit {
     const isAdmin =
       user.role === Role.CLIENT_SUPER_ADMIN || user.role === Role.HR_ADMIN;
 
+    // Opportunistic sweep: mark expired announcements inactive in the database
+    this.prisma.announcement.updateMany({
+      where: {
+        organizationId,
+        isActive: true,
+        expiresAt: { lte: new Date() },
+      },
+      data: { isActive: false },
+    }).catch(() => {});
+
     const whereClause: any = { organizationId };
 
     if (query.isActive !== undefined) {
       whereClause.isActive = query.isActive === 'true';
     } else if (!isAdmin) {
       whereClause.isActive = true;
+    }
+
+    // Active announcements must not be expired
+    if (whereClause.isActive === true) {
+      whereClause.AND = [
+        ...(whereClause.AND || []),
+        {
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: new Date() } },
+          ],
+        },
+      ];
     }
 
     if (!isAdmin) {
@@ -368,16 +571,32 @@ export class NotificationService implements OnModuleInit {
     organizationId: string,
     user: AuthenticatedUser,
   ) {
-    if (user.role !== Role.CLIENT_SUPER_ADMIN && user.role !== Role.HR_ADMIN) {
-      throw new ForbiddenException('Only HR Admins or Super Admins can deactivate announcements.');
-    }
-
     const announcement = await this.prisma.announcement.findFirst({
       where: { id: announcementId, organizationId },
     });
 
     if (!announcement) {
       throw new NotFoundException('Announcement not found.');
+    }
+
+    const isAdmin =
+      user.role === Role.CLIENT_SUPER_ADMIN || user.role === Role.HR_ADMIN;
+    const isAuthor = announcement.createdByUserId === user.id;
+
+    let isDeptHead = false;
+    if (!isAdmin && !isAuthor && user.employeeId && announcement.targetDepartmentId) {
+      const dept = await this.prisma.department.findFirst({
+        where: {
+          id: announcement.targetDepartmentId,
+          organizationId,
+          headId: user.employeeId,
+        },
+      });
+      if (dept) isDeptHead = true;
+    }
+
+    if (!isAdmin && !isAuthor && !isDeptHead) {
+      throw new ForbiddenException('You do not have permission to deactivate this announcement.');
     }
 
     return this.prisma.announcement.update({

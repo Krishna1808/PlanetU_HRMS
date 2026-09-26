@@ -9,10 +9,12 @@ import { PayrollBatchStatus, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AttendanceService } from '../attendance/attendance.service';
 import { NotificationEventBusService } from '../notifications/notification-event-bus.service';
+import { PayslipPdfService, PayslipPdfData } from './services/payslip-pdf.service';
 import { SetSalaryStructureDto } from './dto/set-salary-structure.dto';
 import { UpdatePayrollConfigDto } from './dto/update-payroll-config.dto';
 import { CalculatePayrollBatchDto } from './dto/calculate-payroll-batch.dto';
 import { DisburseBatchDto } from './dto/disburse-batch.dto';
+import { CreateAdjustmentDto } from './dto/create-adjustment.dto';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.interface';
 
 @Injectable()
@@ -20,6 +22,7 @@ export class PayrollService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly attendanceService: AttendanceService,
+    @Optional() private readonly payslipPdfService?: PayslipPdfService,
     @Optional() private readonly eventBus?: NotificationEventBusService,
   ) {}
 
@@ -44,6 +47,10 @@ export class PayrollService {
           applyPfCeiling: true,
           pfEmployeeRate: 12.0,
           pfEmployerRate: 12.0,
+          applyEsi: true,
+          esiThresholdAmount: 21000.0,
+          esiEmployeeRate: 0.75,
+          esiEmployerRate: 3.25,
           ptAmount: 200.0,
           ptSalaryThreshold: 10000.0,
           roundToWholeRupee: true,
@@ -71,6 +78,10 @@ export class PayrollService {
         ...(dto.applyPfCeiling !== undefined && { applyPfCeiling: dto.applyPfCeiling }),
         ...(dto.pfEmployeeRate !== undefined && { pfEmployeeRate: dto.pfEmployeeRate }),
         ...(dto.pfEmployerRate !== undefined && { pfEmployerRate: dto.pfEmployerRate }),
+        ...(dto.applyEsi !== undefined && { applyEsi: dto.applyEsi }),
+        ...(dto.esiThresholdAmount !== undefined && { esiThresholdAmount: dto.esiThresholdAmount }),
+        ...(dto.esiEmployeeRate !== undefined && { esiEmployeeRate: dto.esiEmployeeRate }),
+        ...(dto.esiEmployerRate !== undefined && { esiEmployerRate: dto.esiEmployerRate }),
         ...(dto.ptAmount !== undefined && { ptAmount: dto.ptAmount }),
         ...(dto.ptSalaryThreshold !== undefined && { ptSalaryThreshold: dto.ptSalaryThreshold }),
         ...(dto.roundToWholeRupee !== undefined && { roundToWholeRupee: dto.roundToWholeRupee }),
@@ -243,6 +254,15 @@ export class PayrollService {
       },
     });
 
+    // 2b. Fetch pending adjustments for this month (Bonuses, Arrears, TDS, Overtime)
+    const pendingAdjustments = await this.prisma.payrollAdjustment.findMany({
+      where: {
+        organizationId,
+        year,
+        month,
+      },
+    });
+
     // 3. Compute payslips for each employee who has a salary structure
     const calculatedPayslips: Array<{
       employeeId: string;
@@ -259,11 +279,18 @@ export class PayrollService {
       earnedHra: number;
       earnedSpecialAllowance: number;
       earnedGross: number;
+      bonusAmount: number;
+      arrearsAmount: number;
+      otherAdditions: number;
       employeePf: number;
+      employerPf: number;
+      employeeEsi: number;
+      employerEsi: number;
       professionalTax: number;
+      tdsDeduction: number;
+      otherDeductions: number;
       totalDeductions: number;
       netPay: number;
-      employerPf: number;
     }> = [];
 
     for (const emp of activeEmployees) {
@@ -302,6 +329,42 @@ export class PayrollService {
         (earnedBasic + earnedHra + earnedSpecialAllowance).toFixed(2),
       );
 
+      // Adjustments (Bonuses, Arrears, TDS, Overtime) for this employee
+      const empAdjustments = pendingAdjustments.filter((a) => a.employeeId === emp.id);
+      let bonusAmount = 0.0;
+      let arrearsAmount = 0.0;
+      let otherAdditions = 0.0;
+      let tdsDeduction = 0.0;
+      let otherDeductions = 0.0;
+
+      for (const adj of empAdjustments) {
+        const val = Number(adj.amount);
+        switch (adj.type) {
+          case 'BONUS':
+            bonusAmount += val;
+            break;
+          case 'ARREARS':
+            arrearsAmount += val;
+            break;
+          case 'OVERTIME':
+          case 'REIMBURSEMENT':
+            otherAdditions += val;
+            break;
+          case 'TDS':
+            tdsDeduction += val;
+            break;
+          case 'OTHER_DEDUCTION':
+            otherDeductions += val;
+            break;
+        }
+      }
+
+      bonusAmount = Number(bonusAmount.toFixed(2));
+      arrearsAmount = Number(arrearsAmount.toFixed(2));
+      otherAdditions = Number(otherAdditions.toFixed(2));
+      tdsDeduction = Number(tdsDeduction.toFixed(2));
+      otherDeductions = Number(otherDeductions.toFixed(2));
+
       // PF Calculation on Earned Basic
       const pfCeiling = Number(config.pfCeilingAmount);
       const pfBasis = config.applyPfCeiling
@@ -314,16 +377,32 @@ export class PayrollService {
       const employeePf = Number((pfBasis * employeePfRate).toFixed(2));
       const employerPf = Number((pfBasis * employerPfRate).toFixed(2));
 
+      // ESI Calculation (Statutory threshold default 21,000 INR on earned gross)
+      let employeeEsi = 0.0;
+      let employerEsi = 0.0;
+      const esiThreshold = Number(config.esiThresholdAmount || 21000.0);
+      if (config.applyEsi && earnedGross <= esiThreshold) {
+        const eeRate = Number(config.esiEmployeeRate || 0.75) / 100;
+        const erRate = Number(config.esiEmployerRate || 3.25) / 100;
+        employeeEsi = Number((earnedGross * eeRate).toFixed(2));
+        employerEsi = Number((earnedGross * erRate).toFixed(2));
+      }
+
       // Professional Tax (PT) Calculation
       const ptThreshold = Number(config.ptSalaryThreshold);
       const professionalTax =
         earnedGross >= ptThreshold ? Number(config.ptAmount) : 0.0;
 
       // Deductions
-      const totalDeductions = Number((employeePf + professionalTax).toFixed(2));
+      const totalDeductions = Number(
+        (employeePf + employeeEsi + professionalTax + tdsDeduction + otherDeductions).toFixed(2),
+      );
 
       // Net Pay with rounding policy applied strictly at the final figure
-      const rawNetPay = earnedGross - totalDeductions;
+      const totalEarnings = Number(
+        (earnedGross + bonusAmount + arrearsAmount + otherAdditions).toFixed(2),
+      );
+      const rawNetPay = totalEarnings - totalDeductions;
       let netPay = config.roundToWholeRupee
         ? Math.round(rawNetPay)
         : Number(rawNetPay.toFixed(2));
@@ -344,18 +423,25 @@ export class PayrollService {
         earnedHra,
         earnedSpecialAllowance,
         earnedGross,
+        bonusAmount,
+        arrearsAmount,
+        otherAdditions,
         employeePf,
+        employerPf,
+        employeeEsi,
+        employerEsi,
         professionalTax,
+        tdsDeduction,
+        otherDeductions,
         totalDeductions,
         netPay,
-        employerPf,
       });
     }
 
     // 4. Batch totals
     const totalEmployees = calculatedPayslips.length;
     const totalGrossPay = Number(
-      calculatedPayslips.reduce((sum, p) => sum + p.earnedGross, 0).toFixed(2),
+      calculatedPayslips.reduce((sum, p) => sum + p.earnedGross + p.bonusAmount + p.arrearsAmount + p.otherAdditions, 0).toFixed(2),
     );
     const totalDeductions = Number(
       calculatedPayslips.reduce((sum, p) => sum + p.totalDeductions, 0).toFixed(2),
@@ -412,6 +498,20 @@ export class PayrollService {
             payrollBatchId: batchId,
             ...p,
           })),
+        });
+
+        // Mark processed adjustments
+        await tx.payrollAdjustment.updateMany({
+          where: {
+            organizationId,
+            year,
+            month,
+            employeeId: { in: calculatedPayslips.map((p) => p.employeeId) },
+          },
+          data: {
+            isProcessed: true,
+            payrollBatchId: batchId,
+          },
         });
       }
 
@@ -475,6 +575,19 @@ export class PayrollService {
             },
           },
           orderBy: { employee: { employeeCode: 'asc' } },
+        },
+        adjustments: {
+          include: {
+            employee: {
+              select: {
+                id: true,
+                employeeCode: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
         },
       },
     });
@@ -937,5 +1050,212 @@ export class PayrollService {
 </body>
 </html>
     `.trim();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 7. Binary PDF Payslip Generation (pdfkit)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Generates a binary PDF buffer for a monthly payslip.
+   */
+  async generatePayslipPdf(
+    organizationId: string,
+    payslipId: string,
+    currentUser: AuthenticatedUser,
+  ): Promise<Buffer> {
+    const p = await this.getPayslipById(organizationId, payslipId, currentUser);
+    const emp = p.employee;
+
+    const data: PayslipPdfData = {
+      organizationName: emp.organization?.name || 'PlanetU HRMS',
+      month: p.payrollBatch.month,
+      year: p.payrollBatch.year,
+      employee: {
+        name: `${emp.firstName} ${emp.lastName}`.trim(),
+        employeeCode: emp.employeeCode,
+        department: emp.department?.name || 'General',
+        designation: emp.designation?.name || 'Employee',
+        dateOfJoining: emp.dateOfJoining ? emp.dateOfJoining.toISOString().split('T')[0] : 'N/A',
+        bankName: emp.bankName || undefined,
+        accountNumber: emp.accountNumber || undefined,
+        panNumber: emp.panNumber || undefined,
+        uanNumber: emp.uanNumber || undefined,
+      },
+      attendance: {
+        totalMonthDays: p.totalMonthDays,
+        payableDays: Number(p.payableDays),
+        lwpDays: Number(p.lwpDays),
+      },
+      earnings: {
+        basic: Number(p.earnedBasic),
+        hra: Number(p.earnedHra),
+        specialAllowance: Number(p.earnedSpecialAllowance),
+        bonus: Number(p.bonusAmount || 0),
+        arrears: Number(p.arrearsAmount || 0),
+        otherAdditions: Number(p.otherAdditions || 0),
+        totalEarnings: Number(
+          (
+            Number(p.earnedGross) +
+            Number(p.bonusAmount || 0) +
+            Number(p.arrearsAmount || 0) +
+            Number(p.otherAdditions || 0)
+          ).toFixed(2),
+        ),
+      },
+      deductions: {
+        employeePf: Number(p.employeePf),
+        employeeEsi: Number(p.employeeEsi || 0),
+        professionalTax: Number(p.professionalTax),
+        tds: Number(p.tdsDeduction || 0),
+        otherDeductions: Number(p.otherDeductions || 0),
+        totalDeductions: Number(p.totalDeductions),
+      },
+      netPay: Number(p.netPay),
+      employerPf: Number(p.employerPf || 0),
+      employerEsi: Number(p.employerEsi || 0),
+    };
+
+    if (this.payslipPdfService) {
+      return this.payslipPdfService.generatePdf(data);
+    }
+
+    throw new BadRequestException('PDF generator service is not available');
+  }
+
+  // ---------------------------------------------------------------------------
+  // 8. One-Time Monthly Adjustments & Bonuses Ledger
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Adds a one-time adjustment (bonus, arrears, overtime, or TDS deduction) to an employee.
+   */
+  async createAdjustment(
+    organizationId: string,
+    userId: string,
+    dto: CreateAdjustmentDto,
+  ) {
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: dto.employeeId, organizationId, deletedAt: null },
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee not found in this organization.`);
+    }
+
+    // Check if payroll batch for this month is already locked
+    const lockedBatch = await this.prisma.payrollBatch.findFirst({
+      where: {
+        organizationId,
+        year: dto.year,
+        month: dto.month,
+        status: { in: [PayrollBatchStatus.LOCKED, PayrollBatchStatus.DISBURSED] },
+      },
+    });
+
+    if (lockedBatch) {
+      throw new BadRequestException(
+        `Cannot add adjustments to locked or disbursed batch (${dto.month}/${dto.year}).`,
+      );
+    }
+
+    const adjustment = await this.prisma.payrollAdjustment.create({
+      data: {
+        organizationId,
+        employeeId: dto.employeeId,
+        year: dto.year,
+        month: dto.month,
+        type: dto.type,
+        amount: dto.amount,
+        description: dto.description || dto.reason || null,
+        createdByUserId: userId,
+      },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+            user: { select: { id: true } },
+          },
+        },
+      },
+    });
+
+    if (this.eventBus && ['BONUS', 'ARREARS', 'OVERTIME', 'REIMBURSEMENT'].includes(dto.type)) {
+      if (adjustment.employee?.user?.id) {
+        try {
+          this.eventBus.emitBonusAwarded({
+            organizationId,
+            recipientUserId: adjustment.employee.user.id,
+            employeeName: `${adjustment.employee.firstName} ${adjustment.employee.lastName}`.trim(),
+            amount: Number(dto.amount),
+            type: dto.type,
+            month: dto.month,
+            year: dto.year,
+            reason: dto.description || dto.reason,
+          });
+        } catch {
+          // non-blocking notification failure
+        }
+      }
+    }
+
+    return adjustment;
+  }
+
+  /**
+   * Lists all adjustments for a given month and year.
+   */
+  async getAdjustments(
+    organizationId: string,
+    year: number,
+    month: number,
+    employeeId?: string,
+  ) {
+    return this.prisma.payrollAdjustment.findMany({
+      where: {
+        organizationId,
+        year,
+        month,
+        ...(employeeId ? { employeeId } : {}),
+      },
+      include: {
+        employee: {
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Deletes an unprocessed adjustment.
+   */
+  async deleteAdjustment(organizationId: string, id: string) {
+    const adjustment = await this.prisma.payrollAdjustment.findFirst({
+      where: { id, organizationId },
+      include: { payrollBatch: true },
+    });
+
+    if (!adjustment) {
+      throw new NotFoundException(`Payroll adjustment not found.`);
+    }
+
+    if (adjustment.payrollBatch && adjustment.payrollBatch.status !== PayrollBatchStatus.DRAFT) {
+      throw new BadRequestException(
+        `Cannot delete adjustment because the payroll batch for this period is already ${adjustment.payrollBatch.status}.`,
+      );
+    }
+
+    return this.prisma.payrollAdjustment.delete({
+      where: { id },
+    });
   }
 }

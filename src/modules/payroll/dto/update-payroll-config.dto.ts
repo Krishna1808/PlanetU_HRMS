@@ -38,6 +38,37 @@ export class UpdatePayrollConfigDto {
   pfEmployerRate?: number;
 
   /**
+   * Whether ESI calculation is enabled
+   */
+  @IsBoolean()
+  @IsOptional()
+  applyEsi?: boolean;
+
+  /**
+   * Monthly gross threshold below which ESI applies (default 21000.00 INR)
+   */
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  esiThresholdAmount?: number;
+
+  /**
+   * Employee ESI rate percentage (default 0.75%)
+   */
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  esiEmployeeRate?: number;
+
+  /**
+   * Employer ESI rate percentage (default 3.25%)
+   */
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  esiEmployerRate?: number;
+
+  /**
    * Professional Tax monthly flat amount (default 200.00 INR)
    */
   @IsNumber({ maxDecimalPlaces: 2 })

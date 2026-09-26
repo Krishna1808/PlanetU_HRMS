@@ -12,6 +12,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { OffboardingModule } from './modules/offboarding/offboarding.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationModule } from './modules/notifications/notification.module';
+import { MailModule } from './modules/mail/mail.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -29,6 +30,7 @@ import { AppService } from './app.service';
     OnboardingModule,
     OffboardingModule,
     ReportsModule,
+    MailModule,
     NotificationModule,
   ],
   controllers: [AppController],

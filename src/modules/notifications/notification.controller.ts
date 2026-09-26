@@ -50,12 +50,21 @@ export class NotificationController {
     return this.notificationService.markAsRead(id, user.id, user.organizationId);
   }
 
+  @Post('test-email')
+  async sendTestEmail(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body('targetEmail') targetEmail?: string,
+  ) {
+    const destination = targetEmail?.trim() || user.email;
+    return this.notificationService.sendTestEmail(destination);
+  }
+
   // -------------------------------------------------------------------------
   // Announcements Endpoints
   // -------------------------------------------------------------------------
 
   @Post('announcements')
-  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN, Role.MANAGER, Role.EMPLOYEE)
   async createAnnouncement(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateAnnouncementDto,
@@ -72,7 +81,7 @@ export class NotificationController {
   }
 
   @Patch('announcements/:id/deactivate')
-  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN)
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN, Role.MANAGER, Role.EMPLOYEE)
   async deactivateAnnouncement(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,

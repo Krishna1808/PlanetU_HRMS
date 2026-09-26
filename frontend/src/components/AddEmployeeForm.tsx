@@ -12,6 +12,7 @@ export const AddEmployeeForm: React.FC<Props> = ({ onSuccess, onCancel }) => {
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [workEmail, setWorkEmail] = useState('');
   const [personalEmail, setPersonalEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [departmentId, setDepartmentId] = useState('');
@@ -19,6 +20,8 @@ export const AddEmployeeForm: React.FC<Props> = ({ onSuccess, onCancel }) => {
   const [dateOfJoining, setDateOfJoining] = useState(
     new Date().toISOString().split('T')[0],
   );
+  const [createLogin, setCreateLogin] = useState(true);
+  const [initialPassword, setInitialPassword] = useState('Password@123');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -45,13 +48,23 @@ export const AddEmployeeForm: React.FC<Props> = ({ onSuccess, onCancel }) => {
       return;
     }
 
+    const effectiveWorkEmail = workEmail.trim().toLowerCase();
+    if (createLogin && !effectiveWorkEmail && !personalEmail.trim()) {
+      setError('Please provide a work email address to create a login account and receive notifications.');
+      return;
+    }
+
+    const loginEmail = effectiveWorkEmail || personalEmail.trim().toLowerCase();
+
     setLoading(true);
     try {
       await api.createEmployee({
-        firstName,
-        lastName,
-        personalEmail: personalEmail || undefined,
-        phone: phone || undefined,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        workEmail: createLogin && loginEmail ? loginEmail : undefined,
+        personalEmail: personalEmail.trim() || loginEmail || undefined,
+        initialPassword: createLogin && loginEmail ? (initialPassword.trim() || 'Password@123') : undefined,
+        phone: phone.trim() || undefined,
         departmentId,
         designationId,
         dateOfJoining: new Date(dateOfJoining).toISOString(),
@@ -111,16 +124,35 @@ export const AddEmployeeForm: React.FC<Props> = ({ onSuccess, onCancel }) => {
 
         <div className="form-grid">
           <div className="form-group">
-            <label>Personal Email</label>
+            <label>
+              Work / Login Email {createLogin ? '*' : ''}
+            </label>
+            <input
+              className="form-control"
+              type="email"
+              required={createLogin}
+              value={workEmail}
+              onChange={(e) => setWorkEmail(e.target.value)}
+              placeholder="e.g. employee@company.com or employee@gmail.com"
+            />
+            <small style={{ fontSize: '11px', color: '#64748b', display: 'block', marginTop: '4px' }}>
+              Used for Employee Self-Service login and receiving all real-time email notifications.
+            </small>
+          </div>
+
+          <div className="form-group">
+            <label>Personal Email (Optional)</label>
             <input
               className="form-control"
               type="email"
               value={personalEmail}
               onChange={(e) => setPersonalEmail(e.target.value)}
-              placeholder="e.g. john.doe@example.com"
+              placeholder="e.g. personal@example.com"
             />
           </div>
+        </div>
 
+        <div className="form-grid">
           <div className="form-group">
             <label>Phone Number</label>
             <input
@@ -131,6 +163,46 @@ export const AddEmployeeForm: React.FC<Props> = ({ onSuccess, onCancel }) => {
               placeholder="e.g. +91 9876543210"
             />
           </div>
+        </div>
+
+        {/* User Account & Real-time Notification Provisioning */}
+        <div
+          style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '8px',
+            padding: '14px 16px',
+            marginBottom: '16px',
+          }}
+        >
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '13px', color: '#1e293b' }}>
+            <input
+              type="checkbox"
+              checked={createLogin}
+              onChange={(e) => setCreateLogin(e.target.checked)}
+              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+            />
+            <span>Create Self-Service Login & Enable Real-Time Email Notifications</span>
+          </label>
+          <p style={{ fontSize: '12px', color: '#64748b', margin: '6px 0 0 24px' }}>
+            When enabled, a portal account is created with this email address. The employee will receive real-time email notifications for announcements, payslips, bonuses, leave approvals, and shift rosters.
+          </p>
+
+          {createLogin && (
+            <div style={{ marginTop: '12px', marginLeft: '24px', maxWidth: '320px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 500, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                Initial Temporary Password
+              </label>
+              <input
+                className="form-control"
+                type="text"
+                value={initialPassword}
+                onChange={(e) => setInitialPassword(e.target.value)}
+                placeholder="Default: Password@123"
+                style={{ fontSize: '13px' }}
+              />
+            </div>
+          )}
         </div>
 
         <div className="form-grid">

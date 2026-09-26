@@ -110,6 +110,15 @@ enum PayrollBatchStatus {
   DISBURSED
 }
 
+enum PayrollAdjustmentType {
+  BONUS
+  ARREARS
+  OVERTIME
+  REIMBURSEMENT
+  TDS
+  OTHER_DEDUCTION
+}
+
 enum OnboardingStatus {
   INVITED
   IN_PROGRESS
@@ -232,6 +241,7 @@ model Organization {
   salaryStructures      SalaryStructure[]
   payrollBatches        PayrollBatch[]
   payslips              Payslip[]
+  payrollAdjustments    PayrollAdjustment[]
   onboardingCandidates  OnboardingCandidate[]
   onboardingTasks       OnboardingTask[]
   exitRequests          ExitRequest[]
@@ -436,6 +446,7 @@ model Employee {
   attendanceRecords           AttendanceRecord[]
   salaryStructures            SalaryStructure[]
   payslips                    Payslip[]
+  payrollAdjustments          PayrollAdjustment[]
   onboardingCandidatesManaged OnboardingCandidate[]     @relation("CandidateReportingManager")
   convertedFromCandidate      OnboardingCandidate?      @relation("CandidateConvertedEmployee")
   exitRequests                ExitRequest[]
@@ -682,6 +693,10 @@ model PayrollConfiguration {
   applyPfCeiling             Boolean  @default(true) @map("apply_pf_ceiling")
   pfEmployeeRate             Decimal  @default(12.00) @map("pf_employee_rate") @db.Decimal(5, 2)
   pfEmployerRate             Decimal  @default(12.00) @map("pf_employer_rate") @db.Decimal(5, 2)
+  applyEsi                   Boolean  @default(true) @map("apply_esi")
+  esiThresholdAmount         Decimal  @default(21000.00) @map("esi_threshold_amount") @db.Decimal(12, 2)
+  esiEmployeeRate            Decimal  @default(0.75) @map("esi_employee_rate") @db.Decimal(5, 2)
+  esiEmployerRate            Decimal  @default(3.25) @map("esi_employer_rate") @db.Decimal(5, 2)
   ptAmount                   Decimal  @default(200.00) @map("pt_amount") @db.Decimal(12, 2)
   ptSalaryThreshold          Decimal  @default(10000.00) @map("pt_salary_threshold") @db.Decimal(12, 2)
   roundToWholeRupee          Boolean  @default(true) @map("round_to_whole_rupee")
@@ -739,12 +754,37 @@ model PayrollBatch {
   createdAt         DateTime           @default(now()) @map("created_at")
   updatedAt         DateTime           @updatedAt @map("updated_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   payslips     Payslip[]
+  adjustments  PayrollAdjustment[]
 
   @@unique([organizationId, year, month])
   @@index([organizationId, status])
   @@map("payroll_batches")
+}
+
+model PayrollAdjustment {
+  id              String                @id @default(uuid()) @db.Uuid
+  organizationId  String                @map("organization_id") @db.Uuid
+  employeeId      String                @map("employee_id") @db.Uuid
+  payrollBatchId  String?               @map("payroll_batch_id") @db.Uuid
+  year            Int
+  month           Int
+  type            PayrollAdjustmentType
+  amount          Decimal               @db.Decimal(12, 2)
+  description     String?
+  isProcessed     Boolean               @default(false) @map("is_processed")
+  createdByUserId String?               @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee     Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  payrollBatch PayrollBatch? @relation(fields: [payrollBatchId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, employeeId, year, month])
+  @@index([organizationId, isProcessed])
+  @@map("payroll_adjustments")
 }
 
 model Payslip {
@@ -768,11 +808,21 @@ model Payslip {
   earnedSpecialAllowance Decimal @map("earned_special_allowance") @db.Decimal(12, 2)
   earnedGross            Decimal @map("earned_gross") @db.Decimal(12, 2)
 
-  employeePf      Decimal @map("employee_pf") @db.Decimal(12, 2)
-  professionalTax Decimal @map("professional_tax") @db.Decimal(12, 2)
-  totalDeductions Decimal @map("total_deductions") @db.Decimal(12, 2)
-  netPay          Decimal @map("net_pay") @db.Decimal(12, 2)
-  employerPf      Decimal @map("employer_pf") @db.Decimal(12, 2)
+  // Adjustments & Bonuses
+  bonusAmount            Decimal @default(0.00) @map("bonus_amount") @db.Decimal(12, 2)
+  arrearsAmount          Decimal @default(0.00) @map("arrears_amount") @db.Decimal(12, 2)
+  otherAdditions         Decimal @default(0.00) @map("other_additions") @db.Decimal(12, 2)
+
+  // Statutory & Other Deductions
+  employeePf             Decimal @map("employee_pf") @db.Decimal(12, 2)
+  employerPf             Decimal @map("employer_pf") @db.Decimal(12, 2)
+  employeeEsi            Decimal @default(0.00) @map("employee_esi") @db.Decimal(12, 2)
+  employerEsi            Decimal @default(0.00) @map("employer_esi") @db.Decimal(12, 2)
+  professionalTax        Decimal @map("professional_tax") @db.Decimal(12, 2)
+  tdsDeduction           Decimal @default(0.00) @map("tds_deduction") @db.Decimal(12, 2)
+  otherDeductions        Decimal @default(0.00) @map("other_deductions") @db.Decimal(12, 2)
+  totalDeductions        Decimal @map("total_deductions") @db.Decimal(12, 2)
+  netPay                 Decimal @map("net_pay") @db.Decimal(12, 2)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

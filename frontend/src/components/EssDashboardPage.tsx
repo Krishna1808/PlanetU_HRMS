@@ -327,15 +327,25 @@ export function EssDashboardPage() {
                 <span>Gross: ₹{latestPayslip.earnedGross}</span>
                 <span>Deductions: ₹{latestPayslip.totalDeductions}</span>
               </div>
-              <a
-                href={api.getPayslipViewHtmlUrl(latestPayslip.id)}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-secondary"
-                style={{ display: 'inline-block', marginTop: '12px', fontSize: '12px', width: '100%', textAlign: 'center' }}
-              >
-                📄 View Printable Payslip
-              </a>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                <a
+                  href={api.getPayslipViewHtmlUrl(latestPayslip.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-secondary"
+                  style={{ flex: 1, fontSize: '12px', textAlign: 'center', padding: '6px 8px' }}
+                >
+                  📄 View Web
+                </a>
+                <button
+                  type="button"
+                  onClick={() => api.downloadPayslipPdf(latestPayslip.id, `Payslip-${latestPayslip.month}-${latestPayslip.year}.pdf`)}
+                  className="btn btn-primary"
+                  style={{ flex: 1, fontSize: '12px', textAlign: 'center', padding: '6px 8px' }}
+                >
+                  📥 Download PDF
+                </button>
+              </div>
             </div>
           ) : (
             <div style={{ color: '#64748b', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
