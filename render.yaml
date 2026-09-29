@@ -1,0 +1,32 @@
+# ==============================================================================
+# Render Blueprint for PlanetU HRMS
+# Automatically provisions PostgreSQL database + PlanetU HRMS Web Service
+# ==============================================================================
+services:
+  - type: web
+    name: planetu-hrms
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: planetu-hrms-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+
+databases:
+  - name: planetu-hrms-db
+    plan: free
+    region: oregon
+    databaseName: planetu_hrms
+    user: planetu_admin

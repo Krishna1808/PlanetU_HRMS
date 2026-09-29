@@ -1,0 +1,12 @@
+node_modules
+frontend/node_modules
+dist
+frontend/dist
+.git
+.env
+.env.*
+!.env.production.example
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

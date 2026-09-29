@@ -1,6 +1,9 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
+import express from 'express';
+import { join } from 'path';
+import { existsSync } from 'fs';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -8,8 +11,22 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+  ];
+
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
     credentials: true,
   });
 
@@ -21,6 +38,21 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(process.env.PORT ?? 3000);
+  // Production Frontend Static Asset Serving & SPA Fallback
+  const frontendDistPath = join(process.cwd(), 'frontend', 'dist');
+  if (existsSync(frontendDistPath)) {
+    app.use(express.static(frontendDistPath));
+    app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (req.method === 'GET' && !req.path.startsWith('/api')) {
+        res.sendFile(join(frontendDistPath, 'index.html'));
+      } else {
+        next();
+      }
+    });
+  }
+
+  const port = process.env.PORT ?? 3000;
+  await app.listen(port);
+  console.log(`PlanetU HRMS Application running on port ${port}`);
 }
 bootstrap();
