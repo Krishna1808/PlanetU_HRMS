@@ -170,6 +170,15 @@ export const api = {
   getLeaveTypes: () => fetchJson<any[]>('/leaves/types'),
   getMyLeaveBalances: () => fetchJson<any>('/leaves/my-balances'),
   getMyLeaveRequests: () => fetchJson<any[]>('/leaves/my-requests'),
+  calculateLeaveDays: (params: { startDate: string; endDate: string; isHalfDay?: boolean; employeeId?: string }) => {
+    const q = new URLSearchParams({
+      startDate: params.startDate,
+      endDate: params.endDate,
+      ...(params.isHalfDay ? { isHalfDay: 'true' } : {}),
+      ...(params.employeeId ? { employeeId: params.employeeId } : {}),
+    });
+    return fetchJson<any>(`/leaves/calculate-days?${q.toString()}`);
+  },
   applyLeave: (data: { leaveTypeId: string; startDate: string; endDate: string; isHalfDay?: boolean; halfDaySession?: string; reason: string }) =>
     fetchJson<any>('/leaves/apply', {
       method: 'POST',

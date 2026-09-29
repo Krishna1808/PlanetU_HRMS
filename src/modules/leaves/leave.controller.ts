@@ -106,6 +106,37 @@ export class LeaveController {
   // ---------------------------------------------------------------------------
 
   /**
+   * GET /api/v1/leaves/calculate-days
+   * Previews working days, weekly offs, and public holidays in a proposed leave date range.
+   */
+  @Get('calculate-days')
+  async calculateDays(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('isHalfDay') isHalfDay?: string,
+    @Query('employeeId') employeeId?: string,
+  ) {
+    if (!startDate || !endDate) {
+      throw new BadRequestException('startDate and endDate query parameters are required');
+    }
+
+    const targetEmpId = employeeId || user.employeeId;
+    if (!targetEmpId) {
+      throw new BadRequestException('No employee specified and user is not linked to an employee');
+    }
+
+    const isHalf = isHalfDay === 'true' || isHalfDay === '1';
+    return this.leaveService.calculateWorkingDays(
+      user.organizationId,
+      targetEmpId,
+      new Date(startDate),
+      new Date(endDate),
+      isHalf,
+    );
+  }
+
+  /**
    * POST /api/v1/leaves/apply
    * Submit a new leave application (All authenticated roles)
    */

@@ -19,6 +19,34 @@ export function LeavesPage({ user }: { user: any }) {
   const [halfDaySession, setHalfDaySession] = useState('FIRST_HALF');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [calculationPreview, setCalculationPreview] = useState<any>(null);
+  const [calculatingPreview, setCalculatingPreview] = useState(false);
+
+  useEffect(() => {
+    if (!showApplyModal || !startDate || !endDate) {
+      setCalculationPreview(null);
+      return;
+    }
+    let isCurrent = true;
+    setCalculatingPreview(true);
+    api.calculateLeaveDays({
+      startDate: new Date(startDate).toISOString(),
+      endDate: new Date(endDate).toISOString(),
+      isHalfDay,
+    })
+      .then((res) => {
+        if (isCurrent) setCalculationPreview(res);
+      })
+      .catch(() => {
+        if (isCurrent) setCalculationPreview(null);
+      })
+      .finally(() => {
+        if (isCurrent) setCalculatingPreview(false);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [showApplyModal, startDate, endDate, isHalfDay]);
 
   // Add Policy modal (HR / Super Admin)
   const [showAddPolicyModal, setShowAddPolicyModal] = useState(false);
@@ -554,6 +582,67 @@ export function LeavesPage({ user }: { user: any }) {
                     <option value="FIRST_HALF">First Half (Morning Session)</option>
                     <option value="SECOND_HALF">Second Half (Afternoon Session)</option>
                   </select>
+                </div>
+              )}
+
+              {calculatingPreview && (
+                <div style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic', padding: '4px 0' }}>
+                  Calculating working days & checking holiday calendar...
+                </div>
+              )}
+
+              {calculationPreview && !calculatingPreview && (
+                <div
+                  style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    padding: '10px 12px',
+                    fontSize: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#475569', fontWeight: 600 }}>Deductible Leave Days:</span>
+                    <span style={{ fontSize: '15px', fontWeight: 800, color: calculationPreview.workingDays > 0 ? '#1e293b' : '#dc2626' }}>
+                      {calculationPreview.workingDays} {calculationPreview.workingDays === 1 ? 'day' : 'days'}
+                    </span>
+                  </div>
+
+                  {(calculationPreview.holidayDays > 0 || calculationPreview.weeklyOffDays > 0) && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+                      {calculationPreview.holidayDays > 0 && (
+                        <span
+                          className="badge"
+                          style={{
+                            background: '#dcfce7',
+                            color: '#15803d',
+                            border: '1px solid #bbf7d0',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {calculationPreview.holidayDays} Public Holiday Excluded ({calculationPreview.holidays.map((h: any) => h.name).join(', ')})
+                        </span>
+                      )}
+                      {calculationPreview.weeklyOffDays > 0 && (
+                        <span
+                          className="badge"
+                          style={{
+                            background: '#eff6ff',
+                            color: '#1d4ed8',
+                            border: '1px solid #bfdbfe',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {calculationPreview.weeklyOffDays} Weekly Off{calculationPreview.weeklyOffDays > 1 ? 's' : ''} Excluded
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

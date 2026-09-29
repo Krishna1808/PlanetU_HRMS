@@ -53,6 +53,10 @@ describe('LeaveService (Module 5: Leave Management & Architecture Rule 4)', () =
         upsert: jest.fn().mockResolvedValue({}),
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      holiday: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       $transaction: jest.fn().mockImplementation(async (cb: any) => {
         if (typeof cb === 'function') {
           return cb(mockPrisma);
@@ -127,6 +131,76 @@ describe('LeaveService (Module 5: Leave Management & Architecture Rule 4)', () =
 
       await expect(
         service.calculateWorkingDays(orgId, empId, sunday, sunday, true),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('excludes public holidays from deductible working days in a leave span', async () => {
+      // Mon 2026-09-07 to Fri 2026-09-11 (5 calendar days, Wed 2026-09-09 is a public holiday)
+      const start = new Date('2026-09-07T00:00:00.000Z');
+      const end = new Date('2026-09-11T00:00:00.000Z');
+
+      mockPrisma.holiday.findMany.mockResolvedValueOnce([
+        {
+          id: 'h-1',
+          name: 'Festival Day',
+          date: new Date('2026-09-09T00:00:00.000Z'),
+          isRestricted: false,
+          locationId: null,
+        },
+      ]);
+
+      const result = await service.calculateWorkingDays(orgId, empId, start, end, false);
+
+      // Total days: 5, Weekly offs: 0, Holidays: 1, Working days: 4
+      expect(result.workingDays).toBe(4);
+      expect(result.holidayDays).toBe(1);
+      expect(result.holidays).toHaveLength(1);
+      expect(result.holidays[0].name).toBe('Festival Day');
+
+      const holidayDetail = result.details.find((d) => d.date === '2026-09-09');
+      expect(holidayDetail?.isWorkingDay).toBe(false);
+      expect(holidayDetail?.reason).toBe('Holiday: Festival Day');
+    });
+
+    it('handles public holiday falling on a weekly off without double deduction', async () => {
+      // Sat 2026-09-12 to Mon 2026-09-14 (Sat/Sun are weekly offs, Sunday 2026-09-13 is also a holiday)
+      const start = new Date('2026-09-12T00:00:00.000Z');
+      const end = new Date('2026-09-14T00:00:00.000Z');
+
+      mockPrisma.holiday.findMany.mockResolvedValueOnce([
+        {
+          id: 'h-sun',
+          name: 'Sunday Holiday',
+          date: new Date('2026-09-13T00:00:00.000Z'),
+          isRestricted: false,
+          locationId: null,
+        },
+      ]);
+
+      const result = await service.calculateWorkingDays(orgId, empId, start, end, false);
+
+      expect(result.workingDays).toBe(1); // Only Monday
+      expect(result.weeklyOffDays).toBe(2);
+      const sunDetail = result.details.find((d) => d.date === '2026-09-13');
+      expect(sunDetail?.isWorkingDay).toBe(false);
+      expect(sunDetail?.reason).toBe('Weekly Off (also Sunday Holiday)');
+    });
+
+    it('throws BadRequestException for half-day requested on a public holiday', async () => {
+      const wednesday = new Date('2026-09-09T00:00:00.000Z');
+
+      mockPrisma.holiday.findMany.mockResolvedValueOnce([
+        {
+          id: 'h-1',
+          name: 'National Holiday',
+          date: wednesday,
+          isRestricted: false,
+          locationId: null,
+        },
+      ]);
+
+      await expect(
+        service.calculateWorkingDays(orgId, empId, wednesday, wednesday, true),
       ).rejects.toThrow(BadRequestException);
     });
   });

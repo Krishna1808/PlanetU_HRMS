@@ -38,7 +38,7 @@ export class LeaveService {
 
   /**
    * Calculates actual working days in a date range by checking the employee's
-   * shift assignment and excluding non-working weekly offs (e.g. Saturdays & Sundays).
+   * shift assignment and excluding non-working weekly offs and official public holidays.
    */
   async calculateWorkingDays(
     organizationId: string,
@@ -49,6 +49,9 @@ export class LeaveService {
   ): Promise<{
     workingDays: number;
     nonWorkingDays: number;
+    weeklyOffDays: number;
+    holidayDays: number;
+    holidays: Array<{ date: string; name: string }>;
     details: Array<{ date: string; dayOfWeek: DayOfWeek; isWorkingDay: boolean; reason?: string }>;
   }> {
     if (startDate > endDate) {
@@ -65,16 +68,83 @@ export class LeaveService {
       DayOfWeek.SATURDAY,
     ];
 
+    const formatYmd = (d: Date): string => {
+      const year = d.getUTCFullYear();
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    // 1. Fetch employee's assigned location for location-scoped holidays
+    let employeeLocationId: string | null = null;
+    if (this.prisma.employee) {
+      try {
+        const emp = await this.prisma.employee.findFirst({
+          where: { id: employeeId, organizationId },
+          select: { locationId: true },
+        });
+        if (emp?.locationId) {
+          employeeLocationId = emp.locationId;
+        }
+      } catch {
+        // ignore if mock or query fails
+      }
+    }
+
+    // 2. Fetch official public holidays within date range (with ±1 day buffer for timezones)
+    const startBuffer = new Date(startDate);
+    startBuffer.setUTCDate(startBuffer.getUTCDate() - 1);
+    startBuffer.setUTCHours(0, 0, 0, 0);
+
+    const endBuffer = new Date(endDate);
+    endBuffer.setUTCDate(endBuffer.getUTCDate() + 1);
+    endBuffer.setUTCHours(23, 59, 59, 999);
+
+    const holidayMap = new Map<string, string>();
+    if (this.prisma.holiday) {
+      try {
+        const holidays = await this.prisma.holiday.findMany({
+          where: {
+            organizationId,
+            isRestricted: false, // Mandatory public holidays
+            date: {
+              gte: startBuffer,
+              lte: endBuffer,
+            },
+            OR: [
+              { locationId: null },
+              ...(employeeLocationId ? [{ locationId: employeeLocationId }] : []),
+            ],
+          },
+        });
+
+        for (const h of holidays) {
+          holidayMap.set(formatYmd(h.date), h.name);
+        }
+      } catch {
+        // ignore if holiday table query fails
+      }
+    }
+
     if (isHalfDay) {
       // Half-day leave must fall on a single day
       const isSameDay =
-        startDate.getFullYear() === endDate.getFullYear() &&
-        startDate.getMonth() === endDate.getMonth() &&
-        startDate.getDate() === endDate.getDate();
+        startDate.getUTCFullYear() === endDate.getUTCFullYear() &&
+        startDate.getUTCMonth() === endDate.getUTCMonth() &&
+        startDate.getUTCDate() === endDate.getUTCDate();
 
       if (!isSameDay) {
         throw new BadRequestException(
           'Half-day leave must start and end on the same calendar date',
+        );
+      }
+
+      const dateStr = formatYmd(startDate);
+      const holidayName = holidayMap.get(dateStr);
+
+      if (holidayName) {
+        throw new BadRequestException(
+          `Cannot apply for half-day leave on an official public holiday (${holidayName})`,
         );
       }
 
@@ -85,7 +155,7 @@ export class LeaveService {
         startDate,
       );
 
-      const dayEnum = dayOfWeekMap[startDate.getDay()];
+      const dayEnum = dayOfWeekMap[startDate.getUTCDay()];
       const isWeeklyOff = shiftInfo.weeklyOffDays.includes(dayEnum);
 
       if (isWeeklyOff) {
@@ -97,9 +167,12 @@ export class LeaveService {
       return {
         workingDays: 0.5,
         nonWorkingDays: 0,
+        weeklyOffDays: 0,
+        holidayDays: 0,
+        holidays: [],
         details: [
           {
-            date: startDate.toISOString().split('T')[0],
+            date: dateStr,
             dayOfWeek: dayEnum,
             isWorkingDay: true,
           },
@@ -110,6 +183,9 @@ export class LeaveService {
     // Multi-day calculation: iterate day by day
     let workingDays = 0;
     let nonWorkingDays = 0;
+    let weeklyOffDays = 0;
+    let holidayDays = 0;
+    const holidaysList: Array<{ date: string; name: string }> = [];
     const details: Array<{
       date: string;
       dayOfWeek: DayOfWeek;
@@ -118,13 +194,13 @@ export class LeaveService {
     }> = [];
 
     const current = new Date(startDate);
-    current.setHours(0, 0, 0, 0);
+    current.setUTCHours(0, 0, 0, 0);
 
     const end = new Date(endDate);
-    end.setHours(0, 0, 0, 0);
+    end.setUTCHours(0, 0, 0, 0);
 
     while (current <= end) {
-      const dayEnum = dayOfWeekMap[current.getDay()];
+      const dayEnum = dayOfWeekMap[current.getUTCDay()];
       const shiftInfo = await this.shiftService.getEmployeeShiftForDate(
         organizationId,
         employeeId,
@@ -132,15 +208,27 @@ export class LeaveService {
       );
 
       const isWeeklyOff = shiftInfo.weeklyOffDays.includes(dayEnum);
-      const dateStr = current.toISOString().split('T')[0];
+      const dateStr = formatYmd(current);
+      const holidayName = holidayMap.get(dateStr);
 
       if (isWeeklyOff) {
         nonWorkingDays += 1;
+        weeklyOffDays += 1;
         details.push({
           date: dateStr,
           dayOfWeek: dayEnum,
           isWorkingDay: false,
-          reason: 'Weekly Off',
+          reason: holidayName ? `Weekly Off (also ${holidayName})` : 'Weekly Off',
+        });
+      } else if (holidayName) {
+        nonWorkingDays += 1;
+        holidayDays += 1;
+        holidaysList.push({ date: dateStr, name: holidayName });
+        details.push({
+          date: dateStr,
+          dayOfWeek: dayEnum,
+          isWorkingDay: false,
+          reason: `Holiday: ${holidayName}`,
         });
       } else {
         workingDays += 1;
@@ -151,13 +239,16 @@ export class LeaveService {
         });
       }
 
-      // Move to next calendar day
-      current.setDate(current.getDate() + 1);
+      // Move to next calendar day in UTC
+      current.setUTCDate(current.getUTCDate() + 1);
     }
 
     return {
       workingDays,
       nonWorkingDays,
+      weeklyOffDays,
+      holidayDays,
+      holidays: holidaysList,
       details,
     };
   }
@@ -535,18 +626,28 @@ export class LeaveService {
       throw new BadRequestException('Invalid date format for startDate or endDate');
     }
 
-    // 1. Calculate shift-aware working days (skipping weekly offs)
-    const { workingDays, nonWorkingDays } = await this.calculateWorkingDays(
-      organizationId,
-      employeeId,
-      startDate,
-      endDate,
-      dto.isHalfDay,
-    );
+    // 1. Calculate shift-aware working days (skipping weekly offs and public holidays)
+    const { workingDays, nonWorkingDays, weeklyOffDays, holidayDays, holidays } =
+      await this.calculateWorkingDays(
+        organizationId,
+        employeeId,
+        startDate,
+        endDate,
+        dto.isHalfDay,
+      );
 
     if (workingDays === 0) {
+      const breakdown: string[] = [];
+      if (weeklyOffDays > 0) {
+        breakdown.push(`${weeklyOffDays} weekly off day${weeklyOffDays > 1 ? 's' : ''}`);
+      }
+      if (holidayDays > 0) {
+        const holidayNames = holidays.map((h) => h.name).join(', ');
+        breakdown.push(`${holidayDays} public holiday${holidayDays > 1 ? 's' : ''} (${holidayNames})`);
+      }
+      const reasonStr = breakdown.length > 0 ? breakdown.join(', ') : `${nonWorkingDays} non-working days`;
       throw new BadRequestException(
-        `Selected date range contains 0 working days (${nonWorkingDays} weekly off days). No leave deduction required.`,
+        `Selected date range contains 0 working days (${reasonStr}). No leave deduction required.`,
       );
     }
 
@@ -775,8 +876,8 @@ export class LeaveService {
       );
 
       for (const day of dayDetails) {
+        const recordDate = new Date(day.date + 'T00:00:00.000Z');
         if (day.isWorkingDay) {
-          const recordDate = new Date(day.date + 'T00:00:00.000Z');
           await tx.attendanceRecord.upsert({
             where: {
               organizationId_employeeId_date: {
@@ -801,6 +902,26 @@ export class LeaveService {
               isPaid: leaveRequest.leaveType.isPaid,
               leaveRequestId: leaveRequest.id,
               remarks: `Approved leave: ${leaveRequest.leaveType.name}`,
+            },
+          });
+        } else if (day.reason && day.reason.startsWith('Holiday:')) {
+          await tx.attendanceRecord.upsert({
+            where: {
+              organizationId_employeeId_date: {
+                organizationId,
+                employeeId: leaveRequest.employeeId,
+                date: recordDate,
+              },
+            },
+            update: {},
+            create: {
+              organizationId,
+              employeeId: leaveRequest.employeeId,
+              date: recordDate,
+              status: AttendanceStatus.HOLIDAY,
+              isHalfDay: false,
+              isPaid: true,
+              remarks: day.reason,
             },
           });
         }
