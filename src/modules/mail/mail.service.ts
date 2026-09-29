@@ -11,6 +11,21 @@ export interface SendNotificationEmailDto extends EmailRenderInput {
   to: string;
 }
 
+function parseSenderAddress(fromHeader?: string): { name: string; email: string } {
+  const defaultEmail = process.env.SMTP_USER || 'notifications@planetu.com';
+  if (!fromHeader) {
+    return { name: 'PlanetU HRMS', email: defaultEmail };
+  }
+  const match = fromHeader.match(/^(.*?)\s*<(.+?)>$/);
+  if (match) {
+    return {
+      name: match[1].replace(/['"]/g, '').trim() || 'PlanetU HRMS',
+      email: match[2].trim(),
+    };
+  }
+  return { name: 'PlanetU HRMS', email: fromHeader.trim() };
+}
+
 @Injectable()
 export class MailService implements OnModuleInit {
   private readonly logger = new Logger(MailService.name);
@@ -25,6 +40,13 @@ export class MailService implements OnModuleInit {
   }
 
   private async initializeTransporter() {
+    const brevoApiKey = process.env.BREVO_API_KEY?.trim();
+    if (brevoApiKey) {
+      this.isConfigured = true;
+      this.logger.log('Brevo HTTPS REST API active (Port 443 - Bypasses Render free tier SMTP blocks, sends to ANY recipient).');
+      return;
+    }
+
     const resendApiKey = process.env.RESEND_API_KEY || (process.env.SMTP_PASS?.startsWith('re_') ? process.env.SMTP_PASS.trim() : null);
     if (resendApiKey) {
       this.isConfigured = true;
@@ -49,7 +71,7 @@ export class MailService implements OnModuleInit {
           greetingTimeout: 5000,
           socketTimeout: 10000,
           tls: {
-            rejectUnauthorized: false, // Prevents self-signed cert blocks in local dev
+            rejectUnauthorized: false,
           },
         });
 
@@ -72,7 +94,7 @@ export class MailService implements OnModuleInit {
       }
     } else {
       this.logger.log(
-        `SMTP_USER or SMTP_PASS not set in .env. Operating in Zero-Cost Local Simulation mode.`,
+        `No live email provider API key or SMTP set. Operating in Zero-Cost Local Simulation mode.`,
       );
       this.isConfigured = false;
     }
@@ -83,9 +105,47 @@ export class MailService implements OnModuleInit {
    */
   async sendNotificationEmail(dto: SendNotificationEmailDto): Promise<{ success: boolean; messageId?: string; mode: string }> {
     const rendered: RenderedEmail = renderEmailTemplate(dto);
-    const resendApiKey = process.env.RESEND_API_KEY || (process.env.SMTP_PASS?.startsWith('re_') ? process.env.SMTP_PASS.trim() : null);
 
-    // 1. Resend HTTPS REST API (Port 443 - Never blocked on Render free tier)
+    // 1. Brevo HTTPS REST API (Port 443 - Can send to ANY recipient in the world without a domain!)
+    const brevoApiKey = process.env.BREVO_API_KEY?.trim();
+    if (brevoApiKey) {
+      try {
+        const sender = parseSenderAddress(process.env.MAIL_FROM);
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'api-key': brevoApiKey,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            sender,
+            to: [{ email: dto.to, name: dto.recipientName || dto.to.split('@')[0] }],
+            subject: rendered.subject,
+            htmlContent: rendered.html,
+            textContent: rendered.text,
+          }),
+        });
+
+        const data: any = await response.json();
+        if (response.ok && data.messageId) {
+          this.logger.log(`Email dispatched via Brevo HTTPS API to ${dto.to} [Subject: ${rendered.subject}] (ID: ${data.messageId})`);
+          return { success: true, messageId: data.messageId, mode: 'brevo_https' };
+        } else {
+          const errMsg = data.message || JSON.stringify(data);
+          this.logger.error(`Brevo HTTPS API error (${response.status}): ${errMsg}`);
+          this.logSimulatedEmail(dto, rendered);
+          return { success: false, mode: 'brevo_api_error', messageId: errMsg };
+        }
+      } catch (err: any) {
+        this.logger.error(`Failed to dispatch email via Brevo HTTPS API to ${dto.to}: ${err.message}`);
+        this.logSimulatedEmail(dto, rendered);
+        return { success: false, mode: 'brevo_api_failed' };
+      }
+    }
+
+    // 2. Resend HTTPS REST API (Port 443)
+    const resendApiKey = process.env.RESEND_API_KEY || (process.env.SMTP_PASS?.startsWith('re_') ? process.env.SMTP_PASS.trim() : null);
     if (resendApiKey) {
       try {
         const from = process.env.MAIL_FROM || 'PlanetU HRMS <onboarding@resend.dev>';
@@ -121,7 +181,7 @@ export class MailService implements OnModuleInit {
       }
     }
 
-    // 2. Nodemailer SMTP (For environments where ports 465/587 are not blocked)
+    // 3. Nodemailer SMTP (For environments where ports 465/587 are not blocked)
     const from = process.env.MAIL_FROM || `PlanetU HRMS <${process.env.SMTP_USER || 'notifications@planetu.com'}>`;
     if (this.isConfigured && this.transporter) {
       try {
@@ -144,7 +204,7 @@ export class MailService implements OnModuleInit {
       }
     }
 
-    // 3. Otherwise, use zero-cost console simulation mode
+    // 4. Otherwise, use zero-cost console simulation mode
     this.logSimulatedEmail(dto, rendered);
     return { success: true, mode: 'simulated_envelope' };
   }
@@ -166,12 +226,20 @@ export class MailService implements OnModuleInit {
       actionUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
       metadata: {
         timestamp: new Date().toISOString(),
-        host: process.env.SMTP_HOST || 'api.resend.com',
-        user: process.env.SMTP_USER || '(api_key)',
+        host: process.env.BREVO_API_KEY ? 'api.brevo.com' : (process.env.SMTP_HOST || 'api.resend.com'),
+        user: process.env.BREVO_API_KEY ? '(brevo_api_key)' : (process.env.SMTP_USER || '(api_key)'),
       },
     };
 
     const result = await this.sendNotificationEmail(testPayload);
+
+    if (result.success && result.mode === 'brevo_https') {
+      return {
+        success: true,
+        message: `Live test email dispatched successfully to ${toEmail} via Brevo HTTPS API (Port 443)! Check your inbox.`,
+        details: result,
+      };
+    }
 
     if (result.success && result.mode === 'resend_https') {
       return {
@@ -189,6 +257,14 @@ export class MailService implements OnModuleInit {
       };
     }
 
+    if (!result.success && result.mode === 'brevo_api_error') {
+      return {
+        success: false,
+        message: `Brevo error: ${result.messageId || 'Request rejected'}. (Tip: Ensure your sender email in MAIL_FROM is verified in your Brevo account).`,
+        details: result,
+      };
+    }
+
     if (!result.success && result.mode === 'resend_api_error') {
       return {
         success: false,
@@ -199,7 +275,7 @@ export class MailService implements OnModuleInit {
 
     return {
       success: true,
-      message: `Test email logged in local simulation mode (MessageId: ${result.messageId || 'local-sim'}). To send real emails, set RESEND_API_KEY in Render.`,
+      message: `Test email logged in local simulation mode (MessageId: ${result.messageId || 'local-sim'}). To send real emails, set BREVO_API_KEY in Render.`,
       details: result,
     };
   }

@@ -86,6 +86,8 @@ describe('Mail Module (Real-Time Email Notifications & Templates)', () => {
     beforeEach(async () => {
       delete process.env.SMTP_USER;
       delete process.env.SMTP_PASS;
+      delete process.env.BREVO_API_KEY;
+      delete process.env.RESEND_API_KEY;
       service = new MailService();
       await service.onModuleInit();
     });
