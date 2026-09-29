@@ -18,7 +18,10 @@ export class MailService implements OnModuleInit {
   private isConfigured = false;
 
   async onModuleInit() {
-    await this.initializeTransporter();
+    // Non-blocking initialization so external network delays never block server port binding
+    this.initializeTransporter().catch((err: any) => {
+      this.logger.warn(`SMTP initialization warning: ${err.message}`);
+    });
   }
 
   private async initializeTransporter() {
@@ -35,13 +38,22 @@ export class MailService implements OnModuleInit {
           port,
           secure,
           auth: { user, pass },
+          connectionTimeout: 5000,
+          greetingTimeout: 5000,
+          socketTimeout: 10000,
           tls: {
             rejectUnauthorized: false, // Prevents self-signed cert blocks in local dev
           },
         });
 
-        // Verify connection configuration
-        await this.transporter.verify();
+        // Verify with 5-second timeout so it never hangs server startup
+        await Promise.race([
+          this.transporter.verify(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('SMTP connection verification timed out after 5s')), 5000),
+          ),
+        ]);
+
         this.isConfigured = true;
         this.logger.log(`SMTP transporter verified successfully for ${host}:${port} (${user})`);
       } catch (err: any) {
