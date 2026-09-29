@@ -25,6 +25,13 @@ export class MailService implements OnModuleInit {
   }
 
   private async initializeTransporter() {
+    const resendApiKey = process.env.RESEND_API_KEY || (process.env.SMTP_PASS?.startsWith('re_') ? process.env.SMTP_PASS.trim() : null);
+    if (resendApiKey) {
+      this.isConfigured = true;
+      this.logger.log('Resend HTTPS REST API active (Port 443 - Bypasses Render free tier SMTP blocks).');
+      return;
+    }
+
     const host = process.env.SMTP_HOST || 'smtp.gmail.com';
     const port = Number(process.env.SMTP_PORT) || 465;
     const secure = process.env.SMTP_SECURE === 'true' || port === 465;
@@ -76,9 +83,46 @@ export class MailService implements OnModuleInit {
    */
   async sendNotificationEmail(dto: SendNotificationEmailDto): Promise<{ success: boolean; messageId?: string; mode: string }> {
     const rendered: RenderedEmail = renderEmailTemplate(dto);
-    const from = process.env.MAIL_FROM || `PlanetU HRMS <${process.env.SMTP_USER || 'notifications@planetu.com'}>`;
+    const resendApiKey = process.env.RESEND_API_KEY || (process.env.SMTP_PASS?.startsWith('re_') ? process.env.SMTP_PASS.trim() : null);
 
-    // 1. If real SMTP is configured and connected, send live email
+    // 1. Resend HTTPS REST API (Port 443 - Never blocked on Render free tier)
+    if (resendApiKey) {
+      try {
+        const from = process.env.MAIL_FROM || 'PlanetU HRMS <onboarding@resend.dev>';
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from,
+            to: [dto.to],
+            subject: rendered.subject,
+            html: rendered.html,
+            text: rendered.text,
+          }),
+        });
+
+        const data: any = await response.json();
+        if (response.ok && data.id) {
+          this.logger.log(`Email dispatched via Resend HTTPS API to ${dto.to} [Subject: ${rendered.subject}] (ID: ${data.id})`);
+          return { success: true, messageId: data.id, mode: 'resend_https' };
+        } else {
+          const errMsg = data.message || JSON.stringify(data);
+          this.logger.error(`Resend HTTPS API returned error (${response.status}): ${errMsg}`);
+          this.logSimulatedEmail(dto, rendered);
+          return { success: false, mode: 'resend_api_error', messageId: errMsg };
+        }
+      } catch (err: any) {
+        this.logger.error(`Failed to dispatch email via Resend HTTPS API to ${dto.to}: ${err.message}`);
+        this.logSimulatedEmail(dto, rendered);
+        return { success: false, mode: 'resend_api_failed' };
+      }
+    }
+
+    // 2. Nodemailer SMTP (For environments where ports 465/587 are not blocked)
+    const from = process.env.MAIL_FROM || `PlanetU HRMS <${process.env.SMTP_USER || 'notifications@planetu.com'}>`;
     if (this.isConfigured && this.transporter) {
       try {
         const info = await this.transporter.sendMail({
@@ -95,22 +139,20 @@ export class MailService implements OnModuleInit {
         return { success: true, messageId: info.messageId, mode: 'live_smtp' };
       } catch (err: any) {
         this.logger.error(`Failed to send real-time email to ${dto.to}: ${err.message}`, err.stack);
-        // Fallback to simulation log so the action isn't lost
         this.logSimulatedEmail(dto, rendered);
         return { success: false, mode: 'smtp_failed' };
       }
     }
 
-    // 2. Otherwise, use zero-cost console simulation mode
+    // 3. Otherwise, use zero-cost console simulation mode
     this.logSimulatedEmail(dto, rendered);
     return { success: true, mode: 'simulated_envelope' };
   }
 
   /**
-   * Helper method to send a test email directly to verify Gmail connectivity.
+   * Helper method to send a test email directly to verify connectivity.
    */
   async sendTestEmail(toEmail: string): Promise<{ success: boolean; message: string; details?: any }> {
-    // Re-check transporter if credentials were added dynamically
     if (!this.isConfigured) {
       await this.initializeTransporter();
     }
@@ -120,28 +162,44 @@ export class MailService implements OnModuleInit {
       recipientName: 'PlanetU Tester',
       type: 'TEST_EMAIL',
       title: 'Realtime Email Notification System Active',
-      message: 'Your PlanetU HRMS real-time email notification engine is working successfully with personal Gmail SMTP. All employee leave updates, payslip releases, and critical alerts will now arrive instantly.',
+      message: 'Your PlanetU HRMS real-time email notification engine is working successfully over HTTPS! All employee leave updates, payslip releases, and critical alerts will now arrive instantly.',
       actionUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
       metadata: {
         timestamp: new Date().toISOString(),
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        user: process.env.SMTP_USER || '(none configured)',
+        host: process.env.SMTP_HOST || 'api.resend.com',
+        user: process.env.SMTP_USER || '(api_key)',
       },
     };
 
     const result = await this.sendNotificationEmail(testPayload);
 
+    if (result.success && result.mode === 'resend_https') {
+      return {
+        success: true,
+        message: `Live test email dispatched successfully to ${toEmail} via Resend HTTPS API (Port 443)! Check your inbox.`,
+        details: result,
+      };
+    }
+
     if (result.success && result.mode === 'live_smtp') {
       return {
         success: true,
-        message: `Live test email dispatched successfully to ${toEmail} via Gmail SMTP! Check your inbox.`,
+        message: `Live test email dispatched successfully to ${toEmail} via SMTP! Check your inbox.`,
+        details: result,
+      };
+    }
+
+    if (!result.success && result.mode === 'resend_api_error') {
+      return {
+        success: false,
+        message: `Resend error: ${result.messageId || 'Request rejected'}. (Note: Resend free sandbox only sends to your registered Resend email address until a domain is added at resend.com/domains).`,
         details: result,
       };
     }
 
     return {
       success: true,
-      message: `Test email logged in local simulation mode (MessageId: ${result.messageId || 'local-sim'}). To send real emails to your Gmail inbox, add SMTP_USER and SMTP_PASS in .env.`,
+      message: `Test email logged in local simulation mode (MessageId: ${result.messageId || 'local-sim'}). To send real emails, set RESEND_API_KEY in Render.`,
       details: result,
     };
   }
