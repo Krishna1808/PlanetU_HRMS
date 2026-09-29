@@ -6,9 +6,9 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "npm --prefix frontend install && npx prisma generate && nest build && npm --prefix frontend run build",
+    "build": "npm --prefix frontend install --include=dev && npx prisma generate && nest build && npm --prefix frontend run build",
     "build:backend": "npx prisma generate && nest build",
-    "build:frontend": "npm --prefix frontend install && npm --prefix frontend run build",
+    "build:frontend": "npm --prefix frontend install --include=dev && npm --prefix frontend run build",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
