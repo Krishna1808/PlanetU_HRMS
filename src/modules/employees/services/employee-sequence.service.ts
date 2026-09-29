@@ -34,7 +34,6 @@ export class EmployeeSequenceService {
     }
 
     // 2. Atomically upsert and increment the sequence number
-    // PostgreSQL row locks the row during update, ensuring serialized sequential IDs under high concurrency
     const sequence = await tx.employeeCodeSequence.upsert({
       where: {
         organizationId_departmentId: {
@@ -55,7 +54,43 @@ export class EmployeeSequenceService {
       },
     });
 
-    const sequentialPadded = String(sequence.lastNumber).padStart(4, '0');
-    return `${department.codePrefix}-${sequentialPadded}`;
+    let currentNumber = sequence.lastNumber;
+    let candidateCode = `${department.codePrefix}-${String(currentNumber).padStart(4, '0')}`;
+
+    // 3. Collision guard: Ensure candidateCode is not already taken by any employee
+    if (tx.employee?.findUnique) {
+      while (true) {
+        const existing = await tx.employee.findUnique({
+          where: {
+            organizationId_employeeCode: {
+              organizationId,
+              employeeCode: candidateCode,
+            },
+          },
+          select: { id: true },
+        });
+
+        if (!existing) {
+          break;
+        }
+
+        currentNumber += 1;
+        candidateCode = `${department.codePrefix}-${String(currentNumber).padStart(4, '0')}`;
+
+        await tx.employeeCodeSequence.update({
+          where: {
+            organizationId_departmentId: {
+              organizationId,
+              departmentId,
+            },
+          },
+          data: {
+            lastNumber: currentNumber,
+          },
+        });
+      }
+    }
+
+    return candidateCode;
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
-import { autoSeedDatabase } from './seed-data';
+import { autoSeedDatabase, syncAllEmployeeCodeSequences } from './seed-data';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -16,9 +16,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           this.logger.log('Database empty on startup. Automatically seeding initial organization & demo accounts...');
           await autoSeedDatabase(this);
           this.logger.log('Database auto-seeded successfully.');
+        } else {
+          // Keep employee sequential counters in sync with current employees
+          await syncAllEmployeeCodeSequences(this);
         }
       } catch (err: any) {
-        this.logger.warn(`Auto-seed check skipped or encountered error: ${err.message}`);
+        this.logger.warn(`Startup DB check skipped or encountered error: ${err.message}`);
       }
     }
   }

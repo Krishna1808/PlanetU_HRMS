@@ -387,5 +387,77 @@ export async function autoSeedDatabase(prisma: PrismaClient): Promise<void> {
     });
   }
 
+  // 10. Synchronize Employee Code Sequences so next created employees receive new unique codes
+  await syncAllEmployeeCodeSequences(prisma);
+
   console.log('✅ Automatic database seed completed successfully! All demo accounts initialized.');
 }
+
+/**
+ * Ensures all departments have their employeeCodeSequence set to at least
+ * the highest existing sequential employee code in the database.
+ */
+export async function syncAllEmployeeCodeSequences(prisma: PrismaClient) {
+  try {
+    const departments = await prisma.department.findMany({ select: { id: true, organizationId: true } });
+    for (const dept of departments) {
+      const employees = await prisma.employee.findMany({
+        where: { organizationId: dept.organizationId, departmentId: dept.id },
+        select: { employeeCode: true },
+      });
+
+      let maxNum = 0;
+      for (const e of employees) {
+        const parts = e.employeeCode.split('-');
+        if (parts.length === 2) {
+          const num = parseInt(parts[1], 10);
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num;
+          }
+        }
+      }
+
+      if (maxNum > 0) {
+        await prisma.employeeCodeSequence.upsert({
+          where: {
+            organizationId_departmentId: {
+              organizationId: dept.organizationId,
+              departmentId: dept.id,
+            },
+          },
+          update: {},
+          create: {
+            organizationId: dept.organizationId,
+            departmentId: dept.id,
+            lastNumber: maxNum,
+          },
+        });
+
+        const current = await prisma.employeeCodeSequence.findUnique({
+          where: {
+            organizationId_departmentId: {
+              organizationId: dept.organizationId,
+              departmentId: dept.id,
+            },
+          },
+          select: { lastNumber: true },
+        });
+
+        if (current && current.lastNumber < maxNum) {
+          await prisma.employeeCodeSequence.update({
+            where: {
+              organizationId_departmentId: {
+                organizationId: dept.organizationId,
+                departmentId: dept.id,
+              },
+            },
+            data: { lastNumber: maxNum },
+          });
+        }
+      }
+    }
+  } catch (err: any) {
+    // Non-fatal background sync
+  }
+}
+

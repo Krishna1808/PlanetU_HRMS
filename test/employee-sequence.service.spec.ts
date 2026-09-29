@@ -58,4 +58,20 @@ describe('EmployeeSequenceService (FR-EMP-002 & Architecture Rule 7)', () => {
       expect(code).toMatch(/^ENG-\d{4}$/);
     });
   });
+
+  it('skips numbers if an employee with that code already exists in the organization', async () => {
+    // Simulate that ENG-0001 already exists in Employee table
+    mockPrisma.employee = {
+      findUnique: jest.fn().mockImplementation(async ({ where }: any) => {
+        if (where.organizationId_employeeCode.employeeCode === 'ENG-0001') {
+          return { id: 'existing-emp-1' };
+        }
+        return null;
+      }),
+    };
+    mockPrisma.employeeCodeSequence.update = jest.fn().mockResolvedValue({});
+
+    const code = await sequenceService.generateEmployeeCode('org-1', 'dept-eng');
+    expect(code).toBe('ENG-0002');
+  });
 });
