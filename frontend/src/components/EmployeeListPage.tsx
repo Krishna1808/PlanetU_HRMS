@@ -350,7 +350,7 @@ export const EmployeeListPage: React.FC<Props> = ({
           )}
         </div>
       ) : (
-        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+        <div className="table-responsive" style={{ border: '1px solid #e2e8f0', borderRadius: '8px' }}>
           <table>
             <thead>
               <tr>

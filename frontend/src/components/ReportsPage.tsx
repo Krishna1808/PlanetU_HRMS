@@ -233,10 +233,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
 
       {/* Sub Navigation Bar */}
       <div
+        className="subtabs-scroll"
         style={{
           display: 'flex',
           gap: '8px',
-          overflowX: 'auto',
           borderBottom: '1px solid #e2e8f0',
           paddingBottom: '8px',
         }}
@@ -268,6 +268,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                 fontWeight: isActive ? 700 : 500,
                 fontSize: '13px',
                 cursor: 'pointer',
+                flexShrink: 0,
                 whiteSpace: 'nowrap',
                 boxShadow: isActive ? '0 1px 3px rgba(37,99,235,0.3)' : 'none',
                 transition: 'all 0.15s ease',
@@ -403,7 +404,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
                 {/* Department Distribution (Donut Chart) */}
                 <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
@@ -592,7 +593,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
                 {/* Leave Type Breakdown (Bar Chart) */}
                 <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
@@ -720,7 +721,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
 
           {/* TAB 6: Talent Lifecycle */}
           {activeTab === 'lifecycle' && lifecycleData && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
               {/* Onboarding Funnel (FunnelChart) */}
               <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

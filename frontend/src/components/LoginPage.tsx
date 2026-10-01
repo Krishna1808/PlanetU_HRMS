@@ -129,7 +129,7 @@ export const LoginPage: React.FC<Props> = ({ onLoginSuccess }) => {
         </div>
 
         {/* Main Grid: Testing Role Quick-Selector + Login Box */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: '20px', alignItems: 'start' }}>
           
           {/* Quick Select Testing Credentials Panel */}
           <div className="card" style={{ border: '2px dashed #93c5fd', background: '#f8fafc' }}>

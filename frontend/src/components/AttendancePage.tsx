@@ -218,34 +218,36 @@ export function AttendancePage() {
         ) : history.length === 0 ? (
           <div style={{ color: '#64748b', fontSize: '13px' }}>No recorded punches found.</div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Check In</th>
-                <th>Check Out</th>
-                <th>Duration</th>
-                <th>Lateness</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((rec) => (
-                <tr key={rec.id}>
-                  <td>{new Date(rec.date).toLocaleDateString()}</td>
-                  <td>{rec.checkInTime ? new Date(rec.checkInTime).toLocaleTimeString() : '—'}</td>
-                  <td>{rec.checkOutTime ? new Date(rec.checkOutTime).toLocaleTimeString() : '—'}</td>
-                  <td>{rec.totalActiveMinutes !== null ? `${rec.totalActiveMinutes} mins` : '—'}</td>
-                  <td>{rec.isLate ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Late ({rec.lateMinutes}m)</span> : 'On Time'}</td>
-                  <td>
-                    <span className={`badge ${rec.status === 'PRESENT' ? 'badge-active' : 'badge-inactive'}`}>
-                      {rec.status}
-                    </span>
-                  </td>
+          <div className="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Check In</th>
+                  <th>Check Out</th>
+                  <th>Duration</th>
+                  <th>Lateness</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {history.map((rec) => (
+                  <tr key={rec.id}>
+                    <td>{new Date(rec.date).toLocaleDateString()}</td>
+                    <td>{rec.checkInTime ? new Date(rec.checkInTime).toLocaleTimeString() : '—'}</td>
+                    <td>{rec.checkOutTime ? new Date(rec.checkOutTime).toLocaleTimeString() : '—'}</td>
+                    <td>{rec.totalActiveMinutes !== null ? `${rec.totalActiveMinutes} mins` : '—'}</td>
+                    <td>{rec.isLate ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Late ({rec.lateMinutes}m)</span> : 'On Time'}</td>
+                    <td>
+                      <span className={`badge ${rec.status === 'PRESENT' ? 'badge-active' : 'badge-inactive'}`}>
+                        {rec.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

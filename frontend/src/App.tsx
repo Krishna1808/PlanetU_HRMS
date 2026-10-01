@@ -125,6 +125,35 @@ export default function App() {
   const [employeeSubView, setEmployeeSubView] = useState<EmployeeSubView>('list');
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null);
 
+  // Responsive mobile/tablet viewport detection (< 1024px)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setMobileDrawerOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Close drawer on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mobileDrawerOpen) {
+        setMobileDrawerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileDrawerOpen]);
+
   // Check existing session via httpOnly cookie on mount
   useEffect(() => {
     api
@@ -226,39 +255,54 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: '#f8fafc', color: '#1e293b' }}>
+      {/* Mobile Drawer Backdrop Overlay */}
+      {isMobile && mobileDrawerOpen && (
+        <div
+          className="mobile-sidebar-backdrop"
+          onClick={() => setMobileDrawerOpen(false)}
+          aria-label="Close navigation overlay"
+        />
+      )}
+
       {/* --------------------------------------------------------------------- */}
-      {/* Left Navigation Sidebar Drawer                                        */}
+      {/* Left Navigation Sidebar Drawer (Responsive)                           */}
       {/* --------------------------------------------------------------------- */}
       <aside
         style={{
-          width: sidebarCollapsed ? '68px' : '250px',
+          width: isMobile ? '280px' : sidebarCollapsed ? '68px' : '250px',
           background: '#0f172a',
           color: '#f8fafc',
           display: 'flex',
           flexDirection: 'column',
-          transition: 'width 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: isMobile
+            ? 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+            : 'width 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           borderRight: '1px solid #1e293b',
-          zIndex: 40,
-          position: 'sticky',
+          zIndex: isMobile ? 1050 : 40,
+          position: isMobile ? 'fixed' : 'sticky',
           top: 0,
+          left: 0,
+          bottom: isMobile ? 0 : undefined,
           height: '100vh',
           flexShrink: 0,
           userSelect: 'none',
+          transform: isMobile ? (mobileDrawerOpen ? 'translateX(0)' : 'translateX(-100%)') : 'none',
+          boxShadow: isMobile && mobileDrawerOpen ? '4px 0 25px rgba(0, 0, 0, 0.5)' : 'none',
         }}
       >
         {/* Brand & Toggle Header */}
         <div
           style={{
-            padding: sidebarCollapsed ? '16px 0' : '16px 18px',
+            padding: (!isMobile && sidebarCollapsed) ? '16px 0' : '16px 18px',
             borderBottom: '1px solid #1e293b',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+            justifyContent: (!isMobile && sidebarCollapsed) ? 'center' : 'space-between',
             height: '60px',
             boxSizing: 'border-box',
           }}
         >
-          {!sidebarCollapsed ? (
+          {isMobile || !sidebarCollapsed ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
               <div style={{ background: '#ffffff', padding: '3px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <img src="/logo.png" alt="PlanetU" style={{ height: '24px', maxWidth: '85px', objectFit: 'contain' }} />
@@ -278,24 +322,45 @@ export default function App() {
             </div>
           )}
 
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            title={sidebarCollapsed ? 'Expand Navigation' : 'Collapse Navigation'}
-            style={{
-              background: 'transparent',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              color: '#94a3b8',
-              cursor: 'pointer',
-              padding: '5px 7px',
-              fontSize: '12px',
-              display: sidebarCollapsed ? 'none' : 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icons.ChevronLeft size={14} color="#94a3b8" />
-          </button>
+          {isMobile ? (
+            <button
+              onClick={() => setMobileDrawerOpen(false)}
+              title="Close navigation"
+              style={{
+                background: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '6px',
+                color: '#cbd5e1',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              ✕
+            </button>
+          ) : (
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? 'Expand Navigation' : 'Collapse Navigation'}
+              style={{
+                background: 'transparent',
+                border: '1px solid #334155',
+                borderRadius: '6px',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                padding: '5px 7px',
+                fontSize: '12px',
+                display: sidebarCollapsed ? 'none' : 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icons.ChevronLeft size={14} color="#94a3b8" />
+            </button>
+          )}
         </div>
 
         {/* Navigation Modules List */}
@@ -304,7 +369,7 @@ export default function App() {
             const tabsInSection = visibleTabs.filter((t) => t.section === secName);
             return (
               <div key={secName} style={{ marginBottom: '14px' }}>
-                {!sidebarCollapsed && (
+                {(isMobile || !sidebarCollapsed) && (
                   <div
                     style={{
                       fontSize: '10px',
@@ -322,6 +387,7 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                   {tabsInSection.map((t) => {
                     const isActive = activeTab === t.key;
+                    const showCollapsed = !isMobile && sidebarCollapsed;
                     return (
                       <button
                         key={t.key}
@@ -331,14 +397,17 @@ export default function App() {
                             setEmployeeSubView('list');
                             setSelectedEmpId(null);
                           }
+                          if (isMobile) {
+                            setMobileDrawerOpen(false);
+                          }
                         }}
-                        title={sidebarCollapsed ? t.label : undefined}
+                        title={showCollapsed ? t.label : undefined}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: sidebarCollapsed ? '0' : '10px',
-                          justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                          padding: sidebarCollapsed ? '10px 0' : '9px 12px',
+                          gap: showCollapsed ? '0' : '10px',
+                          justifyContent: showCollapsed ? 'center' : 'flex-start',
+                          padding: showCollapsed ? '10px 0' : '9px 12px',
                           borderRadius: '6px',
                           border: 'none',
                           background: isActive ? '#2563eb' : 'transparent',
@@ -361,7 +430,7 @@ export default function App() {
                         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           {React.createElement(Icons[t.icon], { size: 17, color: isActive ? '#ffffff' : '#94a3b8' })}
                         </span>
-                        {!sidebarCollapsed && (
+                        {(isMobile || !sidebarCollapsed) && (
                           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {t.label}
                           </span>
@@ -378,17 +447,17 @@ export default function App() {
         {/* Sidebar Footer / User Profile Card */}
         <div
           style={{
-            padding: sidebarCollapsed ? '12px 0' : '12px 14px',
+            padding: (!isMobile && sidebarCollapsed) ? '12px 0' : '12px 14px',
             borderTop: '1px solid #1e293b',
             background: '#090d16',
             display: 'flex',
-            flexDirection: sidebarCollapsed ? 'column' : 'row',
+            flexDirection: (!isMobile && sidebarCollapsed) ? 'column' : 'row',
             alignItems: 'center',
-            justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+            justifyContent: (!isMobile && sidebarCollapsed) ? 'center' : 'space-between',
             gap: '8px',
           }}
         >
-          {sidebarCollapsed ? (
+          {!isMobile && sidebarCollapsed ? (
             <button
               onClick={() => setSidebarCollapsed(false)}
               title="Expand Sidebar"
@@ -443,7 +512,7 @@ export default function App() {
             </div>
           )}
 
-          {!sidebarCollapsed && (
+          {(isMobile || !sidebarCollapsed) && (
             <button
               onClick={handleLogout}
               title="Sign Out"
@@ -478,7 +547,7 @@ export default function App() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '0 24px',
+            padding: isMobile ? '0 12px' : '0 24px',
             position: 'sticky',
             top: 0,
             zIndex: 30,
@@ -486,10 +555,16 @@ export default function App() {
           }}
         >
           {/* Breadcrumb & Module Indicator */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '12px', minWidth: 0 }}>
             <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              title="Toggle sidebar drawer"
+              onClick={() => {
+                if (isMobile) {
+                  setMobileDrawerOpen(!mobileDrawerOpen);
+                } else {
+                  setSidebarCollapsed(!sidebarCollapsed);
+                }
+              }}
+              title="Toggle navigation"
               style={{
                 background: '#1e293b',
                 border: '1px solid #334155',
@@ -501,21 +576,32 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
               <Icons.Menu size={16} color="#f8fafc" />
             </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
               {currentTabItem && (
-                <span style={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                   {React.createElement(Icons[currentTabItem.icon], { size: 18, color: '#38bdf8' })}
                 </span>
               )}
-              <span style={{ fontWeight: 700, fontSize: '15px', color: '#f8fafc' }}>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: isMobile ? '14px' : '15px',
+                  color: '#f8fafc',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
                 {currentTabItem?.label || 'PlanetU HRMS'}
               </span>
               <span
+                className="header-section-badge"
                 style={{
                   fontSize: '11px',
                   background: '#1e293b',
@@ -523,6 +609,7 @@ export default function App() {
                   padding: '2px 8px',
                   borderRadius: '4px',
                   marginLeft: '4px',
+                  flexShrink: 0,
                 }}
               >
                 {currentTabItem?.section}
@@ -531,11 +618,11 @@ export default function App() {
           </div>
 
           {/* Right Header Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '14px', flexShrink: 0 }}>
             {/* Module 11 Notification Bell with Live Unread Counter */}
             <NotificationBell user={user} onNavigateTab={(tab) => setActiveTab(tab as MainTab)} />
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderLeft: '1px solid #334155', paddingLeft: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', borderLeft: '1px solid #334155', paddingLeft: isMobile ? '8px' : '16px' }}>
               <div
                 style={{
                   width: '32px',
@@ -560,12 +647,12 @@ export default function App() {
                   boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
                   flexShrink: 0,
                 }}
-                title={user.email}
+                title={`${user.email} (${user.role})`}
               >
                 {user.email?.slice(0, 2).toUpperCase() || 'U'}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                <span style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
+              <div className="header-user-text">
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }}>
                   {user.email}
                 </span>
                 <span
@@ -589,24 +676,25 @@ export default function App() {
               <button
                 className="btn btn-secondary"
                 style={{
-                  padding: '5px 12px',
-                  fontSize: '12px',
+                  padding: isMobile ? '5px 8px' : '5px 12px',
+                  fontSize: isMobile ? '11px' : '12px',
                   background: '#1e293b',
                   color: '#cbd5e1',
                   borderColor: '#334155',
-                  marginLeft: '4px',
+                  marginLeft: '2px',
                 }}
                 onClick={handleLogout}
+                title="Sign Out"
               >
-                Sign Out
+                {isMobile ? 'Exit' : 'Sign Out'}
               </button>
             </div>
           </div>
         </header>
 
         {/* Main Content Area */}
-        <main style={{ flex: 1, padding: '24px 28px', overflowY: 'auto' }}>
-          <div key={activeTab} className="tab-page-enter" style={{ maxWidth: '1240px', margin: '0 auto' }}>
+        <main className="app-main-content" style={{ flex: 1, padding: isMobile ? '14px 12px' : '24px 28px', overflowY: 'auto' }}>
+          <div key={activeTab} className="tab-page-enter" style={{ maxWidth: '1240px', margin: '0 auto', width: '100%' }}>
             {activeTab === 'ess' && <EssDashboardPage />}
 
             {activeTab === 'organization' && <OrganizationMastersPage />}

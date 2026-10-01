@@ -381,67 +381,69 @@ export function PayrollPage({ user }: { user: any }) {
                 <h4 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px' }}>
                   Adjustments & Bonuses ({selectedBatch.adjustments.length})
                 </h4>
-                <table style={{ marginBottom: '16px' }}>
-                  <thead>
-                    <tr>
-                      <th>Employee</th>
-                      <th>Type</th>
-                      <th>Amount</th>
-                      <th>Reason / Note</th>
-                      <th>Status</th>
-                      {isFinance && selectedBatch.status === 'DRAFT' && <th>Action</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedBatch.adjustments.map((adj: any) => {
-                      const isAddition = ['BONUS', 'ARREARS', 'OVERTIME', 'REIMBURSEMENT'].includes(adj.type);
-                      return (
-                        <tr key={adj.id}>
-                          <td><strong>{adj.employee?.employeeCode}</strong> — {adj.employee?.firstName} {adj.employee?.lastName}</td>
-                          <td>
-                            <span className="badge" style={{
-                              background: isAddition ? '#dcfce7' : '#fee2e2',
-                              color: isAddition ? '#166534' : '#991b1b',
-                              fontSize: '11px',
-                            }}>
-                              {adj.type}
-                            </span>
-                          </td>
-                          <td style={{ fontWeight: 700, color: isAddition ? '#16a34a' : '#dc2626' }}>
-                            {isAddition ? '+' : '-'}₹{Number(adj.amount).toFixed(2)}
-                          </td>
-                          <td style={{ fontSize: '12px' }}>{adj.description || '—'}</td>
-                          <td>
-                            <span className={`badge ${adj.isProcessed ? 'badge-active' : 'badge-inactive'}`}>
-                              {adj.isProcessed ? 'Included in Batch' : 'Pending'}
-                            </span>
-                          </td>
-                          {isFinance && selectedBatch.status === 'DRAFT' && (
+                <div className="table-responsive">
+                  <table style={{ marginBottom: '16px' }}>
+                    <thead>
+                      <tr>
+                        <th>Employee</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Reason / Note</th>
+                        <th>Status</th>
+                        {isFinance && selectedBatch.status === 'DRAFT' && <th>Action</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedBatch.adjustments.map((adj: any) => {
+                        const isAddition = ['BONUS', 'ARREARS', 'OVERTIME', 'REIMBURSEMENT'].includes(adj.type);
+                        return (
+                          <tr key={adj.id}>
+                            <td><strong>{adj.employee?.employeeCode}</strong> — {adj.employee?.firstName} {adj.employee?.lastName}</td>
                             <td>
-                              <button
-                                type="button"
-                                className="btn btn-secondary"
-                                style={{ padding: '2px 8px', fontSize: '11px', color: '#dc2626', borderColor: '#fca5a5' }}
-                                onClick={async () => {
-                                  if (!confirm(`Delete adjustment ${adj.type} of ₹${adj.amount}?`)) return;
-                                  try {
-                                    await api.deletePayrollAdjustment(adj.id);
-                                    alert('Adjustment deleted! Recalculate draft batch to update payroll totals.');
-                                    loadBatchDetails(selectedBatch.id);
-                                  } catch (err: any) {
-                                    alert(err.message || 'Failed to delete adjustment');
-                                  }
-                                }}
-                              >
-                                Remove
-                              </button>
+                              <span className="badge" style={{
+                                background: isAddition ? '#dcfce7' : '#fee2e2',
+                                color: isAddition ? '#166534' : '#991b1b',
+                                fontSize: '11px',
+                              }}>
+                                {adj.type}
+                              </span>
                             </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            <td style={{ fontWeight: 700, color: isAddition ? '#16a34a' : '#dc2626' }}>
+                              {isAddition ? '+' : '-'}₹{Number(adj.amount).toFixed(2)}
+                            </td>
+                            <td style={{ fontSize: '12px' }}>{adj.description || '—'}</td>
+                            <td>
+                              <span className={`badge ${adj.isProcessed ? 'badge-active' : 'badge-inactive'}`}>
+                                {adj.isProcessed ? 'Included in Batch' : 'Pending'}
+                              </span>
+                            </td>
+                            {isFinance && selectedBatch.status === 'DRAFT' && (
+                              <td>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary"
+                                  style={{ padding: '2px 8px', fontSize: '11px', color: '#dc2626', borderColor: '#fca5a5' }}
+                                  onClick={async () => {
+                                    if (!confirm(`Delete adjustment ${adj.type} of ₹${adj.amount}?`)) return;
+                                    try {
+                                      await api.deletePayrollAdjustment(adj.id);
+                                      alert('Adjustment deleted! Recalculate draft batch to update payroll totals.');
+                                      loadBatchDetails(selectedBatch.id);
+                                    } catch (err: any) {
+                                      alert(err.message || 'Failed to delete adjustment');
+                                    }
+                                  }}
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
@@ -450,7 +452,8 @@ export function PayrollPage({ user }: { user: any }) {
               Individual Employee Payslips ({selectedBatch.payslips?.length || 0})
             </h4>
 
-            <table>
+            <div className="table-responsive">
+              <table>
               <thead>
                 <tr>
                   <th>Code</th>
@@ -511,6 +514,7 @@ export function PayrollPage({ user }: { user: any }) {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         ) : (
           <div style={{ color: '#64748b', fontSize: '13px', padding: '20px 0', textAlign: 'center' }}>
@@ -699,7 +703,7 @@ export function PayrollPage({ user }: { user: any }) {
                   </select>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 600 }}>Year</label>
                     <input

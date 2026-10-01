@@ -320,7 +320,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             {canEditPosition && employee.employmentStatus !== 'TERMINATED' && (
               <button
                 type="button"
@@ -353,7 +353,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
         </div>
 
         {/* Detailed Attributes Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginTop: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginTop: '24px' }}>
           {/* Employment & Position Details */}
           <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>

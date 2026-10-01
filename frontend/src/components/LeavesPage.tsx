@@ -361,36 +361,38 @@ export function LeavesPage({ user }: { user: any }) {
           {leaveTypes.length === 0 ? (
             <div style={{ color: '#64748b', fontSize: '13px' }}>No leave policies defined. Click 'Define New Policy' to add one.</div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Policy Name</th>
-                  <th>Code</th>
-                  <th>Type</th>
-                  <th>Quota (Days/Year)</th>
-                  <th>Accrual</th>
-                  <th>Carry Forward Max</th>
-                  <th>Approval Required</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaveTypes.map((type) => (
-                  <tr key={type.id}>
-                    <td><strong>{type.name}</strong></td>
-                    <td><span className="badge badge-role">{type.code}</span></td>
-                    <td>
-                      <span className={`badge ${type.isPaid ? 'badge-active' : 'badge-inactive'}`}>
-                        {type.isPaid ? 'Paid' : 'Unpaid (LWP)'}
-                      </span>
-                    </td>
-                    <td>{type.daysAllowedPerYear} days</td>
-                    <td style={{ textTransform: 'capitalize' }}>{type.accrualFrequency?.toLowerCase() || 'Monthly'}</td>
-                    <td>{type.carryForwardLimit} days</td>
-                    <td>{type.requiresApproval ? 'Yes' : 'No (Auto)'}</td>
+            <div className="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Policy Name</th>
+                    <th>Code</th>
+                    <th>Type</th>
+                    <th>Quota (Days/Year)</th>
+                    <th>Accrual</th>
+                    <th>Carry Forward Max</th>
+                    <th>Approval Required</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {leaveTypes.map((type) => (
+                    <tr key={type.id}>
+                      <td><strong>{type.name}</strong></td>
+                      <td><span className="badge badge-role">{type.code}</span></td>
+                      <td>
+                        <span className={`badge ${type.isPaid ? 'badge-active' : 'badge-inactive'}`}>
+                          {type.isPaid ? 'Paid' : 'Unpaid (LWP)'}
+                        </span>
+                      </td>
+                      <td>{type.daysAllowedPerYear} days</td>
+                      <td style={{ textTransform: 'capitalize' }}>{type.accrualFrequency?.toLowerCase() || 'Monthly'}</td>
+                      <td>{type.carryForwardLimit} days</td>
+                      <td>{type.requiresApproval ? 'Yes' : 'No (Auto)'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -405,47 +407,49 @@ export function LeavesPage({ user }: { user: any }) {
           {pendingRequests.length === 0 ? (
             <div style={{ color: '#64748b', fontSize: '13px' }}>No pending approval requests from your direct reports.</div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Leave Type</th>
-                  <th>Dates</th>
-                  <th>Days</th>
-                  <th>Reason</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingRequests.map((req) => (
-                  <tr key={req.id}>
-                    <td><strong>{req.employee?.firstName} {req.employee?.lastName}</strong> ({req.employee?.employeeCode})</td>
-                    <td><span className="badge badge-role">{req.leaveType?.code}</span></td>
-                    <td>{new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}</td>
-                    <td>{req.totalDays}</td>
-                    <td>{req.reason}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          className="btn btn-primary"
-                          style={{ padding: '4px 10px', fontSize: '12px', background: '#16a34a' }}
-                          onClick={() => handleAction(req.id, 'APPROVE')}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          className="btn btn-danger"
-                          style={{ padding: '4px 10px', fontSize: '12px' }}
-                          onClick={() => handleAction(req.id, 'REJECT')}
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </td>
+            <div className="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Leave Type</th>
+                    <th>Dates</th>
+                    <th>Days</th>
+                    <th>Reason</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {pendingRequests.map((req) => (
+                    <tr key={req.id}>
+                      <td><strong>{req.employee?.firstName} {req.employee?.lastName}</strong> ({req.employee?.employeeCode})</td>
+                      <td><span className="badge badge-role">{req.leaveType?.code}</span></td>
+                      <td>{new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}</td>
+                      <td>{req.totalDays}</td>
+                      <td>{req.reason}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            className="btn btn-primary"
+                            style={{ padding: '4px 10px', fontSize: '12px', background: '#16a34a' }}
+                            onClick={() => handleAction(req.id, 'APPROVE')}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            className="btn btn-danger"
+                            style={{ padding: '4px 10px', fontSize: '12px' }}
+                            onClick={() => handleAction(req.id, 'REJECT')}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -458,54 +462,56 @@ export function LeavesPage({ user }: { user: any }) {
         ) : myRequests.length === 0 ? (
           <div style={{ color: '#64748b', fontSize: '13px' }}>No leave requests found.</div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Dates</th>
-                <th>Days</th>
-                <th>Reason</th>
-                <th>Applied At</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {myRequests.map((req) => (
-                <tr key={req.id}>
-                  <td><span className="badge badge-role">{req.leaveType?.code}</span> {req.leaveType?.name}</td>
-                  <td>{new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}</td>
-                  <td>{req.totalDays}</td>
-                  <td>{req.reason}</td>
-                  <td>{new Date(req.appliedAt).toLocaleDateString()}</td>
-                  <td>
-                    <span
-                      className={`badge ${
-                        req.status === 'APPROVED'
-                          ? 'badge-active'
-                          : req.status === 'PENDING'
-                          ? 'badge-role'
-                          : 'badge-inactive'
-                      }`}
-                    >
-                      {req.status}
-                    </span>
-                  </td>
-                  <td>
-                    {req.status === 'PENDING' && (
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: '3px 8px', fontSize: '11px', color: '#dc2626' }}
-                        onClick={() => handleCancel(req.id)}
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </td>
+          <div className="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Dates</th>
+                  <th>Days</th>
+                  <th>Reason</th>
+                  <th>Applied At</th>
+                  <th>Status</th>
+                  <th>Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {myRequests.map((req) => (
+                  <tr key={req.id}>
+                    <td><span className="badge badge-role">{req.leaveType?.code}</span> {req.leaveType?.name}</td>
+                    <td>{new Date(req.startDate).toLocaleDateString()} – {new Date(req.endDate).toLocaleDateString()}</td>
+                    <td>{req.totalDays}</td>
+                    <td>{req.reason}</td>
+                    <td>{new Date(req.appliedAt).toLocaleDateString()}</td>
+                    <td>
+                      <span
+                        className={`badge ${
+                          req.status === 'APPROVED'
+                            ? 'badge-active'
+                            : req.status === 'PENDING'
+                            ? 'badge-role'
+                            : 'badge-inactive'
+                        }`}
+                      >
+                        {req.status}
+                      </span>
+                    </td>
+                    <td>
+                      {req.status === 'PENDING' && (
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '3px 8px', fontSize: '11px', color: '#dc2626' }}
+                          onClick={() => handleCancel(req.id)}
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -540,7 +546,7 @@ export function LeavesPage({ user }: { user: any }) {
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600 }}>Start Date</label>
                   <input
@@ -692,7 +698,7 @@ export function LeavesPage({ user }: { user: any }) {
             </p>
 
             <form onSubmit={handleCreatePolicy} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
+              <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600 }}>Policy Name *</label>
                   <input
@@ -728,7 +734,7 @@ export function LeavesPage({ user }: { user: any }) {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600 }}>Annual Quota (Days) *</label>
                   <input
@@ -754,7 +760,7 @@ export function LeavesPage({ user }: { user: any }) {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600 }}>Accrual Frequency</label>
                   <select

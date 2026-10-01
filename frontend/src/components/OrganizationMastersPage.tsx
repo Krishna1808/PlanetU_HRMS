@@ -451,7 +451,7 @@ export function OrganizationMastersPage() {
       </div>
 
       {/* Navigation Subtabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e2e8f0', background: '#ffffff', padding: '8px 16px', borderRadius: '8px', flexWrap: 'wrap' }}>
+      <div className="subtabs-scroll" style={{ borderBottom: '1px solid #e2e8f0', background: '#ffffff', padding: '8px 16px', borderRadius: '8px' }}>
         {[
           { key: 'departments', label: `Departments (${departments.length})`, icon: Icons.Building },
           { key: 'designations', label: `Designations / Job Roles (${designations.length})`, icon: Icons.Briefcase },
@@ -477,6 +477,8 @@ export function OrganizationMastersPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
                 transition: 'all 0.15s ease',
               }}
             >
@@ -501,7 +503,7 @@ export function OrganizationMastersPage() {
 
       {/* TAB 1: DEPARTMENTS */}
       {activeTab === 'departments' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: '20px', alignItems: 'start' }}>
+        <div className="split-view-grid">
           <div className="card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div>
@@ -520,7 +522,7 @@ export function OrganizationMastersPage() {
             ) : departments.length === 0 ? (
               <div style={{ color: '#94a3b8', padding: '24px', textAlign: 'center' }}>No departments found.</div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
+              <div className="table-responsive">
                 <table>
                   <thead>
                     <tr>
@@ -706,7 +708,7 @@ export function OrganizationMastersPage() {
 
       {/* TAB 2: DESIGNATIONS */}
       {activeTab === 'designations' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' }}>
+        <div className="split-view-grid">
           <div className="card">
             <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Designations & Job Roles</h3>
             {loading ? (
@@ -714,35 +716,37 @@ export function OrganizationMastersPage() {
             ) : designations.length === 0 ? (
               <div style={{ color: '#94a3b8' }}>No designations found.</div>
             ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Job Title / Designation</th>
-                    <th>Description</th>
-                    <th>Created</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {designations.map((d) => (
-                    <tr key={d.id} style={{ background: editingDesig?.id === d.id ? '#f0f9ff' : undefined }}>
-                      <td><strong>{d.name}</strong></td>
-                      <td style={{ color: '#64748b', fontSize: '13px' }}>{d.description || '—'}</td>
-                      <td style={{ color: '#94a3b8', fontSize: '12px' }}>{new Date(d.createdAt).toLocaleDateString()}</td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          style={{ fontSize: '12px', padding: '4px 8px' }}
-                          onClick={() => handleStartEditDesig(d)}
-                        >
-                          Edit
-                        </button>
-                      </td>
+              <div className="table-responsive">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Job Title / Designation</th>
+                      <th>Description</th>
+                      <th>Created</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {designations.map((d) => (
+                      <tr key={d.id} style={{ background: editingDesig?.id === d.id ? '#f0f9ff' : undefined }}>
+                        <td><strong>{d.name}</strong></td>
+                        <td style={{ color: '#64748b', fontSize: '13px' }}>{d.description || '—'}</td>
+                        <td style={{ color: '#94a3b8', fontSize: '12px' }}>{new Date(d.createdAt).toLocaleDateString()}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ fontSize: '12px', padding: '4px 8px' }}
+                            onClick={() => handleStartEditDesig(d)}
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
@@ -828,7 +832,7 @@ export function OrganizationMastersPage() {
 
       {/* TAB 3: GRADES */}
       {activeTab === 'grades' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' }}>
+        <div className="split-view-grid">
           <div className="card">
             <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Job Grades & Levels</h3>
             {loading ? (
@@ -836,24 +840,26 @@ export function OrganizationMastersPage() {
             ) : grades.length === 0 ? (
               <div style={{ color: '#94a3b8' }}>No grades found.</div>
             ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Grade Code</th>
-                    <th>Level</th>
-                    <th>Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {grades.map((g) => (
-                    <tr key={g.id}>
-                      <td><span className="badge badge-active">{g.name}</span></td>
-                      <td>Level {g.level || 1}</td>
-                      <td style={{ color: '#64748b', fontSize: '13px' }}>{g.description || '—'}</td>
+              <div className="table-responsive">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Grade Code</th>
+                      <th>Level</th>
+                      <th>Description</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {grades.map((g) => (
+                      <tr key={g.id}>
+                        <td><span className="badge badge-active">{g.name}</span></td>
+                        <td>Level {g.level || 1}</td>
+                        <td style={{ color: '#64748b', fontSize: '13px' }}>{g.description || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
@@ -911,7 +917,7 @@ export function OrganizationMastersPage() {
 
       {/* TAB 4: LOCATIONS */}
       {activeTab === 'locations' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px', alignItems: 'start' }}>
+        <div className="split-view-grid">
           <div className="card">
             <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Office Locations</h3>
             {loading ? (
@@ -919,26 +925,28 @@ export function OrganizationMastersPage() {
             ) : locations.length === 0 ? (
               <div style={{ color: '#94a3b8' }}>No locations found.</div>
             ) : (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Location Name</th>
-                    <th>City</th>
-                    <th>Country</th>
-                    <th>Address</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {locations.map((l) => (
-                    <tr key={l.id}>
-                      <td><strong>{l.name}</strong></td>
-                      <td>{l.city || '—'}</td>
-                      <td>{l.country || 'India'}</td>
-                      <td style={{ color: '#64748b', fontSize: '13px' }}>{l.address || '—'}</td>
+              <div className="table-responsive">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Location Name</th>
+                      <th>City</th>
+                      <th>Country</th>
+                      <th>Address</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {locations.map((l) => (
+                      <tr key={l.id}>
+                        <td><strong>{l.name}</strong></td>
+                        <td>{l.city || '—'}</td>
+                        <td>{l.country || 'India'}</td>
+                        <td style={{ color: '#64748b', fontSize: '13px' }}>{l.address || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
@@ -959,7 +967,7 @@ export function OrganizationMastersPage() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '3px' }}>
                     City
@@ -1100,7 +1108,7 @@ export function OrganizationMastersPage() {
               </p>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
               {holidays.map((h) => {
                 const dateObj = new Date(h.date);
                 const dayNum = dateObj.toLocaleDateString('en-US', { day: '2-digit', timeZone: 'UTC' });
@@ -1294,7 +1302,7 @@ export function OrganizationMastersPage() {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>
                       Date <span style={{ color: '#ef4444' }}>*</span>
@@ -1725,7 +1733,7 @@ export function OrganizationMastersPage() {
                         No employees match your filter "{employeeSearchTerm}".
                       </div>
                     ) : (
-                      <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                      <div className="table-responsive" style={{ border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                         <table>
                           <thead>
                             <tr>

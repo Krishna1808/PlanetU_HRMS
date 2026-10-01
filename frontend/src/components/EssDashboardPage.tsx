@@ -240,7 +240,7 @@ export function EssDashboardPage() {
       )}
 
       {/* 3. Grid: Today Attendance & Shift info */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: '20px' }}>
         {/* Attendance Card */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -522,40 +522,42 @@ export function EssDashboardPage() {
         {recentLeaveRequests.length === 0 ? (
           <div style={{ color: '#64748b', fontSize: '13px' }}>No leave applications recorded.</div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Dates</th>
-                <th>Days</th>
-                <th>Reason</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentLeaveRequests.map((r: any) => (
-                <tr key={r.id}>
-                  <td><strong>{r.leaveTypeCode}</strong></td>
-                  <td>{r.startDate} to {r.endDate}</td>
-                  <td>{r.totalDays}</td>
-                  <td>{r.reason}</td>
-                  <td>
-                    <span
-                      className={`badge ${
-                        r.status === 'APPROVED'
-                          ? 'badge-active'
-                          : r.status === 'PENDING'
-                          ? 'badge-role'
-                          : 'badge-inactive'
-                      }`}
-                    >
-                      {r.status}
-                    </span>
-                  </td>
+          <div className="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Dates</th>
+                  <th>Days</th>
+                  <th>Reason</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recentLeaveRequests.map((r: any) => (
+                  <tr key={r.id}>
+                    <td><strong>{r.leaveTypeCode}</strong></td>
+                    <td>{r.startDate} to {r.endDate}</td>
+                    <td>{r.totalDays}</td>
+                    <td>{r.reason}</td>
+                    <td>
+                      <span
+                        className={`badge ${
+                          r.status === 'APPROVED'
+                            ? 'badge-active'
+                            : r.status === 'PENDING'
+                            ? 'badge-role'
+                            : 'badge-inactive'
+                        }`}
+                      >
+                        {r.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -621,7 +623,7 @@ export function EssDashboardPage() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600 }}>Emergency Contact Name</label>
                   <input
@@ -723,7 +725,7 @@ export function EssDashboardPage() {
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
                     Start Date *

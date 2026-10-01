@@ -443,3 +443,171 @@ textarea:focus {
   padding: 20px 24px;
   flex: 1;
 }
+
+/* ==========================================================================
+   Responsive Utilities & Layout Helpers
+   ========================================================================== */
+
+/* Universal Responsive Table Wrapper */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+.table-responsive table {
+  margin-top: 0;
+  min-width: 620px;
+}
+
+/* Responsive Split-view Grid (Table on left, Form on right) */
+.split-view-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 350px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* Two-column modal form grid that stacks on mobile */
+.modal-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Horizontally scrollable tab bar for mobile/tablet */
+.subtabs-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  white-space: nowrap;
+}
+
+/* Mobile sidebar backdrop */
+.mobile-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1040;
+  animation: modalFadeIn 0.2s ease forwards;
+}
+
+/* ==========================================================================
+   Media Queries (Tablet: <= 1023px)
+   ========================================================================== */
+@media (max-width: 1023px) {
+  .split-view-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .app-main-content {
+    padding: 18px 16px !important;
+  }
+}
+
+/* ==========================================================================
+   Media Queries (Mobile Phones: <= 767px)
+   ========================================================================== */
+@media (max-width: 767px) {
+  /* Containers & Padding */
+  .container {
+    padding: 12px 10px;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 8px;
+  }
+
+  .app-main-content {
+    padding: 12px 10px !important;
+  }
+
+  /* Form Grids & Modal Form Grids */
+  .modal-form-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Modals on Mobile */
+  .modal-overlay {
+    padding: 12px;
+    align-items: center;
+  }
+
+  .modal-dialog {
+    max-height: 94vh;
+    border-radius: 12px;
+    width: 100% !important;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+
+  /* Header on Mobile */
+  .header-user-text {
+    display: none !important;
+  }
+
+  .header-section-badge {
+    display: none !important;
+  }
+
+  /* Inputs & Form Controls Touch Sizing (prevent iOS 16px zoom trigger) */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  select,
+  textarea {
+    font-size: 14px;
+    padding: 9px 12px;
+  }
+
+  /* Buttons on touch screens */
+  .btn {
+    min-height: 38px;
+    font-size: 13px;
+  }
+
+  /* Ensure card headings wrap nicely */
+  h1 { font-size: 18px; }
+  h2 { font-size: 17px; }
+  h3 { font-size: 15px; }
+}
+
+/* ==========================================================================
+   Media Queries (Small Mobile Phones: <= 480px)
+   ========================================================================== */
+@media (max-width: 480px) {
+  .card {
+    padding: 14px 12px;
+  }
+
+  .app-main-content {
+    padding: 10px 8px !important;
+  }
+
+  .modal-overlay {
+    padding: 8px;
+    align-items: center;
+  }
+
+  .modal-dialog {
+    border-radius: 10px;
+    max-height: 96vh;
+  }
+}

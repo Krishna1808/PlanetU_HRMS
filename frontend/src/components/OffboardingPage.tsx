@@ -286,7 +286,7 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
+        <div className="subtabs-scroll" style={{ display: 'flex', gap: '6px' }}>
           {[
             { key: 'ALL', label: 'All Exits' },
             { key: 'PENDING_APPROVAL', label: 'Pending Approval' },
@@ -308,6 +308,8 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
                 fontWeight: statusFilter === tab.key ? 700 : 500,
                 fontSize: '12px',
                 cursor: 'pointer',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
               }}
             >
               {tab.label}
@@ -341,11 +343,11 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
 
       {/* Requests Table */}
       <div
+        className="table-responsive"
         style={{
           background: '#ffffff',
           borderRadius: '8px',
           border: '1px solid #e2e8f0',
-          overflow: 'hidden',
           boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
         }}
       >

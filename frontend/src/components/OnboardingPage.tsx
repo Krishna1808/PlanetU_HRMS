@@ -333,7 +333,8 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
               No candidates found in the onboarding pipeline. Click "Invite New Candidate" to initiate onboarding.
             </div>
           ) : (
-            <table>
+            <div className="table-responsive">
+              <table>
               <thead>
                 <tr>
                   <th>Candidate Name</th>
@@ -423,7 +424,8 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                 })}
               </tbody>
             </table>
-          )}
+          </div>
+        )}
         </div>
       </div>
 
@@ -440,7 +442,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
 
               <h3 style={{ marginBottom: '16px' }}>Invite Candidate for Onboarding</h3>
               <form onSubmit={handleInviteSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 600 }}>First Name *</label>
                     <input
@@ -463,7 +465,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 600 }}>Personal Email *</label>
                     <input
@@ -485,7 +487,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 600 }}>Target Department *</label>
                     <select
@@ -512,7 +514,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 600 }}>Grade (Optional)</label>
                     <select
@@ -541,7 +543,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="modal-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={{ fontSize: '12px', fontWeight: 600 }}>Proposed Joining Date *</label>
                     <input

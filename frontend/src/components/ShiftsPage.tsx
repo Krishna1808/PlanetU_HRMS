@@ -101,32 +101,34 @@ export function ShiftsPage() {
         {loading ? (
           <div>Loading shifts...</div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Shift Name</th>
-                <th>Work Timings</th>
-                <th>Grace Period</th>
-                <th>Break</th>
-                <th>Full Day / Half Day Threshold</th>
-                <th>Default</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shifts.map((s) => (
-                <tr key={s.id}>
-                  <td><span className="badge badge-role">{s.code}</span></td>
-                  <td><strong>{s.name}</strong></td>
-                  <td>{s.startTime} – {s.endTime} {s.isOvernight && <span style={{ color: '#d97706', fontSize: '11px' }}>(Overnight)</span>}</td>
-                  <td>{s.gracePeriodMinutes} mins</td>
-                  <td>{s.breakDurationMinutes} mins</td>
-                  <td>{s.fullDayThresholdMinutes / 60}h / {s.halfDayThresholdMinutes / 60}h</td>
-                  <td>{s.isDefault ? <span className="badge badge-active">Default</span> : 'No'}</td>
+          <div className="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Shift Name</th>
+                  <th>Work Timings</th>
+                  <th>Grace Period</th>
+                  <th>Break</th>
+                  <th>Full Day / Half Day Threshold</th>
+                  <th>Default</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {shifts.map((s) => (
+                  <tr key={s.id}>
+                    <td><span className="badge badge-role">{s.code}</span></td>
+                    <td><strong>{s.name}</strong></td>
+                    <td>{s.startTime} – {s.endTime} {s.isOvernight && <span style={{ color: '#d97706', fontSize: '11px' }}>(Overnight)</span>}</td>
+                    <td>{s.gracePeriodMinutes} mins</td>
+                    <td>{s.breakDurationMinutes} mins</td>
+                    <td>{s.fullDayThresholdMinutes / 60}h / {s.halfDayThresholdMinutes / 60}h</td>
+                    <td>{s.isDefault ? <span className="badge badge-active">Default</span> : 'No'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
