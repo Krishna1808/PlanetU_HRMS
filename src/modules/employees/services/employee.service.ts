@@ -667,6 +667,35 @@ export class EmployeeService {
   }
 
   /**
+   * FR-EMP-009: Delete employee document
+   */
+  async deleteDocument(
+    organizationId: string,
+    employeeId: string,
+    documentId: string,
+    viewer: AuthenticatedUser,
+  ) {
+    const isHrOrAdmin =
+      viewer.role === Role.CLIENT_SUPER_ADMIN || viewer.role === Role.HR_ADMIN;
+    const isSelf = viewer.employeeId && viewer.employeeId === employeeId;
+
+    if (!isHrOrAdmin && !isSelf) {
+      throw new ForbiddenException('Access denied: You can only delete your own documents');
+    }
+
+    const doc = await this.prisma.employeeDocument.findFirst({
+      where: { id: documentId, employeeId, organizationId },
+    });
+    if (!doc) {
+      throw new NotFoundException('Document not found');
+    }
+
+    return this.prisma.employeeDocument.delete({
+      where: { id: documentId },
+    });
+  }
+
+  /**
    * FR-EMP-004: Org Chart view derived from reportingManagerId
    */
   async getOrgChart(organizationId: string) {

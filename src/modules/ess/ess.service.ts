@@ -12,6 +12,7 @@ import { LeaveService } from '../leaves/leave.service';
 import { PayrollService } from '../payroll/payroll.service';
 import { AuthenticatedUser } from '../../common/types/authenticated-user.interface';
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
+import { CreateEmployeeDocumentDto } from '../employees/dto/create-document.dto';
 import {
   EssDashboardResponse,
   EssProfileSummary,
@@ -463,5 +464,40 @@ export class EssService {
     }
 
     return this.leaveService.listPendingRequests(organizationId, currentUser);
+  }
+
+  /**
+   * Personal documents and company letters for logged-in employee.
+   */
+  async getMyDocuments(organizationId: string, currentUser: AuthenticatedUser) {
+    const employeeId = await this.ensureEmployee(organizationId, currentUser);
+    const viewer = { ...currentUser, employeeId };
+    return this.employeeService.getDocuments(organizationId, employeeId, viewer);
+  }
+
+  /**
+   * Upload personal document (or company letter) for logged-in employee.
+   */
+  async uploadMyDocument(
+    organizationId: string,
+    dto: CreateEmployeeDocumentDto,
+    currentUser: AuthenticatedUser,
+  ) {
+    const employeeId = await this.ensureEmployee(organizationId, currentUser);
+    const viewer = { ...currentUser, employeeId };
+    return this.employeeService.addDocument(organizationId, employeeId, dto, viewer);
+  }
+
+  /**
+   * Delete document for logged-in employee.
+   */
+  async deleteMyDocument(
+    organizationId: string,
+    documentId: string,
+    currentUser: AuthenticatedUser,
+  ) {
+    const employeeId = await this.ensureEmployee(organizationId, currentUser);
+    const viewer = { ...currentUser, employeeId };
+    return this.employeeService.deleteDocument(organizationId, employeeId, documentId, viewer);
   }
 }

@@ -157,4 +157,17 @@ export class EmployeesController {
   ) {
     return this.employeeService.getDocuments(user.organizationId, id, user);
   }
+
+  /**
+   * DELETE /api/v1/employees/:id/documents/:docId
+   * Delete an employee document
+   */
+  @Delete(':id/documents/:docId')
+  async deleteDocument(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('docId') docId: string,
+  ) {
+    return this.employeeService.deleteDocument(user.organizationId, id, docId, user);
+  }
 }

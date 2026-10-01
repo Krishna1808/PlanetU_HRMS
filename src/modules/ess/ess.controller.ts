@@ -1,14 +1,18 @@
 import {
   Controller,
   Get,
+  Post,
+  Delete,
   Patch,
   Body,
+  Param,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { EssService } from './ess.service';
 import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
+import { CreateEmployeeDocumentDto } from '../employees/dto/create-document.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -91,5 +95,38 @@ export class EssController {
   @Roles(Role.MANAGER, Role.HR_ADMIN, Role.CLIENT_SUPER_ADMIN)
   async getManagerPendingApprovals(@CurrentUser() user: AuthenticatedUser) {
     return this.essService.getManagerPendingApprovals(user.organizationId, user);
+  }
+
+  /**
+   * GET /api/v1/ess/documents
+   * Personal documents and company letters for logged-in employee
+   */
+  @Get('documents')
+  async getMyDocuments(@CurrentUser() user: AuthenticatedUser) {
+    return this.essService.getMyDocuments(user.organizationId, user);
+  }
+
+  /**
+   * POST /api/v1/ess/documents
+   * Upload personal document (ID, degree, resume, etc.)
+   */
+  @Post('documents')
+  async uploadMyDocument(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateEmployeeDocumentDto,
+  ) {
+    return this.essService.uploadMyDocument(user.organizationId, dto, user);
+  }
+
+  /**
+   * DELETE /api/v1/ess/documents/:docId
+   * Delete personal document
+   */
+  @Delete('documents/:docId')
+  async deleteMyDocument(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('docId') docId: string,
+  ) {
+    return this.essService.deleteMyDocument(user.organizationId, docId, user);
   }
 }

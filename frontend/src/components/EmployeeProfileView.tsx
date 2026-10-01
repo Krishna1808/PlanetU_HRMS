@@ -1,6 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
+import { Icons } from './Icons';
+
+const DOCUMENT_TYPE_LABELS: Record<string, { label: string; badgeClass: string }> = {
+  OFFER_LETTER: { label: 'Offer / Appointment Letter', badgeClass: 'badge-role' },
+  EXPERIENCE_LETTER: { label: 'Experience / Relieving Letter', badgeClass: 'badge-role' },
+  ID_PROOF: { label: 'Identity Proof', badgeClass: 'badge-active' },
+  EDUCATION_CERTIFICATE: { label: 'Education / Degree', badgeClass: 'badge-role' },
+  RESUME: { label: 'Resume / CV', badgeClass: 'badge-role' },
+  OTHER: { label: 'Other Document', badgeClass: 'badge-inactive' },
+};
+
+function formatFileSize(bytes?: number | null): string {
+  if (!bytes) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 interface Props {
   employeeId: string;
@@ -34,6 +51,18 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
   const [terminateError, setTerminateError] = useState('');
   const [terminateSuccess, setTerminateSuccess] = useState('');
 
+  // Document management state
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [showUploadDocModal, setShowUploadDocModal] = useState(false);
+  const [uploadDocType, setUploadDocType] = useState('OFFER_LETTER');
+  const [uploadDocName, setUploadDocName] = useState('');
+  const [uploadDocFile, setUploadDocFile] = useState<File | null>(null);
+  const [uploadDocBase64, setUploadDocBase64] = useState('');
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [uploadDocError, setUploadDocError] = useState('');
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
+
   const calculateEffectiveExitDate = (days: number) => {
     const d = new Date();
     d.setDate(d.getDate() + Number(days));
@@ -45,22 +74,108 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
     });
   };
 
+  const loadDocuments = async () => {
+    try {
+      setLoadingDocs(true);
+      const docs = await api.getEmployeeDocuments(employeeId);
+      setDocuments(docs || []);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
+  const handleDocFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadDocError('File size exceeds 10 MB limit.');
+      return;
+    }
+    setUploadDocFile(file);
+    setUploadDocError('');
+    if (!uploadDocName) {
+      setUploadDocName(file.name.replace(/\.[^/.]+$/, ''));
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setUploadDocBase64(reader.result as string);
+    };
+    reader.onerror = () => {
+      setUploadDocError('Failed to read file.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadDocSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadDocFile || !uploadDocBase64) {
+      setUploadDocError('Please select a file to upload');
+      return;
+    }
+    try {
+      setUploadingDoc(true);
+      setUploadDocError('');
+      await api.uploadEmployeeDocument(employeeId, {
+        documentType: uploadDocType,
+        fileName: uploadDocName.trim() || uploadDocFile.name,
+        fileUrl: uploadDocBase64,
+        fileSize: uploadDocFile.size,
+      });
+      setShowUploadDocModal(false);
+      setUploadDocFile(null);
+      setUploadDocBase64('');
+      setUploadDocName('');
+      await loadDocuments();
+    } catch (err: any) {
+      setUploadDocError(err?.message || 'Failed to upload document');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleDeleteDoc = async (docId: string, docName: string) => {
+    if (!confirm(`Delete "${docName}"?`)) return;
+    try {
+      await api.deleteEmployeeDocument(employeeId, docId);
+      await loadDocuments();
+    } catch (err: any) {
+      alert(err?.message || 'Failed to delete document');
+    }
+  };
+
+  const downloadDoc = (doc: any) => {
+    if (doc.fileUrl.startsWith('data:')) {
+      const a = document.createElement('a');
+      a.href = doc.fileUrl;
+      a.download = doc.fileName || 'document';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } else {
+      window.open(doc.fileUrl, '_blank');
+    }
+  };
+
   const loadProfile = async () => {
     setLoading(true);
     setError('');
     try {
-      const [empData, meData, desigData, deptData, empsData] = await Promise.all([
+      const [empData, meData, desigData, deptData, empsData, docsData] = await Promise.all([
         api.getEmployeeById(employeeId),
         api.getMe().catch(() => null),
         api.getDesignations().catch(() => []),
         api.getDepartments().catch(() => []),
         api.getEmployees().catch(() => ({ data: [] })),
+        api.getEmployeeDocuments(employeeId).catch(() => []),
       ]);
       setEmployee(empData);
       setCurrentUser(meData);
       setDesignations(desigData || []);
       setDepartments(deptData || []);
       setAllEmployees(empsData?.data || []);
+      setDocuments(docsData || []);
     } catch (err: any) {
       setError(err?.message || 'Failed to load employee details');
     } finally {
@@ -474,6 +589,126 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
             </div>
           </div>
         </div>
+      </div>
+
+      {/* EMPLOYEE DOCUMENTS & OFFICIAL RECORDS */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '16px' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
+              Employee Documents & Official Records ({documents.length})
+            </h3>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0' }}>
+              Offer letters, appointment letters, identity cards, educational certificates, and employee uploads.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              setUploadDocError('');
+              setUploadDocFile(null);
+              setUploadDocBase64('');
+              setUploadDocName('');
+              setShowUploadDocModal(true);
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', padding: '8px 16px' }}
+          >
+            <Icons.Upload size={15} color="#ffffff" />
+            <span>Upload Document</span>
+          </button>
+        </div>
+
+        {loadingDocs ? (
+          <div style={{ textAlign: 'center', padding: '24px', color: '#64748b', fontSize: '13px' }}>
+            Loading documents...
+          </div>
+        ) : documents.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '30px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+            <p style={{ color: '#64748b', margin: '0 0 12px', fontSize: '13px' }}>No documents uploaded for this employee yet.</p>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                setUploadDocError('');
+                setShowUploadDocModal(true);
+              }}
+              style={{ fontSize: '12px' }}
+            >
+              + Upload Offer Letter or Document
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '12px' }}>
+            {documents.map((doc) => {
+              const meta = DOCUMENT_TYPE_LABELS[doc.documentType] || DOCUMENT_TYPE_LABELS.OTHER;
+              return (
+                <div
+                  key={doc.id}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <div style={{ padding: '8px', background: '#eff6ff', borderRadius: '6px', color: '#2563eb' }}>
+                      <Icons.FileText size={18} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {doc.fileName}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '4px' }}>
+                        <span className={`badge ${meta.badgeClass}`} style={{ fontSize: '10px' }}>
+                          {meta.label}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                          • {formatFileSize(doc.fileSize)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', borderTop: '1px solid #f1f5f9', paddingTop: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewDoc(doc)}
+                      className="btn btn-secondary"
+                      style={{ padding: '4px 8px', fontSize: '11px' }}
+                    >
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadDoc(doc)}
+                      className="btn btn-primary"
+                      style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Icons.Download size={12} color="#ffffff" />
+                      <span>Download</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteDoc(doc.id, doc.fileName)}
+                      style={{ padding: '4px 6px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: '4px', cursor: 'pointer' }}
+                      title="Delete Document"
+                    >
+                      <Icons.Trash size={12} color="#dc2626" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* EDIT POSITION & DESIGNATION MODAL */}
@@ -922,6 +1157,197 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
               </div>
             </form>
           </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Upload Document Modal */}
+      {showUploadDocModal && (
+        <Modal onClose={() => setShowUploadDocModal(false)}>
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(4px)',
+            padding: '20px',
+            boxSizing: 'border-box',
+          }}>
+            <div className="card" style={{ width: '480px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>
+                  Upload Document for {employee.firstName}
+                </h3>
+                <button
+                  onClick={() => setShowUploadDocModal(false)}
+                  style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#64748b' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {uploadDocError && (
+                <div style={{ padding: '10px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '13px', marginBottom: '14px' }}>
+                  {uploadDocError}
+                </div>
+              )}
+
+              <form onSubmit={handleUploadDocSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Document Type *
+                  </label>
+                  <select
+                    value={uploadDocType}
+                    onChange={(e) => setUploadDocType(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '13px' }}
+                  >
+                    <option value="OFFER_LETTER">Offer / Appointment Letter</option>
+                    <option value="EXPERIENCE_LETTER">Relieving / Experience Certificate</option>
+                    <option value="ID_PROOF">Identity Proof (Aadhaar / PAN / Passport)</option>
+                    <option value="EDUCATION_CERTIFICATE">Education / Degree Certificate</option>
+                    <option value="RESUME">Resume / Curriculum Vitae</option>
+                    <option value="OTHER">Other Official Document</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Document Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Official Offer Letter, Signed Appointment Letter"
+                    value={uploadDocName}
+                    onChange={(e) => setUploadDocName(e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Select File (PDF, PNG, JPG - Max 10MB) *
+                  </label>
+                  <input
+                    type="file"
+                    required
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                    onChange={handleDocFileChange}
+                    style={{ width: '100%', padding: '8px', border: '1px dashed #cbd5e1', borderRadius: '6px', fontSize: '13px', background: '#f8fafc', boxSizing: 'border-box' }}
+                  />
+                  {uploadDocFile && (
+                    <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '4px', fontWeight: 600 }}>
+                      Selected: {uploadDocFile.name} ({formatFileSize(uploadDocFile.size)})
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowUploadDocModal(false)}
+                    disabled={uploadingDoc}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={uploadingDoc || !uploadDocFile}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Icons.Upload size={14} color="#ffffff" />
+                    <span>{uploadingDoc ? 'Uploading...' : 'Upload Document'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Preview Document Modal */}
+      {previewDoc && (
+        <Modal onClose={() => setPreviewDoc(null)}>
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(4px)',
+            padding: '20px',
+            boxSizing: 'border-box',
+          }}>
+            <div className="card" style={{ width: '700px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px' }}>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>
+                    {previewDoc.fileName}
+                  </h3>
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>
+                    {DOCUMENT_TYPE_LABELS[previewDoc.documentType]?.label || previewDoc.documentType} • {formatFileSize(previewDoc.fileSize)}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => downloadDoc(previewDoc)}
+                    style={{ fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Icons.Download size={14} color="#ffffff" />
+                    <span>Download</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setPreviewDoc(null)}
+                    style={{ fontSize: '12px', padding: '6px 10px' }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'center', minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', borderRadius: '8px', padding: '10px' }}>
+                {previewDoc.fileUrl.startsWith('data:image/') || /\.(png|jpe?g|webp)$/i.test(previewDoc.fileName) ? (
+                  <img
+                    src={previewDoc.fileUrl}
+                    alt={previewDoc.fileName}
+                    style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: '4px' }}
+                  />
+                ) : previewDoc.fileUrl.startsWith('data:application/pdf') || previewDoc.fileName.toLowerCase().endsWith('.pdf') ? (
+                  <iframe
+                    src={previewDoc.fileUrl}
+                    title={previewDoc.fileName}
+                    style={{ width: '100%', height: '65vh', border: 'none', borderRadius: '4px' }}
+                  />
+                ) : (
+                  <div style={{ padding: '40px', color: '#64748b' }}>
+                    <Icons.FileText size={48} color="#94a3b8" />
+                    <p style={{ marginTop: '12px', fontSize: '14px', fontWeight: 600 }}>Preview not available for this file type</p>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => downloadDoc(previewDoc)}
+                      style={{ marginTop: '8px' }}
+                    >
+                      Download File to View
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </Modal>
       )}

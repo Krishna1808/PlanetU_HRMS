@@ -140,6 +140,21 @@ export const api = {
     });
   },
 
+  getEmployeeDocuments: (employeeId: string) =>
+    fetchJson<any[]>(`/employees/${employeeId}/documents`),
+  uploadEmployeeDocument: (
+    employeeId: string,
+    data: { documentType: string; fileName: string; fileUrl: string; fileSize?: number },
+  ) =>
+    fetchJson<any>(`/employees/${employeeId}/documents`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteEmployeeDocument: (employeeId: string, docId: string) =>
+    fetchJson<any>(`/employees/${employeeId}/documents/${docId}`, {
+      method: 'DELETE',
+    }),
+
   // 4. Module 3: Shifts
   getShifts: () => fetchJson<any[]>('/shifts'),
   assignShift: (data: { employeeId: string; shiftId: string; effectiveFrom: string; weeklyOffDays?: string[] }) =>
@@ -320,6 +335,21 @@ export const api = {
   getEssLeaves: () => fetchJson<any>('/ess/leaves'),
   getEssPayslips: () => fetchJson<any[]>('/ess/payslips'),
   getEssManagerPending: () => fetchJson<any[]>('/ess/manager/pending-actions'),
+  getEssDocuments: () => fetchJson<any[]>('/ess/documents'),
+  uploadEssDocument: (data: {
+    documentType: string;
+    fileName: string;
+    fileUrl: string;
+    fileSize?: number;
+  }) =>
+    fetchJson<any>('/ess/documents', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  deleteEssDocument: (docId: string) =>
+    fetchJson<any>(`/ess/documents/${docId}`, {
+      method: 'DELETE',
+    }),
 
   // 9. Module 8: Employee Onboarding
   getOnboardingCandidates: (status?: string, search?: string) => {
