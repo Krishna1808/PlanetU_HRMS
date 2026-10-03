@@ -15,6 +15,7 @@ import { OffboardingPage } from './components/OffboardingPage';
 import { ReportsPage } from './components/ReportsPage';
 import { OrganizationMastersPage } from './components/OrganizationMastersPage';
 import { NotificationBell } from './components/NotificationBell';
+import { GrievanceManagementPage } from './components/GrievanceManagementPage';
 import { Icons } from './components/Icons';
 
 type MainTab =
@@ -23,6 +24,7 @@ type MainTab =
   | 'organization'
   | 'onboarding'
   | 'offboarding'
+  | 'grievances'
   | 'shifts'
   | 'attendance'
   | 'leaves'
@@ -76,6 +78,13 @@ const ALL_TABS: NavTabItem[] = [
     icon: 'DoorExit',
     section: 'WORKFORCE',
     allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'FINANCE', 'MANAGER'],
+  },
+  {
+    key: 'grievances',
+    label: 'Grievance Redressal',
+    icon: 'Shield',
+    section: 'WORKFORCE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN'],
   },
   // 3. Time & Attendance
   {
@@ -741,6 +750,8 @@ export default function App() {
             {activeTab === 'payroll' && <PayrollPage user={user} />}
 
             {activeTab === 'offboarding' && <OffboardingPage user={user} />}
+
+            {activeTab === 'grievances' && <GrievanceManagementPage user={user} />}
 
             {activeTab === 'reports' && <ReportsPage user={user} />}
           </div>

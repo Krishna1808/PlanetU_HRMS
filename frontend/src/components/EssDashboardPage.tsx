@@ -50,7 +50,29 @@ export function EssDashboardPage() {
   const [calculatingPreview, setCalculatingPreview] = useState(false);
 
   // Subtabs navigation
-  const [essTab, setEssTab] = useState<'overview' | 'documents' | 'payslips'>('overview');
+  const [essTab, setEssTab] = useState<'overview' | 'documents' | 'payslips' | 'grievances'>('overview');
+
+  // Grievance module state
+  const [myGrievances, setMyGrievances] = useState<any[]>([]);
+  const [loadingGrievances, setLoadingGrievances] = useState(false);
+  const [showRaiseGrievanceModal, setShowRaiseGrievanceModal] = useState(false);
+  const [selectedGrievance, setSelectedGrievance] = useState<any | null>(null);
+
+  // Filing form
+  const [grvCategory, setGrvCategory] = useState('HARASSMENT_DISCRIMINATION');
+  const [grvPriority, setGrvPriority] = useState('MEDIUM');
+  const [grvSubject, setGrvSubject] = useState('');
+  const [grvDescription, setGrvDescription] = useState('');
+  const [grvIsAnonymous, setGrvIsAnonymous] = useState(false);
+  const [grvFile, setGrvFile] = useState<File | null>(null);
+  const [grvBase64, setGrvBase64] = useState('');
+  const [grvError, setGrvError] = useState('');
+  const [submittingGrievance, setSubmittingGrievance] = useState(false);
+
+  // Post-resolution feedback form
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackComments, setFeedbackComments] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   // Documents management state
   const [documents, setDocuments] = useState<any[]>([]);
@@ -183,11 +205,104 @@ export function EssDashboardPage() {
     }
   };
 
+  const loadGrievances = async () => {
+    try {
+      setLoadingGrievances(true);
+      const res = await api.getMyGrievances();
+      setMyGrievances(res || []);
+    } catch (err: any) {
+      console.error('Failed to load grievances:', err);
+    } finally {
+      setLoadingGrievances(false);
+    }
+  };
+
   useEffect(() => {
     loadDashboard();
     loadDocuments();
     loadPayslips();
+    loadGrievances();
   }, []);
+
+  const handleGrvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setGrvError('Attachment exceeds the 10 MB limit. Please select a smaller file.');
+      return;
+    }
+    setGrvFile(file);
+    setGrvError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      setGrvBase64(reader.result as string);
+    };
+    reader.onerror = () => {
+      setGrvError('Failed to read file content.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRaiseGrievanceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!grvSubject.trim() || !grvDescription.trim()) {
+      setGrvError('Please provide both subject and description.');
+      return;
+    }
+    try {
+      setSubmittingGrievance(true);
+      setGrvError('');
+      await api.submitGrievance({
+        category: grvCategory,
+        priority: grvPriority,
+        subject: grvSubject.trim(),
+        description: grvDescription.trim(),
+        isAnonymous: grvIsAnonymous,
+        attachmentUrl: grvBase64 || undefined,
+        attachmentName: grvFile?.name || undefined,
+      });
+      setShowRaiseGrievanceModal(false);
+      setGrvSubject('');
+      setGrvDescription('');
+      setGrvFile(null);
+      setGrvBase64('');
+      setGrvIsAnonymous(false);
+      await loadGrievances();
+    } catch (err: any) {
+      setGrvError(err.message || 'Failed to submit grievance');
+    } finally {
+      setSubmittingGrievance(false);
+    }
+  };
+
+  const openEssCaseDetails = async (id: string) => {
+    try {
+      const detail = await api.getGrievanceById(id);
+      setSelectedGrievance(detail);
+      setFeedbackRating(detail.satisfactionRating || 5);
+      setFeedbackComments(detail.feedbackComments || '');
+    } catch (err: any) {
+      alert(`Could not load grievance details: ${err.message}`);
+    }
+  };
+
+  const handleSubmitFeedback = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedGrievance) return;
+    try {
+      setSubmittingFeedback(true);
+      await api.submitGrievanceFeedback(selectedGrievance.id, {
+        satisfactionRating: Number(feedbackRating),
+        feedbackComments: feedbackComments.trim() || undefined,
+      });
+      await openEssCaseDetails(selectedGrievance.id);
+      await loadGrievances();
+    } catch (err: any) {
+      alert(`Failed to submit feedback: ${err.message}`);
+    } finally {
+      setSubmittingFeedback(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -464,6 +579,40 @@ export function EssDashboardPage() {
               fontWeight: 700,
             }}>
               {allPayslips.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setEssTab('grievances')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '8px',
+            border: 'none',
+            background: essTab === 'grievances' ? '#2563eb' : '#f1f5f9',
+            color: essTab === 'grievances' ? '#ffffff' : '#475569',
+            fontWeight: 600,
+            fontSize: '13px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.15s',
+          }}
+        >
+          <Icons.Shield size={16} color={essTab === 'grievances' ? '#ffffff' : '#64748b'} />
+          <span>My Grievances</span>
+          {myGrievances.length > 0 && (
+            <span style={{
+              background: essTab === 'grievances' ? 'rgba(255,255,255,0.3)' : '#cbd5e1',
+              color: essTab === 'grievances' ? '#ffffff' : '#1e293b',
+              padding: '2px 7px',
+              borderRadius: '10px',
+              fontSize: '11px',
+              fontWeight: 700,
+            }}>
+              {myGrievances.length}
             </span>
           )}
         </button>
@@ -1397,6 +1546,164 @@ export function EssDashboardPage() {
         </div>
       )}
 
+      {essTab === 'grievances' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Header & Safe Filing Action */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+            <div>
+              <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                My Grievances & Confidential Helpdesk
+              </h3>
+              <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0' }}>
+                Raise workplace issues safely with complete anti-retaliation protection and optional anonymous filing.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setGrvError('');
+                setGrvSubject('');
+                setGrvDescription('');
+                setGrvFile(null);
+                setGrvBase64('');
+                setGrvIsAnonymous(false);
+                setShowRaiseGrievanceModal(true);
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', fontSize: '13px' }}
+            >
+              <Icons.Shield size={16} color="#ffffff" />
+              <span>+ Raise Grievance / Concern</span>
+            </button>
+          </div>
+
+          {/* Safety & Anti-Retaliation Policy Card */}
+          <div style={{
+            background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)',
+            border: '1px solid #bbf7d0',
+            borderRadius: '10px',
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+          }}>
+            <div style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '8px',
+              background: '#dcfce7',
+              color: '#15803d',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <Icons.Shield size={24} color="#15803d" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ margin: '0 0 4px', fontSize: '14px', fontWeight: 700, color: '#166534' }}>
+                Zero-Tolerance Anti-Retaliation Guarantee & Confidential Safeguards
+              </h4>
+              <p style={{ margin: 0, fontSize: '12px', color: '#15803d', lineHeight: '1.5' }}>
+                PlanetU HRMS guarantees complete protection against adverse employment action when raising concerns in good faith. You can choose to report <strong>anonymously</strong> at any time to preserve full personal privacy.
+              </p>
+            </div>
+          </div>
+
+          {/* Grievances List */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {loadingGrievances ? (
+              <div style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
+                Loading your submitted grievances...
+              </div>
+            ) : myGrievances.length === 0 ? (
+              <div style={{ padding: '48px', textAlign: 'center', color: '#64748b' }}>
+                <Icons.Shield size={36} color="#94a3b8" style={{ marginBottom: '12px' }} />
+                <h4 style={{ margin: 0, fontSize: '16px', color: '#334155' }}>No Grievances Filed</h4>
+                <p style={{ margin: '6px 0 16px', fontSize: '13px' }}>
+                  You have not submitted any concerns or complaints.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setShowRaiseGrievanceModal(true)}
+                  style={{ fontSize: '13px', padding: '8px 18px' }}
+                >
+                  + Raise a Concern
+                </button>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+                      <th style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>TICKET #</th>
+                      <th style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>CATEGORY</th>
+                      <th style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>SUBJECT</th>
+                      <th style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>STATUS</th>
+                      <th style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 700, color: '#475569' }}>DATE SUBMITTED</th>
+                      <th style={{ padding: '12px 16px', fontSize: '12px', fontWeight: 700, color: '#475569', textAlign: 'right' }}>ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myGrievances.map((g) => {
+                      const isResolved = g.status === 'RESOLVED' || g.status === 'CLOSED';
+                      return (
+                        <tr key={g.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '14px 16px', fontWeight: 700, color: '#0f172a' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>{g.ticketNumber}</span>
+                              {g.isAnonymous && (
+                                <span title="Anonymous Filing" style={{ fontSize: '10px', background: '#f1f5f9', color: '#64748b', padding: '2px 5px', borderRadius: '3px' }}>
+                                  Anon
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+                              {g.category.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 16px', maxWidth: '300px' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {g.subject}
+                            </div>
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span className={`badge ${
+                              g.status === 'RESOLVED' || g.status === 'CLOSED' ? 'badge-active' :
+                              g.status === 'UNDER_INVESTIGATION' || g.status === 'ESCALATED' ? 'badge-role' :
+                              g.status === 'REJECTED' ? 'badge-inactive' : 'badge-role'
+                            }`}>
+                              {g.status.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 16px', fontSize: '12px', color: '#64748b' }}>
+                            {new Date(g.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </td>
+                          <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              onClick={() => openEssCaseDetails(g.id)}
+                              style={{ padding: '5px 12px', fontSize: '12px', fontWeight: 600 }}
+                            >
+                              {isResolved && !g.satisfactionRating ? '★ Review & Rate' : 'View Case'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Upload Document Modal */}
       {showUploadModal && (
         <Modal onClose={() => setShowUploadModal(false)}>
@@ -2092,7 +2399,397 @@ export function EssDashboardPage() {
           </div>
         </Modal>
       )}
+
+      {/* Raise Grievance Modal */}
+      {showRaiseGrievanceModal && (
+        <Modal onClose={() => setShowRaiseGrievanceModal(false)}>
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(4px)',
+            padding: '20px',
+            boxSizing: 'border-box',
+          }}>
+            <div className="card" style={{ width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Icons.Shield size={20} color="#2563eb" />
+                  <h3 style={{ fontSize: '17px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                    Raise Grievance or Workplace Concern
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRaiseGrievanceModal(false)}
+                  style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#64748b' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {grvError && (
+                <div style={{ padding: '10px 12px', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '6px', fontSize: '13px', marginBottom: '14px' }}>
+                  {grvError}
+                </div>
+              )}
+
+              <form onSubmit={handleRaiseGrievanceSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {/* Anonymous Checkbox Banner */}
+                <div style={{
+                  background: grvIsAnonymous ? '#eff6ff' : '#f8fafc',
+                  border: `1px solid ${grvIsAnonymous ? '#bfdbfe' : '#e2e8f0'}`,
+                  borderRadius: '8px',
+                  padding: '12px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                }}>
+                  <input
+                    type="checkbox"
+                    id="grvIsAnonymous"
+                    checked={grvIsAnonymous}
+                    onChange={(e) => setGrvIsAnonymous(e.target.checked)}
+                    style={{ marginTop: '3px' }}
+                  />
+                  <div>
+                    <label htmlFor="grvIsAnonymous" style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b', cursor: 'pointer', display: 'block' }}>
+                      Submit Anonymously (Complete Identity Protection)
+                    </label>
+                    <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>
+                      When checked, HR and committee members will only see "Anonymous Submitter". Your name and employee ID are strictly omitted from investigation screens.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                      Category *
+                    </label>
+                    <select
+                      value={grvCategory}
+                      onChange={(e) => setGrvCategory(e.target.value)}
+                      style={{ width: '100%', padding: '8px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    >
+                      <option value="HARASSMENT_DISCRIMINATION">POSH / Harassment & Discrimination</option>
+                      <option value="WORKPLACE_SAFETY">Workplace Safety & Hazard</option>
+                      <option value="COMPENSATION_PAYROLL">Compensation & Payroll</option>
+                      <option value="MANAGEMENT_LEADERSHIP">Management Conduct</option>
+                      <option value="POLICY_VIOLATION">Company Policy Violation</option>
+                      <option value="OTHER">Other / General Concern</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                      Urgency / Priority *
+                    </label>
+                    <select
+                      value={grvPriority}
+                      onChange={(e) => setGrvPriority(e.target.value)}
+                      style={{ width: '100%', padding: '8px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                    >
+                      <option value="LOW">Low (Standard discussion)</option>
+                      <option value="MEDIUM">Medium (Normal priority)</option>
+                      <option value="HIGH">High (Immediate attention)</option>
+                      <option value="URGENT">Urgent (Safety / Critical SLA)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Subject / Concern Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Brief summary of the issue..."
+                    value={grvSubject}
+                    onChange={(e) => setGrvSubject(e.target.value)}
+                    style={{ width: '100%', padding: '8px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Detailed Incident Report *
+                  </label>
+                  <textarea
+                    required
+                    rows={4}
+                    placeholder="Describe what occurred, dates, parties involved, and any relevant circumstances..."
+                    value={grvDescription}
+                    onChange={(e) => setGrvDescription(e.target.value)}
+                    style={{ width: '100%', padding: '8px', fontSize: '13px', border: '1px solid #cbd5e1', borderRadius: '4px', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '4px' }}>
+                    Attach Evidence / Document (Optional, Max 10 MB)
+                  </label>
+                  <input
+                    type="file"
+                    onChange={handleGrvFileChange}
+                    style={{ fontSize: '12px' }}
+                  />
+                  {grvFile && (
+                    <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '4px' }}>
+                      Selected: {grvFile.name} ({(grvFile.size / 1024).toFixed(1)} KB)
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowRaiseGrievanceModal(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={submittingGrievance}
+                  >
+                    {submittingGrievance ? 'Filing Ticket...' : 'Submit Grievance'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* View Grievance & Timeline Modal */}
+      {selectedGrievance && (
+        <Modal onClose={() => setSelectedGrievance(null)}>
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(4px)',
+            padding: '20px',
+            boxSizing: 'border-box',
+          }}>
+            <div className="card" style={{ width: '680px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #e2e8f0', paddingBottom: '14px', marginBottom: '16px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>
+                      Ticket {selectedGrievance.ticketNumber}
+                    </h3>
+                    <span className="badge badge-active">
+                      {selectedGrievance.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                    {selectedGrievance.category.replace(/_/g, ' ')} • Submitted {new Date(selectedGrievance.createdAt).toLocaleString('en-IN')}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedGrievance(null)}
+                  style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', color: '#64748b' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Subject & Description */}
+              <div style={{ marginBottom: '18px' }}>
+                <h4 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 700, color: '#1e293b' }}>
+                  {selectedGrievance.subject}
+                </h4>
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '12px',
+                  fontSize: '13px',
+                  color: '#334155',
+                  lineHeight: '1.5',
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  {selectedGrievance.description}
+                </div>
+
+                {selectedGrievance.attachmentUrl && (
+                  <div style={{ marginTop: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const a = document.createElement('a');
+                        a.href = selectedGrievance.attachmentUrl;
+                        a.download = selectedGrievance.attachmentName || 'evidence';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                      }}
+                      className="btn btn-secondary"
+                      style={{ fontSize: '12px', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Icons.Download size={14} />
+                      <span>{selectedGrievance.attachmentName || 'Download Uploaded Evidence'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Resolution Findings banner */}
+              {selectedGrievance.resolutionNotes && (
+                <div style={{
+                  background: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '8px',
+                  padding: '14px 16px',
+                  marginBottom: '18px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <Icons.Award size={18} color="#15803d" />
+                    <h5 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#166534' }}>
+                      Official Case Resolution
+                    </h5>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#15803d', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                    {selectedGrievance.resolutionNotes}
+                  </p>
+                  {selectedGrievance.resolvedAt && (
+                    <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '6px' }}>
+                      Concluded on {new Date(selectedGrievance.resolvedAt).toLocaleString('en-IN')}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Post-Resolution Satisfaction Rating Form */}
+              {(selectedGrievance.status === 'RESOLVED' || selectedGrievance.status === 'REJECTED' || selectedGrievance.status === 'CLOSED') && (
+                <div style={{
+                  background: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  marginBottom: '20px',
+                }}>
+                  <h5 style={{ margin: '0 0 8px', fontSize: '14px', fontWeight: 700, color: '#92400e' }}>
+                    Employee Closure Feedback
+                  </h5>
+
+                  {selectedGrievance.satisfactionRating ? (
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '18px', color: '#f59e0b', marginBottom: '4px' }}>
+                        {'★'.repeat(selectedGrievance.satisfactionRating)}
+                        {'☆'.repeat(5 - selectedGrievance.satisfactionRating)}
+                        <span style={{ fontSize: '13px', color: '#78350f', marginLeft: '6px', fontWeight: 700 }}>
+                          ({selectedGrievance.satisfactionRating} / 5 stars)
+                        </span>
+                      </div>
+                      {selectedGrievance.feedbackComments && (
+                        <p style={{ margin: 0, fontSize: '12px', color: '#92400e', fontStyle: 'italic' }}>
+                          "{selectedGrievance.feedbackComments}"
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSubmitFeedback} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <p style={{ margin: 0, fontSize: '12px', color: '#92400e' }}>
+                        How satisfied are you with the redressal and outcome of this case?
+                      </p>
+
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setFeedbackRating(star)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '24px',
+                              color: star <= feedbackRating ? '#f59e0b' : '#cbd5e1',
+                              padding: 0,
+                            }}
+                          >
+                            ★
+                          </button>
+                        ))}
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#78350f', marginLeft: '8px' }}>
+                          {feedbackRating} / 5 stars
+                        </span>
+                      </div>
+
+                      <textarea
+                        rows={2}
+                        placeholder="Optional remarks on how the process went..."
+                        value={feedbackComments}
+                        onChange={(e) => setFeedbackComments(e.target.value)}
+                        style={{ width: '100%', padding: '6px 8px', fontSize: '12px', border: '1px solid #fde68a', borderRadius: '4px', boxSizing: 'border-box' }}
+                      />
+
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={submittingFeedback}
+                        style={{ alignSelf: 'flex-start', background: '#d97706', borderColor: '#d97706', fontSize: '12px', padding: '6px 14px' }}
+                      >
+                        {submittingFeedback ? 'Submitting...' : 'Submit Feedback & Close Ticket'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {/* Chronological Timeline */}
+              <div>
+                <h5 style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+                  Investigation & Progress History
+                </h5>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {selectedGrievance.timelines?.map((item: any) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        padding: '10px 12px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700, fontSize: '12px', color: '#1e293b' }}>
+                          {item.actionTitle}
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                          {new Date(item.createdAt).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      {item.notes && (
+                        <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#475569', lineHeight: '1.4' }}>
+                          {item.notes}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
-
 }

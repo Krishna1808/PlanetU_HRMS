@@ -198,6 +198,7 @@ enum NotificationType {
   SHIFT_ASSIGNED
   CLEARANCE_TASK
   ANNOUNCEMENT
+  GRIEVANCE_UPDATE
   SYSTEM
 }
 
@@ -206,6 +207,31 @@ enum AnnouncementPriority {
   NORMAL
   HIGH
   URGENT
+}
+
+enum GrievanceCategory {
+  HARASSMENT_DISCRIMINATION
+  WORKPLACE_SAFETY
+  COMPENSATION_PAYROLL
+  MANAGEMENT_LEADERSHIP
+  POLICY_VIOLATION
+  OTHER
+}
+
+enum GrievancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum GrievanceStatus {
+  SUBMITTED
+  UNDER_INVESTIGATION
+  ESCALATED
+  RESOLVED
+  CLOSED
+  REJECTED
 }
 
 // ---------------------------------------------------------------------------
@@ -251,6 +277,8 @@ model Organization {
   notifications         Notification[]
   announcements         Announcement[]
   holidays              Holiday[]
+  grievances            Grievance[]
+  grievanceTimelines    GrievanceTimeline[]
 
   @@map("organizations")
 }
@@ -274,9 +302,13 @@ model User {
   // Relations
   organization          Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   employee              Employee?      @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  receivedNotifications Notification[] @relation("ReceivedNotifications")
-  sentNotifications     Notification[] @relation("SentNotifications")
-  createdAnnouncements  Announcement[] @relation("CreatedAnnouncements")
+  receivedNotifications    Notification[]      @relation("ReceivedNotifications")
+  sentNotifications        Notification[]      @relation("SentNotifications")
+  createdAnnouncements     Announcement[]      @relation("CreatedAnnouncements")
+  submittedGrievances      Grievance[]         @relation("SubmittedGrievances")
+  assignedGrievances       Grievance[]         @relation("AssignedGrievances")
+  resolvedGrievances       Grievance[]         @relation("ResolvedGrievances")
+  grievanceTimelineActions GrievanceTimeline[] @relation("GrievanceTimelineUser")
 
   @@unique([organizationId, email])
   @@index([organizationId, role])
@@ -453,6 +485,7 @@ model Employee {
   convertedFromCandidate      OnboardingCandidate?      @relation("CandidateConvertedEmployee")
   exitRequests                ExitRequest[]
   fnfSettlements              FnFSettlement[]
+  grievancesFiled             Grievance[]               @relation("EmployeeGrievances")
 
   @@unique([organizationId, employeeCode])
   @@index([organizationId, deletedAt])
@@ -1122,5 +1155,81 @@ model Holiday {
   @@unique([organizationId, date, name])
   @@index([organizationId, year])
   @@map("holidays")
+}
+
+// ---------------------------------------------------------------------------
+// 13. Grievance Redressal & Case Management
+// ---------------------------------------------------------------------------
+
+model Grievance {
+  id                 String            @id @default(uuid()) @db.Uuid
+  organizationId     String            @map("organization_id") @db.Uuid
+  ticketNumber       String            @map("ticket_number") // e.g. "GRV-2026-0001"
+  category           GrievanceCategory
+  priority           GrievancePriority @default(MEDIUM)
+  status             GrievanceStatus   @default(SUBMITTED)
+  subject            String
+  description        String            @db.Text
+  isAnonymous        Boolean           @default(false) @map("is_anonymous")
+  
+  // Submitter identity (nullable if anonymous)
+  employeeId         String?           @map("employee_id") @db.Uuid
+  submittedByUserId  String?           @map("submitted_by_user_id") @db.Uuid
+  
+  // Attachments / Evidence
+  attachmentUrl      String?           @map("attachment_url") @db.Text
+  attachmentName     String?           @map("attachment_name")
+
+  // Assigned Investigator
+  assignedToUserId   String?           @map("assigned_to_user_id") @db.Uuid
+  
+  // Resolution details
+  resolutionNotes    String?           @map("resolution_notes") @db.Text
+  resolvedByUserId   String?           @map("resolved_by_user_id") @db.Uuid
+  resolvedAt         DateTime?         @map("resolved_at")
+  
+  // Employee closure & feedback
+  satisfactionRating Int?              @map("satisfaction_rating") // 1 to 5 stars
+  feedbackComments   String?           @map("feedback_comments") @db.Text
+  closedAt           DateTime?         @map("closed_at")
+
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee           Employee?         @relation("EmployeeGrievances", fields: [employeeId], references: [id], onDelete: SetNull)
+  submittedByUser    User?             @relation("SubmittedGrievances", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+  assignedToUser     User?             @relation("AssignedGrievances", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  resolvedByUser     User?             @relation("ResolvedGrievances", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  timelines          GrievanceTimeline[]
+
+  @@unique([organizationId, ticketNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, category])
+  @@index([organizationId, employeeId])
+  @@index([assignedToUserId])
+  @@map("grievances")
+}
+
+model GrievanceTimeline {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  grievanceId    String           @map("grievance_id") @db.Uuid
+  actionByUserId String?          @map("action_by_user_id") @db.Uuid
+  previousStatus GrievanceStatus? @map("previous_status")
+  newStatus      GrievanceStatus? @map("new_status")
+  actionTitle    String           @map("action_title")
+  notes          String?          @db.Text
+  isInternalOnly Boolean          @default(false) @map("is_internal_only")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  grievance      Grievance        @relation(fields: [grievanceId], references: [id], onDelete: Cascade)
+  actionByUser   User?            @relation("GrievanceTimelineUser", fields: [actionByUserId], references: [id], onDelete: SetNull)
+
+  @@index([grievanceId, createdAt])
+  @@map("grievance_timelines")
 }
 

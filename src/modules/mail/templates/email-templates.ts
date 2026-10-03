@@ -49,6 +49,8 @@ function getBadgeStyle(type: string, metadata?: Record<string, any>): { bg: stri
     }
     case 'TEST_EMAIL':
       return { bg: '#f0fdf4', text: '#15803d', label: 'TEST CONNECTION' };
+    case 'GRIEVANCE_UPDATE':
+      return { bg: '#fef3c7', text: '#92400e', label: 'GRIEVANCE REDRESSAL' };
     default:
       return { bg: '#f8fafc', text: '#334155', label: 'NOTIFICATION' };
   }

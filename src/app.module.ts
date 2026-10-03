@@ -13,6 +13,7 @@ import { OffboardingModule } from './modules/offboarding/offboarding.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationModule } from './modules/notifications/notification.module';
 import { MailModule } from './modules/mail/mail.module';
+import { GrievanceModule } from './modules/grievance/grievance.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -32,6 +33,7 @@ import { AppService } from './app.service';
     ReportsModule,
     MailModule,
     NotificationModule,
+    GrievanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -533,5 +533,83 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ targetEmail }),
     }),
+
+  // 12. Grievance Redressal & Case Management
+  submitGrievance: (data: {
+    category: string;
+    priority?: string;
+    subject: string;
+    description: string;
+    isAnonymous?: boolean;
+    attachmentUrl?: string;
+    attachmentName?: string;
+  }) =>
+    fetchJson<any>('/grievance', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getMyGrievances: () => fetchJson<any[]>('/grievance/my'),
+
+  getGrievanceStats: () => fetchJson<any>('/grievance/stats'),
+
+  getAllGrievances: (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    category?: string;
+    priority?: string;
+    search?: string;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.append('page', String(params.page));
+    if (params?.limit) q.append('limit', String(params.limit));
+    if (params?.status) q.append('status', params.status);
+    if (params?.category) q.append('category', params.category);
+    if (params?.priority) q.append('priority', params.priority);
+    if (params?.search) q.append('search', params.search);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return fetchJson<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>(`/grievance${queryStr}`);
+  },
+
+  getGrievanceById: (id: string) => fetchJson<any>(`/grievance/${id}`),
+
+  updateGrievanceStatus: (id: string, data: {
+    status: string;
+    assignedToUserId?: string;
+    notes?: string;
+    isInternalOnly?: boolean;
+  }) =>
+    fetchJson<any>(`/grievance/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  addGrievanceTimelineNote: (id: string, data: {
+    notes: string;
+    isInternalOnly?: boolean;
+  }) =>
+    fetchJson<any>(`/grievance/${id}/timeline`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  resolveGrievance: (id: string, data: {
+    resolutionNotes: string;
+    status?: string;
+  }) =>
+    fetchJson<any>(`/grievance/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  submitGrievanceFeedback: (id: string, data: {
+    satisfactionRating: number;
+    feedbackComments?: string;
+  }) =>
+    fetchJson<any>(`/grievance/${id}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
