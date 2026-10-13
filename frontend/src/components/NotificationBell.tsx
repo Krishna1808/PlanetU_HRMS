@@ -10,18 +10,13 @@ interface NotificationBellProps {
 
 export function NotificationBell({ user, onNavigateTab }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<'notifications' | 'announcements' | 'emailTest'>('notifications');
+  const [activeSubTab, setActiveSubTab] = useState<'notifications' | 'announcements'>('notifications');
   const [notifications, setNotifications] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [filterUnreadOnly, setFilterUnreadOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Email Test state
-  const [testEmailAddress, setTestEmailAddress] = useState(user?.email || '');
-  const [sendingEmail, setSendingEmail] = useState(false);
-  const [testEmailResult, setTestEmailResult] = useState<{ success: boolean; message: string; mode?: string } | null>(null);
 
   // Announcement compose form state (Admin / HR / Manager / Dept Head)
   const [departments, setDepartments] = useState<any[]>([]);
@@ -94,35 +89,6 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
       api.getDepartments().then(setDepartments).catch(() => {});
     }
   }, [canPublish]);
-
-  // Sync logged in user email to test form
-  useEffect(() => {
-    if (user?.email && !testEmailAddress) {
-      setTestEmailAddress(user.email);
-    }
-  }, [user]);
-
-  const handleSendTestEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!testEmailAddress.trim()) return;
-    setSendingEmail(true);
-    setTestEmailResult(null);
-    try {
-      const res = await api.sendTestEmail(testEmailAddress.trim());
-      setTestEmailResult({
-        success: res.success,
-        message: res.message,
-        mode: res.details?.mode,
-      });
-    } catch (err: any) {
-      setTestEmailResult({
-        success: false,
-        message: err.message || 'Failed to dispatch test email',
-      });
-    } finally {
-      setSendingEmail(false);
-    }
-  };
 
   // Load data when opening drawer or changing subtab/filter
   useEffect(() => {
@@ -476,27 +442,6 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                   {announcements.filter((a) => a.isActive).length}
                 </span>
               )}
-            </button>
-
-            <button
-              onClick={() => setActiveSubTab('emailTest')}
-              style={{
-                flex: 1,
-                padding: '12px 8px',
-                border: 'none',
-                background: 'none',
-                borderBottom: activeSubTab === 'emailTest' ? '2px solid #2563eb' : '2px solid transparent',
-                color: activeSubTab === 'emailTest' ? '#2563eb' : '#64748b',
-                fontWeight: activeSubTab === 'emailTest' ? 700 : 500,
-                fontSize: '13px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-              }}
-            >
-              <span>Email Diagnostics</span>
             </button>
           </div>
 
@@ -993,165 +938,6 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
                       </div>
                     </div>
                   ))}
-                </div>
-              </div>
-            )}
-
-            {/* SUBTAB 3: LIVE EMAIL DISPATCH TESTER */}
-            {activeSubTab === 'emailTest' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div
-                  style={{
-                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '10px',
-                    padding: '16px',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <Icons.Shield size={18} color="#2563eb" />
-                    <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
-                      Live Email Engine
-                    </h4>
-                  </div>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#64748b', lineHeight: 1.5 }}>
-                    Test real-time delivery to your actual inbox powered by BullMQ background queues &amp; Redis.
-                  </p>
-                </div>
-
-                <form onSubmit={handleSendTestEmail} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: '#334155',
-                        marginBottom: '6px',
-                      }}
-                    >
-                      Target Email Address:
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={testEmailAddress}
-                      onChange={(e) => setTestEmailAddress(e.target.value)}
-                      placeholder="your.email@gmail.com"
-                      style={{
-                        width: '100%',
-                        padding: '10px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '13px',
-                        boxSizing: 'border-box',
-                        outline: 'none',
-                      }}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={sendingEmail}
-                    style={{
-                      padding: '11px 16px',
-                      background: sendingEmail
-                        ? '#94a3b8'
-                        : 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontWeight: 600,
-                      fontSize: '13px',
-                      cursor: sendingEmail ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: '0 2px 4px rgba(79, 70, 229, 0.2)',
-                    }}
-                  >
-                    {sendingEmail ? (
-                      <>
-                        
-                        <span>Dispatching Live Email...</span>
-                      </>
-                    ) : (
-                      <>
-                        
-                        <span>Send Live Test Email</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-
-                {testEmailResult && (
-                  <div
-                    style={{
-                      padding: '12px 14px',
-                      borderRadius: '8px',
-                      border: testEmailResult.success
-                        ? testEmailResult.mode === 'live_smtp'
-                          ? '1px solid #86efac'
-                          : '1px solid #93c5fd'
-                        : '1px solid #fca5a5',
-                      background: testEmailResult.success
-                        ? testEmailResult.mode === 'live_smtp'
-                          ? '#f0fdf4'
-                          : '#eff6ff'
-                        : '#fef2f2',
-                      fontSize: '12px',
-                      lineHeight: 1.5,
-                      color: testEmailResult.success
-                        ? testEmailResult.mode === 'live_smtp'
-                          ? '#166534'
-                          : '#1e40af'
-                        : '#991b1b',
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        marginBottom: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                      }}
-                    >
-                      {testEmailResult.success
-                        ? testEmailResult.mode === 'live_smtp'
-                          ? 'Delivered to Live Inbox'
-                          : 'ℹ️ Local Simulation Mode'
-                        : 'Delivery Failed'}
-                    </div>
-                    <div>{testEmailResult.message}</div>
-                  </div>
-                )}
-
-                {/* Configuration status tip */}
-                <div
-                  style={{
-                    padding: '14px',
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '11px',
-                    color: '#475569',
-                    lineHeight: 1.6,
-                  }}
-                >
-                  <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: '6px' }}>
-                    Email Engine Providers:
-                  </div>
-                  <div>
-                    • <strong>Resend:</strong> In <code>.env</code>, set <code>SMTP_USER="resend"</code> &amp; <code>SMTP_PASS="re_..."</code>
-                  </div>
-                  <div>
-                    • <strong>Gmail:</strong> In <code>.env</code>, set <code>SMTP_USER="you@gmail.com"</code> &amp; <code>SMTP_PASS="16-char-app-pass"</code>
-                  </div>
-                  <div style={{ marginTop: '6px', color: '#64748b' }}>
-                    Every real HR action (leave approvals, payslips, circulars) will automatically dispatch to employees in real time!
-                  </div>
                 </div>
               </div>
             )}
