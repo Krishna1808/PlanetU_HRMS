@@ -41,6 +41,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
   const [payrollData, setPayrollData] = useState<any>(null);
   const [lifecycleData, setLifecycleData] = useState<any>(null);
 
+  const isManager = user?.role === 'MANAGER';
   const canSeePayroll =
     user.role === 'CLIENT_SUPER_ADMIN' ||
     user.role === 'HR_ADMIN' ||
@@ -156,26 +157,42 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
             activeTab === 'exports') && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Dept:</span>
-              <select
-                value={selectedDepartmentId}
-                onChange={(e) => setSelectedDepartmentId(e.target.value)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
-                  fontSize: '13px',
-                  background: '#ffffff',
-                  fontWeight: 500,
-                  color: '#0f172a',
-                }}
-              >
-                <option value="">All Departments</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+              {isManager ? (
+                <span
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    background: '#f8fafc',
+                    fontWeight: 600,
+                    color: '#1e293b',
+                  }}
+                >
+                  {overviewData?.departmentName || user?.department?.name || 'My Department'}
+                </span>
+              ) : (
+                <select
+                  value={selectedDepartmentId}
+                  onChange={(e) => setSelectedDepartmentId(e.target.value)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '13px',
+                    background: '#ffffff',
+                    fontWeight: 500,
+                    color: '#0f172a',
+                  }}
+                >
+                  <option value="">All Departments</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
 
@@ -242,7 +259,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
         }}
       >
         {[
-          { key: 'overview', label: 'Executive Overview', icon: Icons.BarChart },
+          { key: 'overview', label: isManager ? 'Department Overview' : 'Executive Overview', icon: Icons.BarChart },
           { key: 'workforce', label: 'Workforce Demographics', icon: Icons.Users },
           { key: 'attendance', label: 'Attendance Patterns', icon: Icons.Clock },
           { key: 'leaves', label: 'Leave Utilization', icon: Icons.Calendar },
@@ -325,7 +342,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
               >
                 <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                    Active Headcount
+                    {overviewData.isDepartmentScoped ? `${overviewData.departmentName || 'Department'} Headcount` : 'Active Headcount'}
                   </div>
                   <div style={{ fontSize: '32px', fontWeight: 900, color: '#0f172a', margin: '6px 0' }}>
                     {overviewData.activeHeadcount}
@@ -339,7 +356,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                 <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                      Today's Presence
+                      {overviewData.isDepartmentScoped ? 'Department Presence' : "Today's Presence"}
                     </div>
                     <div style={{ fontSize: '30px', fontWeight: 900, color: '#2563eb', margin: '4px 0' }}>
                       {overviewData.presenceRate}%
@@ -372,7 +389,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
 
                 <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                    Pending Approvals
+                    {overviewData.isDepartmentScoped ? 'Team Pending Approvals' : 'Pending Approvals'}
                   </div>
                   <div style={{ fontSize: '32px', fontWeight: 900, color: '#f59e0b', margin: '6px 0' }}>
                     {overviewData.pendingApprovals.total}
