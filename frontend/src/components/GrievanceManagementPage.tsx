@@ -3,6 +3,7 @@ import { api } from '../api';
 import { Modal } from './Modal';
 import { Icons } from './Icons';
 import { DonutChart } from './ReportCharts';
+import { showToast } from './Toast';
 
 interface GrievanceManagementPageProps {
   user: any;
@@ -113,7 +114,7 @@ export const GrievanceManagementPage: React.FC<GrievanceManagementPageProps> = (
       setShowResolutionForm(false);
       setResolutionNotes('');
     } catch (err: any) {
-      alert(`Could not load case details: ${err.message}`);
+      showToast.error(`Could not load case details: ${err.message}`);
     }
   };
 
@@ -128,14 +129,16 @@ export const GrievanceManagementPage: React.FC<GrievanceManagementPageProps> = (
         notes: updateNotes.trim() || undefined,
         isInternalOnly: updateIsInternal,
       });
-      setSuccessMsg(`Ticket ${selectedCase.ticketNumber} updated to ${updateStatus.replace(/_/g, ' ')}`);
+      const successText = `Ticket ${selectedCase.ticketNumber} updated to ${updateStatus.replace(/_/g, ' ')}`;
+      setSuccessMsg(successText);
+      showToast.success(successText);
       // Reload details and list
       await openCaseDetails(selectedCase.id);
       await fetchGrievances();
       await fetchStats();
       setUpdateNotes('');
     } catch (err: any) {
-      alert(err.message || 'Failed to update status');
+      showToast.error(err.message || 'Failed to update status');
     } finally {
       setUpdatingStatus(false);
     }
@@ -150,10 +153,11 @@ export const GrievanceManagementPage: React.FC<GrievanceManagementPageProps> = (
         notes: noteContent.trim(),
         isInternalOnly: noteIsInternal,
       });
+      showToast.success('Timeline note logged successfully');
       setNoteContent('');
       await openCaseDetails(selectedCase.id);
     } catch (err: any) {
-      alert(err.message || 'Failed to log note');
+      showToast.error(err.message || 'Failed to log note');
     } finally {
       setAddingNote(false);
     }
@@ -168,14 +172,16 @@ export const GrievanceManagementPage: React.FC<GrievanceManagementPageProps> = (
         resolutionNotes: resolutionNotes.trim(),
         status: resolutionStatus,
       });
-      setSuccessMsg(`Ticket ${selectedCase.ticketNumber} marked as ${resolutionStatus}. Notification sent.`);
+      const resolvedMsg = `Ticket ${selectedCase.ticketNumber} marked as ${resolutionStatus}. Notification sent.`;
+      setSuccessMsg(resolvedMsg);
+      showToast.success(resolvedMsg);
       setShowResolutionForm(false);
       setResolutionNotes('');
       await openCaseDetails(selectedCase.id);
       await fetchGrievances();
       await fetchStats();
     } catch (err: any) {
-      alert(err.message || 'Failed to resolve grievance');
+      showToast.error(err.message || 'Failed to resolve grievance');
     } finally {
       setResolvingCase(false);
     }

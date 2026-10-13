@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
 import { DonutChart } from './ReportCharts';
+import { showToast, showConfirm } from './Toast';
 
 export function LeavesPage({ user }: { user: any }) {
   const [balances, setBalances] = useState<any[]>([]);
@@ -139,7 +140,7 @@ export function LeavesPage({ user }: { user: any }) {
         setAllocLeaveTypeId(leaveTypes[0].id);
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to fetch departments/employees list');
+      showToast.error(err.message || 'Failed to fetch departments/employees list');
     } finally {
       setLoadingMasters(false);
     }
@@ -157,12 +158,12 @@ export function LeavesPage({ user }: { user: any }) {
         halfDaySession: isHalfDay ? halfDaySession : undefined,
         reason,
       });
-      alert('Leave applied successfully!');
+      showToast.success('Leave applied successfully!');
       setShowApplyModal(false);
       setReason('');
       await loadLeaves();
     } catch (err: any) {
-      alert(err.message || 'Failed to apply leave');
+      showToast.error(err.message || 'Failed to apply leave');
     } finally {
       setSubmitting(false);
     }
@@ -182,7 +183,7 @@ export function LeavesPage({ user }: { user: any }) {
         carryForwardLimit: Number(policyCarryForward),
         requiresApproval: policyRequiresApproval,
       });
-      alert(`Leave policy '${policyName}' created successfully!`);
+      showToast.success(`Leave policy '${policyName}' created successfully!`);
       setShowAddPolicyModal(false);
       setPolicyName('');
       setPolicyCode('');
@@ -193,7 +194,7 @@ export function LeavesPage({ user }: { user: any }) {
       setPolicyCarryForward(0);
       await loadLeaves();
     } catch (err: any) {
-      alert(err.message || 'Failed to create leave policy');
+      showToast.error(err.message || 'Failed to create leave policy');
     } finally {
       setSubmittingPolicy(false);
     }
@@ -202,15 +203,15 @@ export function LeavesPage({ user }: { user: any }) {
   const handleAllocateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!allocLeaveTypeId) {
-      alert('Please select a leave policy');
+      showToast.warning('Please select a leave policy');
       return;
     }
     if (!allocDays || isNaN(Number(allocDays))) {
-      alert('Please specify a valid number of days');
+      showToast.warning('Please specify a valid number of days');
       return;
     }
     if (!allocReason.trim()) {
-      alert('Please provide a reason for allocating leaves');
+      showToast.warning('Please provide a reason for allocating leaves');
       return;
     }
 
@@ -218,7 +219,7 @@ export function LeavesPage({ user }: { user: any }) {
       setSubmittingAllocate(true);
       if (allocateTarget === 'DEPARTMENT') {
         if (!allocDepartmentId) {
-          alert('Please select a department');
+          showToast.warning('Please select a department');
           return;
         }
         const res = await api.allocateDepartmentLeaves({
@@ -227,12 +228,12 @@ export function LeavesPage({ user }: { user: any }) {
           days: Number(allocDays),
           reason: allocReason.trim(),
         });
-        alert(
-          `Success: Allocated ${res.daysPerEmployee} day(s) to ${res.allocatedCount} active employee(s) in department '${res.departmentName}'.`
+        showToast.success(
+          `Allocated ${res.daysPerEmployee} day(s) to ${res.allocatedCount} active employee(s) in department '${res.departmentName}'.`
         );
       } else {
         if (!allocEmployeeId) {
-          alert('Please select an employee');
+          showToast.warning('Please select an employee');
           return;
         }
         const res = await api.adjustLeaveBalance({
@@ -241,8 +242,8 @@ export function LeavesPage({ user }: { user: any }) {
           days: Number(allocDays),
           reason: allocReason.trim(),
         });
-        alert(
-          `Success: Adjusted leave balance. New balance is ${res.currentBalance} day(s).`
+        showToast.success(
+          `Adjusted leave balance. New balance is ${res.currentBalance} day(s).`
         );
       }
 
@@ -250,19 +251,26 @@ export function LeavesPage({ user }: { user: any }) {
       setAllocReason('');
       await loadLeaves();
     } catch (err: any) {
-      alert(err.message || 'Failed to allocate/adjust leaves');
+      showToast.error(err.message || 'Failed to allocate/adjust leaves');
     } finally {
       setSubmittingAllocate(false);
     }
   };
 
   const handleCancel = async (id: string) => {
-    if (!confirm('Are you sure you want to cancel this leave application?')) return;
+    const confirmed = await showConfirm({
+      title: 'Cancel Leave Application',
+      message: 'Are you sure you want to cancel this leave application?',
+      confirmText: 'Yes, Cancel',
+      isDanger: true,
+    });
+    if (!confirmed) return;
     try {
       await api.cancelLeave(id);
+      showToast.success('Leave application cancelled');
       await loadLeaves();
     } catch (err: any) {
-      alert(err.message || 'Failed to cancel leave');
+      showToast.error(err.message || 'Failed to cancel leave');
     }
   };
 
@@ -275,10 +283,10 @@ export function LeavesPage({ user }: { user: any }) {
     }
     try {
       await api.actionLeave(id, action, reasonPrompt);
-      alert(`Leave request successfully ${action === 'APPROVE' ? 'approved' : 'rejected'}!`);
+      showToast.success(`Leave request successfully ${action === 'APPROVE' ? 'approved' : 'rejected'}!`);
       await loadLeaves();
     } catch (err: any) {
-      alert(err.message || `Failed to ${action.toLowerCase()} leave`);
+      showToast.error(err.message || `Failed to ${action.toLowerCase()} leave`);
     }
   };
 

@@ -3,6 +3,7 @@ import { api } from '../api';
 import { Modal } from './Modal';
 import { Icons } from './Icons';
 import { DonutChart } from './ReportCharts';
+import { showToast, showConfirm } from './Toast';
 
 export function OrganizationMastersPage() {
   const [activeTab, setActiveTab] = useState<
@@ -193,15 +194,22 @@ export function OrganizationMastersPage() {
   };
 
   const handleDeleteHoliday = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to remove "${name}" from the holiday calendar?`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Remove Holiday',
+      message: `Are you sure you want to remove "${name}" from the holiday calendar?`,
+      confirmText: 'Remove Holiday',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
     try {
       await api.deleteHoliday(id);
+      showToast.success(`Holiday "${name}" removed from calendar.`);
       setSuccessMsg(`Holiday "${name}" removed from calendar.`);
       await loadHolidays();
       setTimeout(() => setSuccessMsg(''), 4000);
     } catch (err: any) {
+      showToast.error(err?.message || 'Failed to delete holiday');
       setError(err?.message || 'Failed to delete holiday');
     }
   };

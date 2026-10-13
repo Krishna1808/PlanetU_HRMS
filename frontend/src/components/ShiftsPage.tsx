@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
 import { DonutChart } from './ReportCharts';
+import { showToast } from './Toast';
 
 export function ShiftsPage() {
   const [shifts, setShifts] = useState<any[]>([]);
@@ -46,7 +47,7 @@ export function ShiftsPage() {
     const sId = selectedShiftId || (shifts.length > 0 ? shifts[0].id : '');
 
     if (!empId || !sId) {
-      alert('Please select both an employee and a shift template.');
+      showToast.warning('Please select both an employee and a shift template.');
       return;
     }
 
@@ -58,10 +59,10 @@ export function ShiftsPage() {
         effectiveFrom: new Date(effectiveFrom).toISOString(),
         weeklyOffDays: weeklyOffs,
       });
-      alert('Shift assigned successfully!');
+      showToast.success('Shift assigned successfully!');
       setShowAssignModal(false);
     } catch (err: any) {
-      alert(err.message || 'Failed to assign shift');
+      showToast.error(err.message || 'Failed to assign shift');
     } finally {
       setSubmitting(false);
     }

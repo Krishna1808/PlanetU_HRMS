@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { api } from '../api';
 import { Icons } from './Icons';
+import { showToast, showConfirm } from './Toast';
 
 interface NotificationBellProps {
   user: any;
@@ -194,24 +195,32 @@ export function NotificationBell({ user, onNavigateTab }: NotificationBellProps)
       setNewDeptId('');
       setNewDurationHours(24);
       setShowCompose(false);
+      showToast.success('Announcement published successfully!');
       fetchAnnouncements();
       fetchUnreadCount();
     } catch (err: any) {
-      alert(err.message || 'Failed to publish announcement');
+      showToast.error(err.message || 'Failed to publish announcement');
     } finally {
       setPublishing(false);
     }
   };
 
   const handleDeactivateAnnouncement = async (id: string) => {
-    if (!confirm('Are you sure you want to deactivate this announcement?')) return;
+    const confirmed = await showConfirm({
+      title: 'Deactivate Announcement',
+      message: 'Are you sure you want to deactivate this announcement?',
+      confirmText: 'Deactivate',
+      isDanger: true,
+    });
+    if (!confirmed) return;
     try {
       await api.deactivateAnnouncement(id);
+      showToast.success('Announcement deactivated');
       setAnnouncements((prev) =>
         prev.map((a) => (a.id === id ? { ...a, isActive: false } : a)),
       );
     } catch (err: any) {
-      alert(err.message || 'Failed to deactivate');
+      showToast.error(err.message || 'Failed to deactivate');
     }
   };
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { CircularGauge } from './ReportCharts';
+import { showToast } from './Toast';
 
 export function AttendancePage({ user }: { user?: any } = {}) {
   const [todayState, setTodayState] = useState<any>(null);
@@ -56,13 +57,15 @@ export function AttendancePage({ user }: { user?: any } = {}) {
       setActionLoading(true);
       if (type === 'in') {
         await api.checkIn(remarks || undefined);
+        showToast.success('Check-in recorded successfully!');
       } else {
         await api.checkOut(remarks || undefined);
+        showToast.success('Check-out recorded successfully!');
       }
       setRemarks('');
       await loadAttendance();
     } catch (err: any) {
-      alert(err.message || `Check-${type} failed`);
+      showToast.error(err.message || `Check-${type} failed`);
     } finally {
       setActionLoading(false);
     }
@@ -74,8 +77,9 @@ export function AttendancePage({ user }: { user?: any } = {}) {
       setCalcLoading(true);
       const res = await api.getPayableDays(queryEmpId, Number(queryYear), Number(queryMonth));
       setPayableDaysResult(res);
+      showToast.success('Payable days calculated successfully!');
     } catch (err: any) {
-      alert(err.message || 'Failed to calculate payable days');
+      showToast.error(err.message || 'Failed to calculate payable days');
     } finally {
       setCalcLoading(false);
     }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
 import { Icons } from './Icons';
+import { showToast, showConfirm } from './Toast';
 
 const DOCUMENT_TYPE_LABELS: Record<string, { label: string; badgeClass: string; color: string }> = {
   OFFER_LETTER: { label: 'Offer / Appointment Letter', badgeClass: 'badge-role', color: '#2563eb' },
@@ -140,7 +141,7 @@ export function EssDashboardPage() {
   const handleApplyLeaveSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!applyTypeId) {
-      alert('Please select a leave type');
+      showToast.warning('Please select a leave type');
       return;
     }
     try {
@@ -153,12 +154,12 @@ export function EssDashboardPage() {
         halfDaySession: applyHalfDay ? applyHalfDaySession : undefined,
         reason: applyReason,
       });
-      alert('Leave application submitted successfully!');
+      showToast.success('Leave application submitted successfully!');
       setShowApplyModal(false);
       setApplyReason('');
       await loadDashboard();
     } catch (err: any) {
-      alert(err.message || 'Failed to submit leave application');
+      showToast.error(err.message || 'Failed to submit leave application');
     } finally {
       setApplyingLeave(false);
     }
@@ -282,7 +283,7 @@ export function EssDashboardPage() {
       setFeedbackRating(detail.satisfactionRating || 5);
       setFeedbackComments(detail.feedbackComments || '');
     } catch (err: any) {
-      alert(`Could not load grievance details: ${err.message}`);
+      showToast.error(`Could not load grievance details: ${err.message}`);
     }
   };
 
@@ -295,10 +296,11 @@ export function EssDashboardPage() {
         satisfactionRating: Number(feedbackRating),
         feedbackComments: feedbackComments.trim() || undefined,
       });
+      showToast.success('Feedback submitted successfully!');
       await openEssCaseDetails(selectedGrievance.id);
       await loadGrievances();
     } catch (err: any) {
-      alert(`Failed to submit feedback: ${err.message}`);
+      showToast.error(`Failed to submit feedback: ${err.message}`);
     } finally {
       setSubmittingFeedback(false);
     }
@@ -355,12 +357,19 @@ export function EssDashboardPage() {
   };
 
   const handleDeleteDocument = async (docId: string, docName: string) => {
-    if (!confirm(`Are you sure you want to delete "${docName}"?`)) return;
+    const confirmed = await showConfirm({
+      title: 'Delete Document',
+      message: `Are you sure you want to delete "${docName}"?`,
+      confirmText: 'Delete Document',
+      isDanger: true,
+    });
+    if (!confirmed) return;
     try {
       await api.deleteEssDocument(docId);
+      showToast.success(`Document "${docName}" deleted successfully`);
       await loadDocuments();
     } catch (err: any) {
-      alert(err?.message || 'Failed to delete document');
+      showToast.error(err?.message || 'Failed to delete document');
     }
   };
 
@@ -381,8 +390,9 @@ export function EssDashboardPage() {
     try {
       setDownloadingPdfId(payslipId);
       await api.downloadPayslipPdf(payslipId, `Payslip-${month}-${year}.pdf`);
+      showToast.success(`Payslip for ${month}/${year} downloaded`);
     } catch (err: any) {
-      alert(err?.message || 'Failed to download payslip PDF');
+      showToast.error(err?.message || 'Failed to download payslip PDF');
     } finally {
       setDownloadingPdfId(null);
     }
@@ -392,10 +402,11 @@ export function EssDashboardPage() {
     try {
       setActionLoading(true);
       await api.checkIn(remarks || undefined);
+      showToast.success('Web Check-in recorded successfully!');
       setRemarks('');
       await loadDashboard();
     } catch (err: any) {
-      alert(err.message || 'Check-in failed');
+      showToast.error(err.message || 'Check-in failed');
     } finally {
       setActionLoading(false);
     }
@@ -405,10 +416,11 @@ export function EssDashboardPage() {
     try {
       setActionLoading(true);
       await api.checkOut(remarks || undefined);
+      showToast.success('Web Check-out recorded successfully!');
       setRemarks('');
       await loadDashboard();
     } catch (err: any) {
-      alert(err.message || 'Check-out failed');
+      showToast.error(err.message || 'Check-out failed');
     } finally {
       setActionLoading(false);
     }
@@ -428,13 +440,14 @@ export function EssDashboardPage() {
         emergencyContactRelation: editEmergencyRelation || undefined,
       });
       setEditMessage('Profile updated successfully!');
+      showToast.success('Profile updated successfully!');
       setTimeout(() => {
         setShowEditModal(false);
         setEditMessage('');
         loadDashboard();
       }, 1200);
     } catch (err: any) {
-      alert(err.message || 'Profile update failed');
+      showToast.error(err.message || 'Profile update failed');
     } finally {
       setActionLoading(false);
     }

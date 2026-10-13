@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
 import { DonutChart, CircularGauge } from './ReportCharts';
+import { showToast, showConfirm } from './Toast';
 
 interface OffboardingPageProps {
   user: any;
@@ -181,18 +182,21 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
   };
 
   const handleFinalizeExit = async (req: any) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to finalize the exit for ${req.employee?.firstName} ${req.employee?.lastName} (${req.employee?.employeeCode})? This will deactivate their login and mark their status as RESIGNED.`
-      )
-    ) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Finalize Employee Exit',
+      message: `Are you sure you want to finalize the exit for ${req.employee?.firstName} ${req.employee?.lastName} (${req.employee?.employeeCode})? This will deactivate their login and mark their status as RESIGNED.`,
+      confirmText: 'Finalize Exit',
+      isDanger: true,
+    });
+    if (!confirmed) return;
+
     try {
       const res = await api.finalizeExit(req.id);
+      showToast.success(res.message || 'Employee exit finalized successfully');
       setSuccessMsg(res.message || 'Employee exit finalized successfully');
       loadRequests();
     } catch (err: any) {
+      showToast.error(err.message || 'Failed to finalize exit');
       setErrorMsg(err.message || 'Failed to finalize exit');
     }
   };

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
 import { DonutChart } from './ReportCharts';
+import { showToast, showConfirm } from './Toast';
 
 export function PayrollPage({ user }: { user: any }) {
   const [config, setConfig] = useState<any>(null);
@@ -78,7 +79,7 @@ export function PayrollPage({ user }: { user: any }) {
       const details = await api.getBatchById(id);
       setSelectedBatch(details);
     } catch (err: any) {
-      alert(err.message || 'Failed to load batch details');
+      showToast.error(err.message || 'Failed to load batch details');
     }
   };
 
@@ -90,11 +91,11 @@ export function PayrollPage({ user }: { user: any }) {
     try {
       setCalcLoading(true);
       const batch = await api.calculateBatch(Number(calcYear), Number(calcMonth));
-      alert(`Payroll batch for ${calcMonth}/${calcYear} calculated successfully as DRAFT!`);
+      showToast.success(`Payroll batch for ${calcMonth}/${calcYear} calculated successfully as DRAFT!`);
       await loadData();
       setSelectedBatch(batch);
     } catch (err: any) {
-      alert(err.message || 'Failed to calculate payroll batch');
+      showToast.error(err.message || 'Failed to calculate payroll batch');
     } finally {
       setCalcLoading(false);
     }
@@ -102,14 +103,20 @@ export function PayrollPage({ user }: { user: any }) {
 
   const handleLockBatch = async () => {
     if (!selectedBatch) return;
-    if (!confirm(`Are you sure you want to LOCK batch ${selectedBatch.month}/${selectedBatch.year}? This freezes all calculations and makes it immutable.`)) return;
+    const confirmed = await showConfirm({
+      title: 'Lock Payroll Batch',
+      message: `Are you sure you want to LOCK batch ${selectedBatch.month}/${selectedBatch.year}? This freezes all calculations and makes it immutable.`,
+      confirmText: 'Lock Batch',
+      isDanger: true,
+    });
+    if (!confirmed) return;
     try {
       await api.lockBatch(selectedBatch.id);
-      alert('Batch locked successfully!');
+      showToast.success('Batch locked successfully!');
       await loadBatchDetails(selectedBatch.id);
       await loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to lock batch');
+      showToast.error(err.message || 'Failed to lock batch');
     }
   };
 
@@ -119,12 +126,12 @@ export function PayrollPage({ user }: { user: any }) {
     try {
       setDisburseLoading(true);
       await api.disburseBatch(selectedBatch.id, paymentRef, disburseNotes);
-      alert('Batch marked as DISBURSED!');
+      showToast.success('Batch marked as DISBURSED!');
       setShowDisburseModal(false);
       await loadBatchDetails(selectedBatch.id);
       await loadData();
     } catch (err: any) {
-      alert(err.message || 'Disbursal failed');
+      showToast.error(err.message || 'Disbursal failed');
     } finally {
       setDisburseLoading(false);
     }
@@ -140,10 +147,10 @@ export function PayrollPage({ user }: { user: any }) {
         effectiveFrom: new Date(salEffectiveFrom).toISOString(),
         revisionReason: salReason,
       });
-      alert('Salary structure updated in append-only ledger!');
+      showToast.success('Salary structure updated in append-only ledger!');
       setShowSalaryModal(false);
     } catch (err: any) {
-      alert(err.message || 'Failed to set salary structure');
+      showToast.error(err.message || 'Failed to set salary structure');
     } finally {
       setSalSubmitting(false);
     }
@@ -161,7 +168,7 @@ export function PayrollPage({ user }: { user: any }) {
         amount: Number(adjAmount),
         reason: adjReason,
       });
-      alert('Adjustment created successfully! Recalculate draft batch to include it.');
+      showToast.success('Adjustment created successfully! Recalculate draft batch to include it.');
       setShowAdjModal(false);
       setAdjReason('Performance Bonus');
       setAdjAmount(5000);
@@ -169,7 +176,7 @@ export function PayrollPage({ user }: { user: any }) {
         await loadBatchDetails(selectedBatch.id);
       }
     } catch (err: any) {
-      alert(err.message || 'Failed to create adjustment');
+      showToast.error(err.message || 'Failed to create adjustment');
     } finally {
       setAdjSubmitting(false);
     }
@@ -185,8 +192,9 @@ export function PayrollPage({ user }: { user: any }) {
       a.href = url;
       a.download = `Bank_Payment_Advice_${selectedBatch.year}_${selectedBatch.month}.csv`;
       a.click();
+      showToast.success('Bank payment advice CSV downloaded');
     } catch (err: any) {
-      alert(err.message || 'Failed to download bank advice');
+      showToast.error(err.message || 'Failed to download bank advice');
     }
   };
 
@@ -717,13 +725,19 @@ export function PayrollPage({ user }: { user: any }) {
                                     className="btn btn-secondary"
                                     style={{ padding: '2px 8px', fontSize: '11px', color: '#dc2626', borderColor: '#fca5a5' }}
                                     onClick={async () => {
-                                      if (!confirm(`Delete adjustment ${adj.type} of ₹${adj.amount}?`)) return;
+                                      const confirmed = await showConfirm({
+                                        title: 'Delete Adjustment',
+                                        message: `Delete adjustment ${adj.type} of ₹${adj.amount}?`,
+                                        confirmText: 'Delete Adjustment',
+                                        isDanger: true,
+                                      });
+                                      if (!confirmed) return;
                                       try {
                                         await api.deletePayrollAdjustment(adj.id);
-                                        alert('Adjustment deleted! Recalculate draft batch to update payroll totals.');
+                                        showToast.success('Adjustment deleted! Recalculate draft batch to update payroll totals.');
                                         loadBatchDetails(selectedBatch.id);
                                       } catch (err: any) {
-                                        alert(err.message || 'Failed to delete adjustment');
+                                        showToast.error(err.message || 'Failed to delete adjustment');
                                       }
                                     }}
                                   >

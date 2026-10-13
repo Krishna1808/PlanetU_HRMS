@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
 import { DonutChart, CircularGauge } from './ReportCharts';
+import { showToast, showConfirm } from './Toast';
 
 interface OnboardingPageProps {
   user?: any;
@@ -116,7 +117,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
         reportingManagerId: inviteForm.reportingManagerId || undefined,
       });
 
-      alert('Candidate invited successfully with verification checklist tasks!');
+      showToast.success('Candidate invited successfully with verification checklist tasks!');
       setShowInviteModal(false);
       setInviteForm({
         firstName: '',
@@ -134,7 +135,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
       });
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to invite candidate');
+      showToast.error(err.message || 'Failed to invite candidate');
     } finally {
       setSubmitting(false);
     }
@@ -146,7 +147,7 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
       setSelectedCandidate(fresh);
       setShowDetailsModal(true);
     } catch (err: any) {
-      alert(err.message || 'Failed to load candidate details');
+      showToast.error(err.message || 'Failed to load candidate details');
     }
   };
 
@@ -177,11 +178,11 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
     try {
       setSubmitting(true);
       await api.submitPreBoardingForm(selectedCandidate.id, preboardForm);
-      alert('Pre-boarding form updated successfully!');
+      showToast.success('Pre-boarding form updated successfully!');
       setShowPreboardingModal(false);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to submit pre-boarding form');
+      showToast.error(err.message || 'Failed to submit pre-boarding form');
     } finally {
       setSubmitting(false);
     }
@@ -194,19 +195,22 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
         status: nextStatus,
         notes: nextStatus === 'COMPLETED' ? 'Verified by HR Admin' : 'Marked pending',
       });
+      showToast.success(`Checklist task marked as ${nextStatus.toLowerCase()}`);
       // Refresh candidate details
       const refreshed = await api.getOnboardingCandidateById(selectedCandidate.id);
       setSelectedCandidate(refreshed);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to update task');
+      showToast.error(err.message || 'Failed to update task');
     }
   };
 
   const handleConvert = async (candidate: any) => {
-    const confirmConvert = window.confirm(
-      `Convert ${candidate.firstName} ${candidate.lastName} into an official Employee? This will generate their employee code, user login credentials, shift schedule, and initial salary structure.`,
-    );
+    const confirmConvert = await showConfirm({
+      title: 'Convert Candidate to Employee',
+      message: `Convert ${candidate.firstName} ${candidate.lastName} into an official Employee? This will generate their employee code, user login credentials, shift schedule, and initial salary structure.`,
+      confirmText: 'Convert to Employee',
+    });
     if (!confirmConvert) return;
 
     try {
@@ -215,10 +219,11 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
         initialPassword: 'Password@123',
       });
       setConversionResult(res);
+      showToast.success(`Successfully converted ${candidate.firstName} ${candidate.lastName}!`);
       setShowDetailsModal(false);
       loadData();
     } catch (err: any) {
-      alert(err.message || 'Failed to convert candidate to employee');
+      showToast.error(err.message || 'Failed to convert candidate to employee');
     } finally {
       setSubmitting(false);
     }

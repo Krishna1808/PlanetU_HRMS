@@ -8,6 +8,7 @@ import {
   FunnelPipeline,
 } from './ReportCharts';
 import { Icons } from './Icons';
+import { showToast } from './Toast';
 
 interface ReportsPageProps {
   user: any;
@@ -102,13 +103,15 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
 
   const handleExportCsv = async (reportType: string) => {
     try {
+      showToast.info('Preparing CSV export...');
       await api.downloadReportCsv(reportType, {
         year: selectedYear,
         month: selectedMonth,
         departmentId: selectedDepartmentId || undefined,
       });
+      showToast.success('Export downloaded successfully!');
     } catch (err: any) {
-      alert(`Export failed: ${err.message}`);
+      showToast.error(`Export failed: ${err.message}`);
     }
   };
 

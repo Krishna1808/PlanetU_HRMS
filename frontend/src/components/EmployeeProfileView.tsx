@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
 import { Icons } from './Icons';
+import { showToast, showConfirm } from './Toast';
 
 const DOCUMENT_TYPE_LABELS: Record<string, { label: string; badgeClass: string }> = {
   OFFER_LETTER: { label: 'Offer / Appointment Letter', badgeClass: 'badge-role' },
@@ -136,12 +137,19 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
   };
 
   const handleDeleteDoc = async (docId: string, docName: string) => {
-    if (!confirm(`Delete "${docName}"?`)) return;
+    const confirmed = await showConfirm({
+      title: 'Delete Document',
+      message: `Are you sure you want to delete "${docName}"? This action cannot be undone.`,
+      confirmText: 'Delete Document',
+      isDanger: true,
+    });
+    if (!confirmed) return;
     try {
       await api.deleteEmployeeDocument(employeeId, docId);
+      showToast.success(`Document "${docName}" deleted successfully`);
       await loadDocuments();
     } catch (err: any) {
-      alert(err?.message || 'Failed to delete document');
+      showToast.error(err?.message || 'Failed to delete document');
     }
   };
 
