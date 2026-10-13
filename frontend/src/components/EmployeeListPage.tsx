@@ -19,6 +19,22 @@ export const EmployeeListPage: React.FC<Props> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+
+  // Authoritative organization-wide KPI metrics from backend
+  const [summary, setSummary] = useState<{
+    totalHeadcount: number;
+    activeCount: number;
+    probationCount: number;
+    noticeCount: number;
+    newHiresThisMonth: number;
+  }>({
+    totalHeadcount: 0,
+    activeCount: 0,
+    probationCount: 0,
+    noticeCount: 0,
+    newHiresThisMonth: 0,
+  });
 
   // Termination modal state
   const [selectedTerminateEmp, setSelectedTerminateEmp] = useState<any | null>(null);
@@ -48,7 +64,19 @@ export const EmployeeListPage: React.FC<Props> = ({
         api.getDepartments().catch(() => []),
         api.getMe().catch(() => null),
       ]);
-      setEmployees(empRes.data || []);
+      const empList = empRes.data || [];
+      setEmployees(empList);
+      if (empRes.summary) {
+        setSummary(empRes.summary);
+      } else {
+        setSummary({
+          totalHeadcount: empList.length,
+          activeCount: empList.filter((e: any) => e.employmentStatus === 'ACTIVE' || !e.employmentStatus).length,
+          probationCount: empList.filter((e: any) => e.employmentStatus === 'PROBATION').length,
+          noticeCount: empList.filter((e: any) => e.employmentStatus === 'NOTICE_PERIOD').length,
+          newHiresThisMonth: 0,
+        });
+      }
       setDepartments(deptRes || []);
       setCurrentUser(meRes);
     } catch (err: any) {
@@ -85,11 +113,6 @@ export const EmployeeListPage: React.FC<Props> = ({
       return matchesSearch && matchesDept && matchesStatus;
     });
   }, [employees, searchQuery, selectedDeptFilter, selectedStatusFilter]);
-
-  const activeCount = useMemo(
-    () => employees.filter((e) => e.employmentStatus === 'ACTIVE' || !e.employmentStatus).length,
-    [employees],
-  );
 
   const isHrOrAdmin =
     currentUser?.role === 'CLIENT_SUPER_ADMIN' || currentUser?.role === 'HR_ADMIN';
@@ -130,7 +153,7 @@ export const EmployeeListPage: React.FC<Props> = ({
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '12px',
-          marginBottom: '20px',
+          marginBottom: '16px',
         }}
       >
         <div>
@@ -147,7 +170,7 @@ export const EmployeeListPage: React.FC<Props> = ({
                 border: '1px solid #bfdbfe',
               }}
             >
-              {employees.length} Total
+              {summary.totalHeadcount} Staff
             </span>
             <span
               style={{
@@ -160,16 +183,16 @@ export const EmployeeListPage: React.FC<Props> = ({
                 border: '1px solid #a7f3d0',
               }}
             >
-              {activeCount} Active
+              {summary.activeCount} Active
             </span>
           </div>
           <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-            View profiles, job designations, reporting structures, and employment statuses.
+            View profiles, designations, reporting hierarchies, and employment statuses across the enterprise.
           </p>
         </div>
 
         <button className="btn btn-primary" onClick={onNavigateAdd} style={{ padding: '8px 18px', fontSize: '13px' }}>
-          Add New Employee
+          + Add New Employee
         </button>
       </div>
 
@@ -179,7 +202,121 @@ export const EmployeeListPage: React.FC<Props> = ({
         </div>
       )}
 
-      {error && <div className="alert-error">{error}</div>}
+      {error && <div className="alert-error" style={{ marginBottom: '16px' }}>{error}</div>}
+
+      {/* 1. Authoritative Organization Headcount KPI Strip */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '12px',
+          marginBottom: '16px',
+        }}
+      >
+        <div
+          onClick={() => setSelectedStatusFilter(selectedStatusFilter === 'ACTIVE' ? '' : 'ACTIVE')}
+          style={{
+            background: selectedStatusFilter === 'ACTIVE' ? '#eff6ff' : '#ffffff',
+            border: selectedStatusFilter === 'ACTIVE' ? '2px solid #2563eb' : '1px solid #e2e8f0',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+          }}
+          title="Click to filter Active employees"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+              Active Workforce
+            </span>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
+          </div>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: '#0f172a', margin: '4px 0 2px' }}>
+            {summary.activeCount}
+          </div>
+          <div style={{ fontSize: '11px', color: '#64748b' }}>
+            Out of {summary.totalHeadcount} total headcount
+          </div>
+        </div>
+
+        <div
+          onClick={() => setSelectedStatusFilter(selectedStatusFilter === 'PROBATION' ? '' : 'PROBATION')}
+          style={{
+            background: selectedStatusFilter === 'PROBATION' ? '#fefce8' : '#ffffff',
+            border: selectedStatusFilter === 'PROBATION' ? '2px solid #ca8a04' : '1px solid #e2e8f0',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+          }}
+          title="Click to filter Probation Watchlist"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#854d0e', textTransform: 'uppercase' }}>
+              Probation Watchlist
+            </span>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }} />
+          </div>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: '#854d0e', margin: '4px 0 2px' }}>
+            {summary.probationCount}
+          </div>
+          <div style={{ fontSize: '11px', color: '#a16207' }}>
+            Under performance evaluation
+          </div>
+        </div>
+
+        <div
+          onClick={() => setSelectedStatusFilter(selectedStatusFilter === 'NOTICE_PERIOD' ? '' : 'NOTICE_PERIOD')}
+          style={{
+            background: selectedStatusFilter === 'NOTICE_PERIOD' ? '#fff7ed' : '#ffffff',
+            border: selectedStatusFilter === 'NOTICE_PERIOD' ? '2px solid #ea580c' : '1px solid #e2e8f0',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+          }}
+          title="Click to filter Notice Period employees"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#c2410c', textTransform: 'uppercase' }}>
+              Serving Notice
+            </span>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ea580c' }} />
+          </div>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: '#c2410c', margin: '4px 0 2px' }}>
+            {summary.noticeCount}
+          </div>
+          <div style={{ fontSize: '11px', color: '#9a3412' }}>
+            Active exit & separation pipeline
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: '#2563eb', textTransform: 'uppercase' }}>
+              New Hires (This Month)
+            </span>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }} />
+          </div>
+          <div style={{ fontSize: '26px', fontWeight: 800, color: '#1d4ed8', margin: '4px 0 2px' }}>
+            +{summary.newHiresThisMonth}
+          </div>
+          <div style={{ fontSize: '11px', color: '#64748b' }}>
+            Joined in current calendar month
+          </div>
+        </div>
+      </div>
 
       {/* Filter and Search Toolbar */}
       <div
@@ -187,7 +324,7 @@ export const EmployeeListPage: React.FC<Props> = ({
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          marginBottom: '16px',
+          marginBottom: '12px',
           flexWrap: 'wrap',
           background: '#f8fafc',
           padding: '12px 14px',
@@ -207,7 +344,7 @@ export const EmployeeListPage: React.FC<Props> = ({
               pointerEvents: 'none',
             }}
           >
-            
+            🔍
           </span>
           <input
             type="text"
@@ -237,12 +374,12 @@ export const EmployeeListPage: React.FC<Props> = ({
               }}
               title="Clear search"
             >
-              Close
+              ✕
             </button>
           )}
         </div>
 
-        <div style={{ minWidth: '180px' }}>
+        <div style={{ minWidth: '170px' }}>
           <select
             value={selectedDeptFilter}
             onChange={(e) => setSelectedDeptFilter(e.target.value)}
@@ -271,6 +408,51 @@ export const EmployeeListPage: React.FC<Props> = ({
           </select>
         </div>
 
+        {/* View Mode Toggle: Cards vs Table */}
+        <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid #cbd5e1' }}>
+          <button
+            type="button"
+            onClick={() => setViewMode('cards')}
+            style={{
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 600,
+              border: 'none',
+              background: viewMode === 'cards' ? '#2563eb' : '#ffffff',
+              color: viewMode === 'cards' ? '#ffffff' : '#475569',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'background 0.15s ease',
+            }}
+            title="Grid cards view"
+          >
+            ☷ Cards
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('table')}
+            style={{
+              padding: '6px 12px',
+              fontSize: '12px',
+              fontWeight: 600,
+              border: 'none',
+              borderLeft: '1px solid #cbd5e1',
+              background: viewMode === 'table' ? '#2563eb' : '#ffffff',
+              color: viewMode === 'table' ? '#ffffff' : '#475569',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              transition: 'background 0.15s ease',
+            }}
+            title="High-density table view"
+          >
+            ☰ Table
+          </button>
+        </div>
+
         {(searchQuery || selectedDeptFilter || selectedStatusFilter) && (
           <button
             type="button"
@@ -287,17 +469,87 @@ export const EmployeeListPage: React.FC<Props> = ({
         )}
       </div>
 
+      {/* Quick Tactile Filter Chips */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '16px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Quick Filters:</span>
+        {[
+          { label: 'All', value: '', count: summary.totalHeadcount },
+          { label: 'Active', value: 'ACTIVE', count: summary.activeCount },
+          { label: 'Probation', value: 'PROBATION', count: summary.probationCount },
+          { label: 'Notice Period', value: 'NOTICE_PERIOD', count: summary.noticeCount },
+        ].map((chip) => {
+          const isSelected = selectedStatusFilter === chip.value;
+          return (
+            <button
+              key={chip.label}
+              type="button"
+              onClick={() => setSelectedStatusFilter(isSelected && chip.value ? '' : chip.value)}
+              style={{
+                padding: '3px 10px',
+                borderRadius: '999px',
+                fontSize: '11px',
+                fontWeight: isSelected ? 700 : 500,
+                border: isSelected ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                background: isSelected ? '#eff6ff' : '#ffffff',
+                color: isSelected ? '#1d4ed8' : '#475569',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {chip.label} {chip.count !== undefined && `(${chip.count})`}
+            </button>
+          );
+        })}
+
+        {departments.length > 0 && (
+          <>
+            <span style={{ color: '#cbd5e1', margin: '0 4px' }}>|</span>
+            {departments.slice(0, 4).map((dept) => {
+              const isDeptSelected = selectedDeptFilter === dept.id;
+              return (
+                <button
+                  key={dept.id}
+                  type="button"
+                  onClick={() => setSelectedDeptFilter(isDeptSelected ? '' : dept.id)}
+                  style={{
+                    padding: '3px 10px',
+                    borderRadius: '999px',
+                    fontSize: '11px',
+                    fontWeight: isDeptSelected ? 700 : 500,
+                    border: isDeptSelected ? '1px solid #7c3aed' : '1px solid #e2e8f0',
+                    background: isDeptSelected ? '#f5f3ff' : '#ffffff',
+                    color: isDeptSelected ? '#6d28d9' : '#475569',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  🏢 {dept.name}
+                </button>
+              );
+            })}
+          </>
+        )}
+      </div>
+
       {/* Loading Skeletons */}
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '10px 0' }}>
-          {[1, 2, 3, 4, 5].map((i) => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '14px', padding: '10px 0' }}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <div
               key={i}
               className="skeleton"
               style={{
-                height: '52px',
+                height: '160px',
                 width: '100%',
-                borderRadius: '8px',
+                borderRadius: '10px',
               }}
             />
           ))}
@@ -314,7 +566,6 @@ export const EmployeeListPage: React.FC<Props> = ({
             margin: '12px 0',
           }}
         >
-          
           {employees.length === 0 ? (
             <div>
               <strong style={{ fontSize: '15px', color: '#1e293b' }}>No employees found in the directory</strong>
@@ -349,7 +600,201 @@ export const EmployeeListPage: React.FC<Props> = ({
             </div>
           )}
         </div>
+      ) : viewMode === 'cards' ? (
+        /* CARDS GRID VIEW */
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))',
+            gap: '16px',
+          }}
+        >
+          {filteredEmployees.map((emp) => {
+            const initials = `${emp.firstName?.[0] || ''}${emp.lastName?.[0] || ''}`.toUpperCase() || 'EM';
+            const isNotice = emp.employmentStatus === 'NOTICE_PERIOD';
+            const isProbation = emp.employmentStatus === 'PROBATION';
+            const isTerminated = emp.employmentStatus === 'TERMINATED';
+            const isActive = !emp.employmentStatus || emp.employmentStatus === 'ACTIVE';
+
+            return (
+              <div
+                key={emp.id}
+                style={{
+                  background: '#ffffff',
+                  borderRadius: '10px',
+                  border: isNotice
+                    ? '1px solid #fed7aa'
+                    : isProbation
+                    ? '1px solid #fef08a'
+                    : '1px solid #e2e8f0',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  padding: '16px',
+                  transition: 'box-shadow 0.15s ease',
+                }}
+              >
+                <div>
+                  {/* Top Row: Avatar, Name & Code, Status */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          background: isTerminated
+                            ? '#ef4444'
+                            : isNotice
+                            ? '#ea580c'
+                            : isProbation
+                            ? '#f59e0b'
+                            : '#2563eb',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: '13px',
+                          flexShrink: 0,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        }}
+                      >
+                        {initials}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                          {emp.firstName} {emp.lastName}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color: '#2563eb',
+                              fontFamily: 'monospace',
+                              fontSize: '11px',
+                              background: '#eff6ff',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              border: '1px solid #dbeafe',
+                            }}
+                          >
+                            {emp.employeeCode}
+                          </span>
+                          {emp.location?.city && (
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>
+                              • {emp.location.city}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <span
+                      className="badge"
+                      style={{
+                        background: isTerminated
+                          ? '#fee2e2'
+                          : isActive
+                          ? '#dcfce7'
+                          : isProbation
+                          ? '#fef9c3'
+                          : '#ffedd5',
+                        color: isTerminated
+                          ? '#b91c1c'
+                          : isActive
+                          ? '#15803d'
+                          : isProbation
+                          ? '#854d0e'
+                          : '#c2410c',
+                        border: isTerminated
+                          ? '1px solid #fca5a5'
+                          : isActive
+                          ? '1px solid #bbf7d0'
+                          : isProbation
+                          ? '1px solid #fef08a'
+                          : '1px solid #fed7aa',
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {isTerminated
+                        ? 'TERMINATED'
+                        : isNotice
+                        ? '⏳ NOTICE'
+                        : emp.employmentStatus || 'ACTIVE'}
+                    </span>
+                  </div>
+
+                  {/* Department & Designation details */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px 0', borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: '#64748b' }}>Department:</span>
+                      <span style={{ fontWeight: 600, color: '#1e293b' }}>{emp.department?.name || '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: '#64748b' }}>Designation:</span>
+                      <span style={{ fontWeight: 600, color: '#1e293b' }}>{emp.designation?.name || '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                      <span style={{ color: '#64748b' }}>Reports To:</span>
+                      <span style={{ fontWeight: 600, color: emp.reportingManager ? '#2563eb' : '#64748b' }}>
+                        {emp.reportingManager
+                          ? `${emp.reportingManager.firstName} ${emp.reportingManager.lastName}`
+                          : 'None / Exec'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Email & Contact */}
+                  <div style={{ marginTop: '10px', fontSize: '12px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    ✉ {emp.personalEmail || emp.user?.email || '—'}
+                  </div>
+                </div>
+
+                {/* Bottom Actions */}
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '8px',
+                    justifyContent: 'flex-end',
+                    alignItems: 'center',
+                    marginTop: '14px',
+                    paddingTop: '10px',
+                    borderTop: '1px solid #f1f5f9',
+                  }}
+                >
+                  <button
+                    className="btn btn-secondary"
+                    style={{ flex: 1, padding: '6px 12px', fontSize: '12px', justifyContent: 'center' }}
+                    onClick={() => onSelectEmployee(emp.id)}
+                  >
+                    View Profile ↗
+                  </button>
+                  {isHrOrAdmin && emp.employmentStatus !== 'TERMINATED' && emp.id !== currentUser?.employeeId && (
+                    <button
+                      className="btn btn-danger"
+                      style={{ padding: '6px 10px', fontSize: '12px' }}
+                      title="Issue Termination Notice"
+                      onClick={() => {
+                        setSelectedTerminateEmp(emp);
+                        setNoticePeriodDays(30);
+                        setTerminateReason('');
+                        setTerminateError('');
+                      }}
+                    >
+                      {emp.employmentStatus === 'NOTICE_PERIOD' ? 'Exit' : 'Terminate'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : (
+        /* TABLE VIEW */
         <div className="table-responsive" style={{ border: '1px solid #e2e8f0', borderRadius: '8px' }}>
           <table>
             <thead>

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import React from 'react';
 import { api } from './api';
 import { LoginPage } from './components/LoginPage';
+import { ExecutiveDashboardPage } from './components/ExecutiveDashboardPage';
 import { EssDashboardPage } from './components/EssDashboardPage';
 import { EmployeeListPage } from './components/EmployeeListPage';
 import { AddEmployeeForm } from './components/AddEmployeeForm';
@@ -19,6 +20,7 @@ import { GrievanceManagementPage } from './components/GrievanceManagementPage';
 import { Icons } from './components/Icons';
 
 type MainTab =
+  | 'overview'
   | 'ess'
   | 'employees'
   | 'organization'
@@ -42,7 +44,14 @@ interface NavTabItem {
 }
 
 const ALL_TABS: NavTabItem[] = [
-  // 1. Self Service Workspace
+  // 1. Executive & Self-Service Workspace
+  {
+    key: 'overview',
+    label: 'Executive Overview',
+    icon: 'LayoutDashboard',
+    section: 'WORKSPACE',
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'],
+  },
   {
     key: 'ess',
     label: 'Employee Self-Service',
@@ -167,17 +176,36 @@ export default function App() {
   useEffect(() => {
     api
       .getMe()
-      .then((profile) => setUser(profile))
+      .then((profile) => {
+        setUser(profile);
+        if (profile?.role && ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'].includes(profile.role)) {
+          setActiveTab('overview');
+        } else {
+          setActiveTab('ess');
+        }
+      })
       .catch(() => setUser(null))
       .finally(() => setCheckingAuth(false));
   }, []);
+
+  const handleNavigateTab = (tab: string, subView?: string) => {
+    setActiveTab(tab as MainTab);
+    if (tab === 'employees' && subView) {
+      setEmployeeSubView(subView as EmployeeSubView);
+    }
+  };
 
   // Compute visible tabs based on user role (Super Admin gets access to all)
   const isSuperAdmin = user?.role === 'CLIENT_SUPER_ADMIN';
   const visibleTabs = useMemo(() => {
     if (!user) return [];
-    if (isSuperAdmin) return ALL_TABS;
-    return ALL_TABS.filter((t) => t.allowedRoles.includes(user.role));
+    const baseTabs = isSuperAdmin ? ALL_TABS : ALL_TABS.filter((t) => t.allowedRoles.includes(user.role));
+    return baseTabs.map((t) => {
+      if (t.key === 'overview' && user.role === 'MANAGER') {
+        return { ...t, label: 'Department Overview' };
+      }
+      return t;
+    });
   }, [user, isSuperAdmin]);
 
   // If current activeTab is not accessible by the logged-in role, auto-switch to first available tab
@@ -253,14 +281,23 @@ export default function App() {
   if (!user) {
     return (
       <div className="container">
-        <LoginPage onLoginSuccess={(u) => setUser(u)} />
+        <LoginPage
+          onLoginSuccess={(u) => {
+            setUser(u);
+            if (u?.role && ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'].includes(u.role)) {
+              setActiveTab('overview');
+            } else {
+              setActiveTab('ess');
+            }
+          }}
+        />
       </div>
     );
   }
 
   // Group visible tabs by section for clean rendering
   const sections = Array.from(new Set(visibleTabs.map((t) => t.section)));
-  const currentTabItem = ALL_TABS.find((t) => t.key === activeTab);
+  const currentTabItem = visibleTabs.find((t) => t.key === activeTab) || ALL_TABS.find((t) => t.key === activeTab);
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: '#f8fafc', color: '#1e293b' }}>
@@ -704,6 +741,10 @@ export default function App() {
         {/* Main Content Area */}
         <main className="app-main-content" style={{ flex: 1, padding: isMobile ? '14px 12px' : '24px 28px', overflowY: 'auto' }}>
           <div key={activeTab} className="tab-page-enter" style={{ maxWidth: '1240px', margin: '0 auto', width: '100%' }}>
+            {activeTab === 'overview' && (
+              <ExecutiveDashboardPage user={user} onNavigateTab={handleNavigateTab} />
+            )}
+
             {activeTab === 'ess' && <EssDashboardPage />}
 
             {activeTab === 'organization' && <OrganizationMastersPage />}
@@ -743,7 +784,7 @@ export default function App() {
 
             {activeTab === 'shifts' && <ShiftsPage />}
 
-            {activeTab === 'attendance' && <AttendancePage />}
+            {activeTab === 'attendance' && <AttendancePage user={user} />}
 
             {activeTab === 'leaves' && <LeavesPage user={user} />}
 

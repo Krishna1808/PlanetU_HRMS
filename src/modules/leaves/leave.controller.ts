@@ -177,6 +177,15 @@ export class LeaveController {
   // ---------------------------------------------------------------------------
 
   /**
+   * GET /api/v1/leaves/out-of-office
+   * Out-of-office timeline for current day and next 14 days
+   */
+  @Get('out-of-office')
+  async getOutOfOfficeTimeline(@CurrentUser() user: AuthenticatedUser) {
+    return this.leaveService.getOutOfOfficeTimeline(user.organizationId, user);
+  }
+
+  /**
    * GET /api/v1/leaves/pending
    * List pending leave requests awaiting approval (Managers see direct reports; HR sees all)
    */

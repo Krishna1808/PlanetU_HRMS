@@ -22,12 +22,7 @@ export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
   @Get('overview')
-  @Roles(
-    Role.CLIENT_SUPER_ADMIN,
-    Role.HR_ADMIN,
-    Role.FINANCE,
-    Role.MANAGER,
-  )
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN, Role.MANAGER)
   async getExecutiveOverview(@CurrentUser() user: AuthenticatedUser) {
     return this.reportsService.getExecutiveOverview(user.organizationId, user);
   }

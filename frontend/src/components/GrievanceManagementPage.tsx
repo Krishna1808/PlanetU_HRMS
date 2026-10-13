@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
 import { Icons } from './Icons';
+import { DonutChart } from './ReportCharts';
 
 interface GrievanceManagementPageProps {
   user: any;
@@ -193,6 +194,28 @@ export const GrievanceManagementPage: React.FC<GrievanceManagementPageProps> = (
     }
   };
 
+  const categorySlices = stats?.byCategory
+    ? Object.entries(stats.byCategory).map(([catKey, count]) => {
+        const meta = CATEGORY_LABELS[catKey] || { label: catKey, color: '#64748b' };
+        return {
+          label: meta.label,
+          value: Number(count),
+          color: meta.color,
+          sublabel: `${count} case${Number(count) > 1 ? 's' : ''}`,
+        };
+      })
+    : [];
+
+  const statusSlices = stats
+    ? [
+        { label: 'Submitted', value: stats.submitted || 0, color: '#1d4ed8', sublabel: `${stats.submitted || 0} intake` },
+        { label: 'Investigating', value: stats.underInvestigation || 0, color: '#b45309', sublabel: `${stats.underInvestigation || 0} active` },
+        { label: 'Escalated', value: stats.escalated || 0, color: '#a21caf', sublabel: `${stats.escalated || 0} committee` },
+        { label: 'Resolved', value: stats.resolved || 0, color: '#047857', sublabel: `${stats.resolved || 0} completed` },
+        { label: 'Dismissed', value: stats.rejected || 0, color: '#b91c1c', sublabel: `${stats.rejected || 0} closed` },
+      ].filter((s) => s.value > 0)
+    : [];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* 1. Header Bar */}
@@ -317,6 +340,24 @@ export const GrievanceManagementPage: React.FC<GrievanceManagementPageProps> = (
             <span style={{ fontSize: '12px', color: '#64748b' }}>
               From {stats.totalFeedbackCount || 0} verified ratings
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Visual Analytics: Category Composition & Lifecycle Stage */}
+      {stats && stats.total > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+          <div className="card" style={{ padding: '16px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#334155', margin: '0 0 12px' }}>
+              Category & Allegation Distribution
+            </h3>
+            <DonutChart data={categorySlices} size={170} />
+          </div>
+          <div className="card" style={{ padding: '16px' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#334155', margin: '0 0 12px' }}>
+              Case Lifecycle & Redressal Status
+            </h3>
+            <DonutChart data={statusSlices} size={170} />
           </div>
         </div>
       )}

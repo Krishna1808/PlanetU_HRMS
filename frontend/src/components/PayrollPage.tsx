@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
+import { DonutChart } from './ReportCharts';
 
 export function PayrollPage({ user }: { user: any }) {
   const [config, setConfig] = useState<any>(null);
@@ -9,6 +10,10 @@ export function PayrollPage({ user }: { user: any }) {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Payslip search and filter
+  const [payslipSearch, setPayslipSearch] = useState('');
+  const [payslipFilter, setPayslipFilter] = useState<'ALL' | 'PRORATED' | 'WITH_BONUS'>('ALL');
 
   // Calculate Batch inputs
   const [calcYear, setCalcYear] = useState(new Date().getFullYear());
@@ -335,109 +340,527 @@ export function PayrollPage({ user }: { user: any }) {
           )}
         </div>
 
-        {selectedBatch ? (
-          <div>
-            {/* Summary Metrics */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>Batch Status</div>
-                <div style={{ fontSize: '16px', fontWeight: 800, marginTop: '4px' }}>
-                  <span className={`badge ${selectedBatch.status === 'DISBURSED' ? 'badge-active' : selectedBatch.status === 'LOCKED' ? 'badge-role' : 'badge-inactive'}`}>
-                    {selectedBatch.status}
+        {selectedBatch ? (() => {
+          const payslips = selectedBatch.payslips || [];
+
+          const totalBasic = payslips.reduce((s: number, p: any) => s + (Number(p.earnedBasic) || 0), 0);
+          const totalHra = payslips.reduce((s: number, p: any) => s + (Number(p.earnedHra) || 0), 0);
+          const totalSpl = payslips.reduce((s: number, p: any) => s + (Number(p.earnedSpecialAllowance) || 0), 0);
+          const totalAdditions = payslips.reduce((s: number, p: any) => s + (Number(p.bonusAmount || 0) + Number(p.arrearsAmount || 0) + Number(p.otherAdditions || 0)), 0);
+
+          const totalEmployeePf = payslips.reduce((s: number, p: any) => s + (Number(p.employeePf) || 0), 0);
+          const totalEmployeeEsi = payslips.reduce((s: number, p: any) => s + (Number(p.employeeEsi) || 0), 0);
+          const totalPt = payslips.reduce((s: number, p: any) => s + (Number(p.professionalTax) || 0), 0);
+          const totalTds = payslips.reduce((s: number, p: any) => s + (Number(p.tdsAmount) || 0), 0);
+          const totalOtherDeductions = payslips.reduce((s: number, p: any) => s + (Number(p.otherDeductions) || 0), 0);
+
+          const totalEmployerPf = payslips.reduce((s: number, p: any) => s + (Number(p.employerPf) || 0), 0);
+          const totalEmployerEsi = payslips.reduce((s: number, p: any) => s + (Number(p.employerEsi) || 0), 0);
+          const totalEmployerStatutory = totalEmployerPf + totalEmployerEsi;
+
+          const totalCostToCompany = Number(selectedBatch.totalGrossPay || 0) + totalEmployerStatutory;
+          const avgTakeHome = selectedBatch.totalEmployees > 0
+            ? Math.round(Number(selectedBatch.totalNetPay || 0) / selectedBatch.totalEmployees)
+            : 0;
+
+          // Donut Slices
+          const earningsSlices = [
+            { label: 'Basic Salary (50%)', value: Math.round(totalBasic), color: '#2563eb', sublabel: 'Statutory Core' },
+            { label: 'HRA (25%)', value: Math.round(totalHra), color: '#3b82f6', sublabel: 'House Rent' },
+            { label: 'Special Allowance (25%)', value: Math.round(totalSpl), color: '#06b6d4', sublabel: 'Flexible Component' },
+            ...(totalAdditions > 0 ? [{ label: 'Bonuses & Adjustments', value: Math.round(totalAdditions), color: '#10b981', sublabel: 'Incentives' }] : []),
+          ];
+
+          const deductionsSlices = [
+            { label: 'Provident Fund (EPF 12%)', value: Math.round(totalEmployeePf), color: '#ea580c', sublabel: 'Employee EPF' },
+            ...(totalEmployeeEsi > 0 ? [{ label: 'Employee ESI (0.75%)', value: Math.round(totalEmployeeEsi), color: '#f59e0b', sublabel: 'Health Insurance' }] : []),
+            { label: 'Professional Tax (PT)', value: Math.round(totalPt), color: '#8b5cf6', sublabel: 'State Statutory' },
+            ...(totalTds > 0 ? [{ label: 'TDS (Income Tax)', value: Math.round(totalTds), color: '#ec4899', sublabel: 'Withholding' }] : []),
+            ...(totalOtherDeductions > 0 ? [{ label: 'Other Deductions', value: Math.round(totalOtherDeductions), color: '#64748b', sublabel: 'Custom' }] : []),
+          ];
+
+          const filteredPayslips = payslips.filter((ps: any) => {
+            const code = ps.employee?.employeeCode?.toLowerCase() || '';
+            const name = `${ps.employee?.firstName} ${ps.employee?.lastName}`.toLowerCase();
+            const dept = ps.employee?.department?.name?.toLowerCase() || '';
+            const q = payslipSearch.toLowerCase().trim();
+            const matchesSearch = !q || code.includes(q) || name.includes(q) || dept.includes(q);
+
+            if (!matchesSearch) return false;
+
+            if (payslipFilter === 'PRORATED') {
+              return Number(ps.payableDays) < Number(ps.totalMonthDays);
+            }
+            if (payslipFilter === 'WITH_BONUS') {
+              const additions = Number(ps.bonusAmount || 0) + Number(ps.arrearsAmount || 0) + Number(ps.otherAdditions || 0);
+              return additions > 0;
+            }
+            return true;
+          });
+
+          const proratedCount = payslips.filter((p: any) => Number(p.payableDays) < Number(p.totalMonthDays)).length;
+          const bonusCount = payslips.filter((p: any) => (Number(p.bonusAmount || 0) + Number(p.arrearsAmount || 0) + Number(p.otherAdditions || 0)) > 0).length;
+
+          return (
+            <div>
+              {/* Batch Lifecycle Stepper */}
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Batch Lifecycle Processing Progression
                   </span>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      Cycle Period: <strong>Month {selectedBatch.month}/{selectedBatch.year}</strong>
+                    </span>
+                    <span className={`badge ${selectedBatch.status === 'DISBURSED' ? 'badge-active' : selectedBatch.status === 'LOCKED' ? 'badge-role' : 'badge-inactive'}`}>
+                      {selectedBatch.status}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                  {/* Step 1: DRAFT */}
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '6px',
+                    background: selectedBatch.status === 'DRAFT' ? '#eff6ff' : '#ffffff',
+                    border: selectedBatch.status === 'DRAFT' ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{
+                        width: '20px', height: '20px', borderRadius: '50%',
+                        background: selectedBatch.status !== 'DRAFT' ? '#16a34a' : '#2563eb',
+                        color: '#ffffff', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        {selectedBatch.status !== 'DRAFT' ? '✓' : '1'}
+                      </span>
+                      <strong style={{ fontSize: '13px', color: '#1e293b' }}>1. Draft & Calculation</strong>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
+                      Prorated math bound to Attendance payable days. Modifiable via bonus/adjustments.
+                    </p>
+                  </div>
+
+                  {/* Step 2: LOCKED */}
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '6px',
+                    background: selectedBatch.status === 'LOCKED' ? '#fffbeb' : '#ffffff',
+                    border: selectedBatch.status === 'LOCKED' ? '2px solid #f59e0b' : '1px solid #e2e8f0',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{
+                        width: '20px', height: '20px', borderRadius: '50%',
+                        background: selectedBatch.status === 'DISBURSED' ? '#16a34a' : selectedBatch.status === 'LOCKED' ? '#d97706' : '#94a3b8',
+                        color: '#ffffff', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        {selectedBatch.status === 'DISBURSED' ? '✓' : '2'}
+                      </span>
+                      <strong style={{ fontSize: '13px', color: '#1e293b' }}>2. Locked & Audited</strong>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
+                      {selectedBatch.lockedAt ? `Locked on ${new Date(selectedBatch.lockedAt).toLocaleDateString()}` : 'Frozen & immutable. Bank advice verified.'}
+                    </p>
+                  </div>
+
+                  {/* Step 3: DISBURSED */}
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '6px',
+                    background: selectedBatch.status === 'DISBURSED' ? '#f0fdf4' : '#ffffff',
+                    border: selectedBatch.status === 'DISBURSED' ? '2px solid #16a34a' : '1px solid #e2e8f0',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{
+                        width: '20px', height: '20px', borderRadius: '50%',
+                        background: selectedBatch.status === 'DISBURSED' ? '#16a34a' : '#94a3b8',
+                        color: '#ffffff', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        {selectedBatch.status === 'DISBURSED' ? '✓' : '3'}
+                      </span>
+                      <strong style={{ fontSize: '13px', color: '#1e293b' }}>3. Disbursed & Released</strong>
+                    </div>
+                    <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>
+                      {selectedBatch.status === 'DISBURSED'
+                        ? `Ref: ${selectedBatch.paymentReference || 'Bank-UTR'} (${new Date(selectedBatch.disbursedAt).toLocaleDateString()})`
+                        : 'Disbursal payout and release of payslips to ESS portal.'}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>Employees Processed</div>
-                <div style={{ fontSize: '20px', fontWeight: 800, marginTop: '4px' }}>{selectedBatch.totalEmployees}</div>
-              </div>
+              {/* State Action Banner */}
+              {selectedBatch.status === 'DRAFT' && (
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '6px', padding: '10px 14px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ fontSize: '12px', color: '#92400e' }}>
+                    🟡 <strong>Draft Cycle in Review:</strong> Adjustments and attendance syncing remain active. Verify net payouts before freezing.
+                  </div>
+                  {isFinance && (
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleLockBatch}
+                      style={{ background: '#f59e0b', borderColor: '#d97706', fontSize: '12px', padding: '4px 12px' }}
+                    >
+                      Lock Batch (Freeze Calculations)
+                    </button>
+                  )}
+                </div>
+              )}
 
-              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>Total Gross Earnings</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, marginTop: '4px', color: '#1e293b' }}>
-                  ₹{Number(selectedBatch.totalGrossPay).toLocaleString('en-IN')}
+              {selectedBatch.status === 'LOCKED' && (
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '10px 14px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ fontSize: '12px', color: '#1e40af' }}>
+                    🔒 <strong>Locked & Audit-Frozen:</strong> Download corporate bank advice CSV for treasury transmission, then confirm disbursal.
+                  </div>
+                  {isFinance && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="btn btn-secondary" onClick={handleDownloadBankAdvice} style={{ fontSize: '12px', padding: '4px 10px' }}>
+                        Bank CSV
+                      </button>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => setShowDisburseModal(true)}
+                        style={{ background: '#16a34a', borderColor: '#15803d', fontSize: '12px', padding: '4px 12px' }}
+                      >
+                        Confirm Disbursal
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedBatch.status === 'DISBURSED' && (
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px', padding: '10px 14px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ fontSize: '12px', color: '#166534' }}>
+                    ✅ <strong>Cycle Disbursed:</strong> Payment Reference: <code>{selectedBatch.paymentReference || 'UTR-PROCESSED'}</code>. Payslips are published in employee ESS portals.
+                  </div>
+                  <button className="btn btn-secondary" onClick={handleDownloadBankAdvice} style={{ fontSize: '12px', padding: '4px 10px' }}>
+                    Download Bank Advice
+                  </button>
+                </div>
+              )}
+
+              {/* Executive Summary Metrics Strip */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+                <div style={{ background: '#eff6ff', padding: '14px', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#1e40af' }}>Total Net Take-Home</div>
+                  <div style={{ fontSize: '22px', fontWeight: 900, marginTop: '4px', color: '#1d4ed8' }}>
+                    ₹{Number(selectedBatch.totalNetPay).toLocaleString('en-IN')}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Direct employee bank transfer</div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>Total Gross Earnings</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, marginTop: '4px', color: '#1e293b' }}>
+                    ₹{Number(selectedBatch.totalGrossPay).toLocaleString('en-IN')}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Earned Basic + HRA + Spl + Bonus</div>
+                </div>
+
+                <div style={{ background: '#fef2f2', padding: '14px', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#b91c1c' }}>Statutory Deductions</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, marginTop: '4px', color: '#dc2626' }}>
+                    ₹{Number(selectedBatch.totalDeductions).toLocaleString('en-IN')}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Employee EPF (12%) + ESI + PT</div>
+                </div>
+
+                <div style={{ background: '#fffbeb', padding: '14px', borderRadius: '8px', border: '1px solid #fde68a' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#b45309' }}>Employer Contributions</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, marginTop: '4px', color: '#d97706' }}>
+                    ₹{totalEmployerStatutory.toLocaleString('en-IN')}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Employer EPF (12%) + ESI (3.25%)</div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#475569' }}>Total CTC Expenditure</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, marginTop: '4px', color: '#0f172a' }}>
+                    ₹{totalCostToCompany.toLocaleString('en-IN')}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Gross + Employer statutory cost</div>
+                </div>
+
+                <div style={{ background: '#f0fdf4', padding: '14px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#15803d' }}>Average Net / Employee</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, marginTop: '4px', color: '#16a34a' }}>
+                    ₹{avgTakeHome.toLocaleString('en-IN')}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Across {selectedBatch.totalEmployees} employees</div>
                 </div>
               </div>
 
-              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: '11px', color: '#64748b' }}>Total Deductions (PF+PT)</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, marginTop: '4px', color: '#dc2626' }}>
-                  ₹{Number(selectedBatch.totalDeductions).toLocaleString('en-IN')}
+              {/* Visual Analytics Strip (Dual Donut Charts & Statutory Breakdown) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                {/* Gross Earnings Composition Donut */}
+                <div style={{ background: '#f8fafc', padding: '18px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '4px', alignSelf: 'flex-start' }}>
+                    Gross Earnings Composition
+                  </h4>
+                  <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '12px', alignSelf: 'flex-start' }}>
+                    Proportional distribution of salary components across the organization.
+                  </p>
+                  <DonutChart
+                    data={earningsSlices}
+                    size={170}
+                    thickness={22}
+                    centerTitle="Gross"
+                    centerValue={`₹${(Number(selectedBatch.totalGrossPay) / 1000).toFixed(0)}k`}
+                  />
+                </div>
+
+                {/* Statutory Deductions & Compliance Donut */}
+                <div style={{ background: '#f8fafc', padding: '18px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '4px', alignSelf: 'flex-start' }}>
+                    Statutory Deductions Composition
+                  </h4>
+                  <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '12px', alignSelf: 'flex-start' }}>
+                    Withholdings for PF, ESI, Professional Tax, and Income Tax.
+                  </p>
+                  <DonutChart
+                    data={deductionsSlices}
+                    size={170}
+                    thickness={22}
+                    centerTitle="Deductions"
+                    centerValue={`₹${(Number(selectedBatch.totalDeductions) / 1000).toFixed(0)}k`}
+                  />
+                </div>
+
+                {/* Compliance & Audit Ratios */}
+                <div style={{ background: '#f8fafc', padding: '18px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                      Compliance Audit Ratios
+                    </h4>
+                    <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '14px' }}>
+                      Statutory efficiency metrics for Month {selectedBatch.month}/{selectedBatch.year}.
+                    </p>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px dashed #e2e8f0' }}>
+                        <span style={{ color: '#64748b' }}>Take-Home Pay Ratio:</span>
+                        <strong>{Number(selectedBatch.totalGrossPay) > 0 ? ((Number(selectedBatch.totalNetPay) / Number(selectedBatch.totalGrossPay)) * 100).toFixed(1) : 0}%</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px dashed #e2e8f0' }}>
+                        <span style={{ color: '#64748b' }}>Employee Deduction Rate:</span>
+                        <strong style={{ color: '#dc2626' }}>{Number(selectedBatch.totalGrossPay) > 0 ? ((Number(selectedBatch.totalDeductions) / Number(selectedBatch.totalGrossPay)) * 100).toFixed(1) : 0}%</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px dashed #e2e8f0' }}>
+                        <span style={{ color: '#64748b' }}>Employer Statutory Burden:</span>
+                        <strong style={{ color: '#d97706' }}>{Number(selectedBatch.totalGrossPay) > 0 ? ((totalEmployerStatutory / Number(selectedBatch.totalGrossPay)) * 100).toFixed(1) : 0}%</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px dashed #e2e8f0' }}>
+                        <span style={{ color: '#64748b' }}>PF Wage Ceiling:</span>
+                        <span className="badge badge-active" style={{ fontSize: '10px' }}>₹{config?.pfCeilingAmount || 15000}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: '#64748b' }}>Rounding Standard:</span>
+                        <span style={{ color: '#16a34a', fontWeight: 600 }}>Whole Rupee at Net</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '10px', borderRadius: '6px', border: '1px solid #e2e8f0', marginTop: '12px', fontSize: '11px', color: '#64748b' }}>
+                    💡 <em>Formulas conform strictly to Indian Reference Model (PF 12% on min(Basic, ₹15,000) prorated by attendance).</em>
+                  </div>
                 </div>
               </div>
 
-              <div style={{ background: '#eff6ff', padding: '14px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
-                <div style={{ fontSize: '11px', color: '#1e40af' }}>Total Net Take-Home</div>
-                <div style={{ fontSize: '20px', fontWeight: 900, marginTop: '4px', color: '#1d4ed8' }}>
-                  ₹{Number(selectedBatch.totalNetPay).toLocaleString('en-IN')}
+              {/* Adjustments & Bonuses Table */}
+              {selectedBatch.adjustments && selectedBatch.adjustments.length > 0 && (
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px' }}>
+                    Adjustments & Bonuses ({selectedBatch.adjustments.length})
+                  </h4>
+                  <div className="table-responsive">
+                    <table style={{ marginBottom: '16px' }}>
+                      <thead>
+                        <tr>
+                          <th>Employee</th>
+                          <th>Type</th>
+                          <th>Amount</th>
+                          <th>Reason / Note</th>
+                          <th>Status</th>
+                          {isFinance && selectedBatch.status === 'DRAFT' && <th>Action</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedBatch.adjustments.map((adj: any) => {
+                          const isAddition = ['BONUS', 'ARREARS', 'OVERTIME', 'REIMBURSEMENT'].includes(adj.type);
+                          return (
+                            <tr key={adj.id}>
+                              <td><strong>{adj.employee?.employeeCode}</strong> — {adj.employee?.firstName} {adj.employee?.lastName}</td>
+                              <td>
+                                <span className="badge" style={{
+                                  background: isAddition ? '#dcfce7' : '#fee2e2',
+                                  color: isAddition ? '#166534' : '#991b1b',
+                                  fontSize: '11px',
+                                }}>
+                                  {adj.type}
+                                </span>
+                              </td>
+                              <td style={{ fontWeight: 700, color: isAddition ? '#16a34a' : '#dc2626' }}>
+                                {isAddition ? '+' : '-'}₹{Number(adj.amount).toFixed(2)}
+                              </td>
+                              <td style={{ fontSize: '12px' }}>{adj.description || '—'}</td>
+                              <td>
+                                <span className={`badge ${adj.isProcessed ? 'badge-active' : 'badge-inactive'}`}>
+                                  {adj.isProcessed ? 'Included in Batch' : 'Pending'}
+                                </span>
+                              </td>
+                              {isFinance && selectedBatch.status === 'DRAFT' && (
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    style={{ padding: '2px 8px', fontSize: '11px', color: '#dc2626', borderColor: '#fca5a5' }}
+                                    onClick={async () => {
+                                      if (!confirm(`Delete adjustment ${adj.type} of ₹${adj.amount}?`)) return;
+                                      try {
+                                        await api.deletePayrollAdjustment(adj.id);
+                                        alert('Adjustment deleted! Recalculate draft batch to update payroll totals.');
+                                        loadBatchDetails(selectedBatch.id);
+                                      } catch (err: any) {
+                                        alert(err.message || 'Failed to delete adjustment');
+                                      }
+                                    }}
+                                  >
+                                    Remove
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )}
 
-            {/* Batch Adjustments & Bonuses (if any) */}
-            {selectedBatch.adjustments && selectedBatch.adjustments.length > 0 && (
-              <div style={{ marginBottom: '24px' }}>
-                <h4 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px' }}>
-                  Adjustments & Bonuses ({selectedBatch.adjustments.length})
-                </h4>
+              {/* Individual Employee Payslips with Search & Filters */}
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: 700, margin: 0 }}>
+                    Itemized Employee Payslips ({filteredPayslips.length} of {payslips.length})
+                  </h4>
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {/* Search Input */}
+                    <input
+                      type="text"
+                      placeholder="Search employee, code, dept..."
+                      value={payslipSearch}
+                      onChange={(e) => setPayslipSearch(e.target.value)}
+                      style={{ padding: '5px 10px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px', width: '200px' }}
+                    />
+
+                    {/* Filter Pills */}
+                    <button
+                      type="button"
+                      className={`btn ${payslipFilter === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ padding: '4px 10px', fontSize: '11px' }}
+                      onClick={() => setPayslipFilter('ALL')}
+                    >
+                      All ({payslips.length})
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn ${payslipFilter === 'PRORATED' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ padding: '4px 10px', fontSize: '11px' }}
+                      onClick={() => setPayslipFilter('PRORATED')}
+                    >
+                      Prorated ({proratedCount})
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn ${payslipFilter === 'WITH_BONUS' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ padding: '4px 10px', fontSize: '11px' }}
+                      onClick={() => setPayslipFilter('WITH_BONUS')}
+                    >
+                      With Bonuses ({bonusCount})
+                    </button>
+                  </div>
+                </div>
+
                 <div className="table-responsive">
-                  <table style={{ marginBottom: '16px' }}>
+                  <table>
                     <thead>
                       <tr>
+                        <th>Code</th>
                         <th>Employee</th>
-                        <th>Type</th>
-                        <th>Amount</th>
-                        <th>Reason / Note</th>
-                        <th>Status</th>
-                        {isFinance && selectedBatch.status === 'DRAFT' && <th>Action</th>}
+                        <th>Attendance</th>
+                        <th>Earned Basic</th>
+                        <th>Earned Gross</th>
+                        <th>Bonus / Add.</th>
+                        <th>PF (12%)</th>
+                        <th>ESI</th>
+                        <th>PT</th>
+                        <th>Deductions</th>
+                        <th>Net Take-Home</th>
+                        <th>Payslip</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedBatch.adjustments.map((adj: any) => {
-                        const isAddition = ['BONUS', 'ARREARS', 'OVERTIME', 'REIMBURSEMENT'].includes(adj.type);
+                      {filteredPayslips.map((ps: any) => {
+                        const additions = Number(ps.bonusAmount || 0) + Number(ps.arrearsAmount || 0) + Number(ps.otherAdditions || 0);
+                        const isProrated = Number(ps.payableDays) < Number(ps.totalMonthDays);
+
                         return (
-                          <tr key={adj.id}>
-                            <td><strong>{adj.employee?.employeeCode}</strong> — {adj.employee?.firstName} {adj.employee?.lastName}</td>
+                          <tr key={ps.id}>
+                            <td><strong>{ps.employee?.employeeCode}</strong></td>
                             <td>
-                              <span className="badge" style={{
-                                background: isAddition ? '#dcfce7' : '#fee2e2',
-                                color: isAddition ? '#166534' : '#991b1b',
-                                fontSize: '11px',
-                              }}>
-                                {adj.type}
-                              </span>
+                              <div>
+                                <span style={{ fontWeight: 600 }}>{ps.employee?.firstName} {ps.employee?.lastName}</span>
+                                {ps.employee?.department?.name && (
+                                  <div style={{ fontSize: '10px', color: '#64748b' }}>{ps.employee.department.name}</div>
+                                )}
+                              </div>
                             </td>
-                            <td style={{ fontWeight: 700, color: isAddition ? '#16a34a' : '#dc2626' }}>
-                              {isAddition ? '+' : '-'}₹{Number(adj.amount).toFixed(2)}
-                            </td>
-                            <td style={{ fontSize: '12px' }}>{adj.description || '—'}</td>
                             <td>
-                              <span className={`badge ${adj.isProcessed ? 'badge-active' : 'badge-inactive'}`}>
-                                {adj.isProcessed ? 'Included in Batch' : 'Pending'}
-                              </span>
+                              {isProrated ? (
+                                <span className="badge badge-inactive" style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', fontSize: '11px' }} title="Prorated based on attendance/absences">
+                                  {ps.payableDays}/{ps.totalMonthDays}d (Prorated)
+                                </span>
+                              ) : (
+                                <span className="badge badge-active" style={{ fontSize: '11px' }}>
+                                  {ps.payableDays}/{ps.totalMonthDays}d
+                                </span>
+                              )}
                             </td>
-                            {isFinance && selectedBatch.status === 'DRAFT' && (
-                              <td>
+                            <td>₹{Number(ps.earnedBasic).toFixed(2)}</td>
+                            <td>₹{Number(ps.earnedGross).toFixed(2)}</td>
+                            <td style={{ color: additions > 0 ? '#16a34a' : '#64748b', fontWeight: additions > 0 ? 700 : 'normal' }}>
+                              {additions > 0 ? `+₹${additions.toFixed(2)}` : '—'}
+                            </td>
+                            <td>₹{Number(ps.employeePf).toFixed(2)}</td>
+                            <td>₹{Number(ps.employeeEsi || 0).toFixed(2)}</td>
+                            <td>₹{Number(ps.professionalTax).toFixed(2)}</td>
+                            <td style={{ color: '#dc2626', fontWeight: 600 }}>₹{Number(ps.totalDeductions).toFixed(2)}</td>
+                            <td style={{ fontWeight: 800, color: '#16a34a', fontSize: '14px' }}>₹{Number(ps.netPay).toFixed(2)}</td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <a
+                                  href={api.getPayslipViewHtmlUrl(ps.id)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="btn btn-secondary"
+                                  style={{ padding: '3px 8px', fontSize: '11px' }}
+                                >
+                                  Web
+                                </a>
                                 <button
                                   type="button"
-                                  className="btn btn-secondary"
-                                  style={{ padding: '2px 8px', fontSize: '11px', color: '#dc2626', borderColor: '#fca5a5' }}
-                                  onClick={async () => {
-                                    if (!confirm(`Delete adjustment ${adj.type} of ₹${adj.amount}?`)) return;
-                                    try {
-                                      await api.deletePayrollAdjustment(adj.id);
-                                      alert('Adjustment deleted! Recalculate draft batch to update payroll totals.');
-                                      loadBatchDetails(selectedBatch.id);
-                                    } catch (err: any) {
-                                      alert(err.message || 'Failed to delete adjustment');
-                                    }
-                                  }}
+                                  onClick={() => api.downloadPayslipPdf(ps.id, `Payslip-${ps.employee?.employeeCode || ps.id}-${selectedBatch.month}-${selectedBatch.year}.pdf`)}
+                                  className="btn btn-primary"
+                                  style={{ padding: '3px 8px', fontSize: '11px' }}
                                 >
-                                  Remove
+                                  PDF
                                 </button>
-                              </td>
-                            )}
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
@@ -445,78 +868,9 @@ export function PayrollPage({ user }: { user: any }) {
                   </table>
                 </div>
               </div>
-            )}
-
-            {/* Payslips Table */}
-            <h4 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '10px' }}>
-              Individual Employee Payslips ({selectedBatch.payslips?.length || 0})
-            </h4>
-
-            <div className="table-responsive">
-              <table>
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Name</th>
-                  <th>Payable Days</th>
-                  <th>Earned Basic</th>
-                  <th>Earned Gross</th>
-                  <th>Bonus/Add.</th>
-                  <th>PF (Emp)</th>
-                  <th>ESI (Emp)</th>
-                  <th>PT</th>
-                  <th>Total Deductions</th>
-                  <th>Net Take-Home</th>
-                  <th>Payslip Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(selectedBatch.payslips || []).map((ps: any) => {
-                  const additions = Number(ps.bonusAmount || 0) + Number(ps.arrearsAmount || 0) + Number(ps.otherAdditions || 0);
-                  return (
-                    <tr key={ps.id}>
-                      <td><strong>{ps.employee?.employeeCode}</strong></td>
-                      <td>{ps.employee?.firstName} {ps.employee?.lastName}</td>
-                      <td>{ps.payableDays} / {ps.totalMonthDays}</td>
-                      <td>₹{Number(ps.earnedBasic).toFixed(2)}</td>
-                      <td>₹{Number(ps.earnedGross).toFixed(2)}</td>
-                      <td style={{ color: additions > 0 ? '#16a34a' : 'inherit', fontWeight: additions > 0 ? 600 : 'normal' }}>
-                        ₹{additions.toFixed(2)}
-                      </td>
-                      <td>₹{Number(ps.employeePf).toFixed(2)}</td>
-                      <td>₹{Number(ps.employeeEsi || 0).toFixed(2)}</td>
-                      <td>₹{Number(ps.professionalTax).toFixed(2)}</td>
-                      <td style={{ color: '#dc2626' }}>₹{Number(ps.totalDeductions).toFixed(2)}</td>
-                      <td style={{ fontWeight: 800, color: '#16a34a' }}>₹{Number(ps.netPay).toFixed(2)}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <a
-                            href={api.getPayslipViewHtmlUrl(ps.id)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-secondary"
-                            style={{ padding: '3px 8px', fontSize: '11px' }}
-                          >
-                            Web
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => api.downloadPayslipPdf(ps.id, `Payslip-${ps.employee?.employeeCode || ps.id}-${selectedBatch.month}-${selectedBatch.year}.pdf`)}
-                            className="btn btn-primary"
-                            style={{ padding: '3px 8px', fontSize: '11px' }}
-                          >
-                            PDF
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
             </div>
-          </div>
-        ) : (
+          );
+        })() : (
           <div style={{ color: '#64748b', fontSize: '13px', padding: '20px 0', textAlign: 'center' }}>
             No payroll batches generated yet. Click "Calculate Draft Batch" above to start.
           </div>

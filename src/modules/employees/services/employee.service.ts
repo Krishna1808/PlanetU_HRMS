@@ -538,24 +538,41 @@ export class EmployeeService {
       ];
     }
 
-    const [total, items] = await Promise.all([
-      this.prisma.employee.count({ where }),
-      this.prisma.employee.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
-        include: {
-          department: { select: { id: true, name: true, codePrefix: true } },
-          designation: { select: { id: true, name: true } },
-          grade: { select: { id: true, name: true, level: true } },
-          location: { select: { id: true, name: true, city: true } },
-          reportingManager: {
-            select: { id: true, employeeCode: true, firstName: true, lastName: true },
+    const now = new Date();
+    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59));
+
+    const [total, items, activeCount, probationCount, noticeCount, newHiresCount] =
+      await Promise.all([
+        this.prisma.employee.count({ where }),
+        this.prisma.employee.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+          include: {
+            department: { select: { id: true, name: true, codePrefix: true } },
+            designation: { select: { id: true, name: true } },
+            grade: { select: { id: true, name: true, level: true } },
+            location: { select: { id: true, name: true, city: true } },
+            reportingManager: {
+              select: { id: true, employeeCode: true, firstName: true, lastName: true },
+            },
           },
-        },
-      }),
-    ]);
+        }),
+        this.prisma.employee.count({
+          where: { organizationId, deletedAt: null, employmentStatus: EmploymentStatus.ACTIVE },
+        }),
+        this.prisma.employee.count({
+          where: { organizationId, deletedAt: null, employmentStatus: EmploymentStatus.PROBATION },
+        }),
+        this.prisma.employee.count({
+          where: { organizationId, deletedAt: null, employmentStatus: EmploymentStatus.NOTICE_PERIOD },
+        }),
+        this.prisma.employee.count({
+          where: { organizationId, deletedAt: null, dateOfJoining: { gte: startOfMonth, lte: endOfMonth } },
+        }),
+      ]);
 
     // Sanitize each item based on viewer role
     const sanitizedItems = items.map((emp) => {
@@ -571,6 +588,13 @@ export class EmployeeService {
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+      },
+      summary: {
+        totalHeadcount: activeCount + probationCount + noticeCount,
+        activeCount,
+        probationCount,
+        noticeCount,
+        newHiresThisMonth: newHiresCount,
       },
     };
   }

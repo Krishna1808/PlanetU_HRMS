@@ -9,7 +9,10 @@ export class FinalizedPayableDaysDto {
   weeklyOffDays: number;
   paidLeaveDays: number;
   halfDays: number;
+  holidayDays?: number;
   unexcusedAbsenceDays: number;
   lwpDays: number;
+  upcomingScheduledDays?: number;
   payableDays: number;
 }
+

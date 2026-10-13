@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
 import { Icons } from './Icons';
+import { DonutChart } from './ReportCharts';
 
 export function OrganizationMastersPage() {
   const [activeTab, setActiveTab] = useState<
@@ -433,6 +434,39 @@ export function OrganizationMastersPage() {
     currentUser.role === 'CLIENT_SUPER_ADMIN' ||
     currentUser.role === 'HR_ADMIN';
 
+  // Department Headcount Slices
+  const deptHeadcountMap: Record<string, number> = {};
+  for (const emp of allEmployees) {
+    const deptName = emp.department?.name || departments.find((d) => d.id === emp.departmentId)?.name || 'Unassigned';
+    deptHeadcountMap[deptName] = (deptHeadcountMap[deptName] || 0) + 1;
+  }
+  const deptHeadcountSlices = Object.entries(deptHeadcountMap).map(([label, value]) => ({
+    label,
+    value,
+    sublabel: `${value} employee${value > 1 ? 's' : ''}`,
+  }));
+
+  // Location Headcount Slices
+  const locHeadcountMap: Record<string, number> = {};
+  for (const emp of allEmployees) {
+    const locName = emp.location?.name || locations.find((l) => l.id === emp.locationId)?.name || 'HQ / Primary';
+    locHeadcountMap[locName] = (locHeadcountMap[locName] || 0) + 1;
+  }
+  const locHeadcountSlices = Object.entries(locHeadcountMap).map(([label, value]) => ({
+    label,
+    value,
+    sublabel: `${value} employee${value > 1 ? 's' : ''}`,
+  }));
+
+  // Holiday Type Slices
+  const holidayTypeSlices = [
+    { label: 'Mandatory / Statutory', value: holidays.filter((h) => !h.isRestricted).length, color: '#2563eb', sublabel: 'Company-wide paid off' },
+    { label: 'Restricted / Floating', value: holidays.filter((h) => h.isRestricted).length, color: '#f59e0b', sublabel: 'Optional floating' },
+  ].filter((s) => s.value > 0);
+
+  const unassignedHeadsCount = departments.filter((d) => !d.headId).length;
+  const maxGradeLevel = grades.length > 0 ? Math.max(...grades.map((g) => g.level || 1)) : 1;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Header Banner */}
@@ -447,6 +481,39 @@ export function OrganizationMastersPage() {
           <span style={{ background: '#1e293b', color: '#38bdf8', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
             Active Tenant: PlanetU HRMS
           </span>
+        </div>
+      </div>
+
+      {/* Master Summary Metric Strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+        <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Departments</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', marginTop: '4px' }}>{departments.length}</div>
+          <div style={{ fontSize: '11px', color: unassignedHeadsCount > 0 ? '#d97706' : '#64748b', marginTop: '2px' }}>
+            {unassignedHeadsCount > 0 ? `${unassignedHeadsCount} without assigned head` : 'All heads assigned'}
+          </div>
+        </div>
+        <div style={{ background: '#eff6ff', padding: '14px', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Designations</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#1d4ed8', marginTop: '4px' }}>{designations.length}</div>
+          <div style={{ fontSize: '11px', color: '#3b82f6', marginTop: '2px' }}>Standardized job roles</div>
+        </div>
+        <div style={{ background: '#f5f3ff', padding: '14px', borderRadius: '8px', border: '1px solid #ddd6fe' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Salary Grades</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#6d28d9', marginTop: '4px' }}>{grades.length}</div>
+          <div style={{ fontSize: '11px', color: '#7c3aed', marginTop: '2px' }}>Hierarchy levels L1 to L{maxGradeLevel}</div>
+        </div>
+        <div style={{ background: '#ecfdf5', padding: '14px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Locations</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#047857', marginTop: '4px' }}>{locations.length}</div>
+          <div style={{ fontSize: '11px', color: '#10b981', marginTop: '2px' }}>Operational facilities</div>
+        </div>
+        <div style={{ background: '#fefce8', padding: '14px', borderRadius: '8px', border: '1px solid #fef08a' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{holidayYear} Holidays</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#a16207', marginTop: '4px' }}>{holidays.length}</div>
+          <div style={{ fontSize: '11px', color: '#ca8a04', marginTop: '2px' }}>
+            {holidays.filter((h) => !h.isRestricted).length} statutory • {holidays.filter((h) => h.isRestricted).length} optional
+          </div>
         </div>
       </div>
 
@@ -503,7 +570,37 @@ export function OrganizationMastersPage() {
 
       {/* TAB 1: DEPARTMENTS */}
       {activeTab === 'departments' && (
-        <div className="split-view-grid">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {allEmployees.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+              <div className="card" style={{ padding: '16px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', margin: '0 0 10px' }}>
+                  Headcount Distribution by Department
+                </h4>
+                <DonutChart data={deptHeadcountSlices} size={160} />
+              </div>
+              <div className="card" style={{ padding: '16px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', margin: '0 0 10px' }}>
+                  Department Leadership Health
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: '#f8fafc', borderRadius: '4px' }}>
+                    <span style={{ color: '#64748b' }}>Total Workforce Tracked:</span>
+                    <strong style={{ color: '#0f172a' }}>{allEmployees.length} employees</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: '#f8fafc', borderRadius: '4px' }}>
+                    <span style={{ color: '#64748b' }}>Designated Department Heads:</span>
+                    <strong style={{ color: '#0f172a' }}>{departments.length - unassignedHeadsCount} of {departments.length} assigned</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: '#f8fafc', borderRadius: '4px' }}>
+                    <span style={{ color: '#64748b' }}>Average Span per Department:</span>
+                    <strong style={{ color: '#0f172a' }}>{departments.length > 0 ? (allEmployees.length / departments.length).toFixed(1) : 0} employees/dept</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="split-view-grid">
           <div className="card">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <div>
@@ -703,6 +800,7 @@ export function OrganizationMastersPage() {
               </button>
             </form>
           </div>
+        </div>
         </div>
       )}
 
@@ -917,7 +1015,37 @@ export function OrganizationMastersPage() {
 
       {/* TAB 4: LOCATIONS */}
       {activeTab === 'locations' && (
-        <div className="split-view-grid">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {locations.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+              <div className="card" style={{ padding: '16px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', margin: '0 0 10px' }}>
+                  Headcount Distribution by Operating Location
+                </h4>
+                <DonutChart data={locHeadcountSlices} size={160} />
+              </div>
+              <div className="card" style={{ padding: '16px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', margin: '0 0 10px' }}>
+                  Facilities & Geographic Footprint
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: '#f8fafc', borderRadius: '4px' }}>
+                    <span style={{ color: '#64748b' }}>Active Operating Hubs:</span>
+                    <strong style={{ color: '#0f172a' }}>{locations.length} locations</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: '#f8fafc', borderRadius: '4px' }}>
+                    <span style={{ color: '#64748b' }}>Primary Headquarter:</span>
+                    <strong style={{ color: '#0f172a' }}>{locations[0]?.name || 'HQ'} ({locations[0]?.city || 'India'})</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: '#f8fafc', borderRadius: '4px' }}>
+                    <span style={{ color: '#64748b' }}>Employees per Location:</span>
+                    <strong style={{ color: '#0f172a' }}>{locations.length > 0 ? (allEmployees.length / locations.length).toFixed(1) : 0} avg</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="split-view-grid">
           <div className="card">
             <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Office Locations</h3>
             {loading ? (
@@ -1013,6 +1141,7 @@ export function OrganizationMastersPage() {
             </form>
           </div>
         </div>
+        </div>
       )}
 
       {/* 5. HOLIDAYS TAB */}
@@ -1091,6 +1220,37 @@ export function OrganizationMastersPage() {
               )}
             </div>
           </div>
+
+          {/* Holiday Analytics & Calendar Composition */}
+          {holidays.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+              <div className="card" style={{ padding: '16px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', margin: '0 0 10px' }}>
+                  Statutory vs Floating Festival Composition ({holidayYear})
+                </h4>
+                <DonutChart data={holidayTypeSlices} size={160} />
+              </div>
+              <div className="card" style={{ padding: '16px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 700, color: '#334155', margin: '0 0 10px' }}>
+                  Statutory Compliance & Time-Off Allowance
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: '#f8fafc', borderRadius: '4px' }}>
+                    <span style={{ color: '#64748b' }}>Statutory Mandatory Holidays:</span>
+                    <strong style={{ color: '#2563eb' }}>{holidays.filter((h) => !h.isRestricted).length} days</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: '#f8fafc', borderRadius: '4px' }}>
+                    <span style={{ color: '#64748b' }}>Restricted / Floating Days:</span>
+                    <strong style={{ color: '#ca8a04' }}>{holidays.filter((h) => h.isRestricted).length} days</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: '#f8fafc', borderRadius: '4px' }}>
+                    <span style={{ color: '#64748b' }}>Calendar Coverage Scope:</span>
+                    <strong style={{ color: '#059669' }}>Year {holidayYear} Full Calendar</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Holiday List Grid / Cards */}
           {holidays.length === 0 ? (

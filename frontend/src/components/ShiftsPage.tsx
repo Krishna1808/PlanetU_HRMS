@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
+import { DonutChart } from './ReportCharts';
 
 export function ShiftsPage() {
   const [shifts, setShifts] = useState<any[]>([]);
@@ -74,6 +75,18 @@ export function ShiftsPage() {
 
   const daysOfWeek = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
 
+  const totalShifts = shifts.length;
+  const activeShifts = shifts.filter((s) => s.isActive !== false).length;
+  const overnightShifts = shifts.filter((s) => s.isOvernight).length;
+  const defaultShift = shifts.find((s) => s.isDefault);
+  const totalEmployees = employees.length;
+
+  const shiftDurationSlices = shifts.map((s) => ({
+    label: `${s.code} (${s.name})`,
+    value: Math.round(s.fullDayThresholdMinutes / 60),
+    sublabel: `${s.startTime} - ${s.endTime} (${s.fullDayThresholdMinutes / 60}h req)`,
+  }));
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div className="card">
@@ -95,6 +108,61 @@ export function ShiftsPage() {
             Assign Shift to Employee
           </button>
         </div>
+
+        {/* Shift Roster Metric Strip */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+          <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Configured Shifts</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', marginTop: '4px' }}>{totalShifts}</div>
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>{activeShifts} active in roster</div>
+          </div>
+          <div style={{ background: '#eff6ff', padding: '14px', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Default Schedule</div>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: '#1d4ed8', marginTop: '4px' }}>{defaultShift?.code || 'GEN'}</div>
+            <div style={{ fontSize: '11px', color: '#3b82f6', marginTop: '2px' }}>{defaultShift?.name || 'General'} ({defaultShift?.startTime || '09:00'} - {defaultShift?.endTime || '18:00'})</div>
+          </div>
+          <div style={{ background: '#fefce8', padding: '14px', borderRadius: '8px', border: '1px solid #fef08a' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Overnight Shifts</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#a16207', marginTop: '4px' }}>{overnightShifts}</div>
+            <div style={{ fontSize: '11px', color: '#ca8a04', marginTop: '2px' }}>{overnightShifts > 0 ? 'Cross-midnight spans' : 'Standard daytime'}</div>
+          </div>
+          <div style={{ background: '#ecfdf5', padding: '14px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Eligible Headcount</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#047857', marginTop: '4px' }}>{totalEmployees}</div>
+            <div style={{ fontSize: '11px', color: '#10b981', marginTop: '2px' }}>Active personnel tracked</div>
+          </div>
+        </div>
+
+        {/* Visual Analytics Panel */}
+        {shifts.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+            <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Shift Duration & Thresholds (Hours)</div>
+              <DonutChart data={shiftDurationSlices} size={160} />
+            </div>
+            <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Attendance Safeguard Policy Rules</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px', color: '#475569' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: '#f8fafc', borderRadius: '4px' }}>
+                  <span>Default Grace Period:</span>
+                  <strong style={{ color: '#0f172a' }}>{defaultShift?.gracePeriodMinutes || 15} minutes</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: '#f8fafc', borderRadius: '4px' }}>
+                  <span>Full-Day Attendance Threshold:</span>
+                  <strong style={{ color: '#0f172a' }}>{(defaultShift?.fullDayThresholdMinutes || 480) / 60} hours</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: '#f8fafc', borderRadius: '4px' }}>
+                  <span>Half-Day Minimum Threshold:</span>
+                  <strong style={{ color: '#0f172a' }}>{(defaultShift?.halfDayThresholdMinutes || 240) / 60} hours</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: '#f8fafc', borderRadius: '4px' }}>
+                  <span>Deductible Break Duration:</span>
+                  <strong style={{ color: '#0f172a' }}>{defaultShift?.breakDurationMinutes || 60} minutes</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && <div style={{ color: '#dc2626', marginBottom: '12px' }}>{error}</div>}
 

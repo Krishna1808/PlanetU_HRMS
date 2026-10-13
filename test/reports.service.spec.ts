@@ -44,6 +44,7 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
         count: jest.fn(),
         groupBy: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
       },
       attendanceRecord: {
         count: jest.fn(),
@@ -76,6 +77,7 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       },
       department: {
         findMany: jest.fn(),
+        findFirst: jest.fn(),
       },
       designation: {
         findMany: jest.fn(),
@@ -119,6 +121,39 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       expect(overview.presenceRate).toBe(90); // 45/50 = 90%
       expect(overview.currentMonthPayrollExpense).toBe(1250000);
       expect(overview.pendingApprovals.total).toBe(4);
+    });
+
+    it('scopes overview metrics to manager department and hides company payroll', async () => {
+      mockPrisma.employee.findUnique.mockResolvedValue({
+        id: 'emp-mgr-1',
+        departmentId: 'dept-eng-1',
+        department: { id: 'dept-eng-1', name: 'Engineering' },
+      });
+
+      mockPrisma.employee.count
+        .mockResolvedValueOnce(12) // activeHeadcount in dept
+        .mockResolvedValueOnce(2) // newHiresThisMonth in dept
+        .mockResolvedValueOnce(0); // exitsThisMonth in dept
+
+      mockPrisma.attendanceRecord.count
+        .mockResolvedValueOnce(11) // todayPunches in dept
+        .mockResolvedValueOnce(1); // todayLatePunches in dept
+
+      mockPrisma.leaveRequest.count.mockResolvedValue(2); // pendingLeaves for team
+      mockPrisma.exitRequest.count.mockResolvedValue(0); // pendingExits for team
+      mockPrisma.onboardingCandidate.count.mockResolvedValue(1); // pendingOnboarding for dept
+
+      const overview = await service.getExecutiveOverview(orgId, mockManagerUser);
+
+      expect(overview.activeHeadcount).toBe(12);
+      expect(overview.newHiresThisMonth).toBe(2);
+      expect(overview.exitsThisMonth).toBe(0);
+      expect(overview.presenceRate).toBe(91.7);
+      expect(overview.currentMonthPayrollExpense).toBeNull();
+      expect(overview.departmentId).toBe('dept-eng-1');
+      expect(overview.departmentName).toBe('Engineering');
+      expect(overview.isDepartmentScoped).toBe(true);
+      expect(overview.pendingApprovals.leaves).toBe(2);
     });
   });
 

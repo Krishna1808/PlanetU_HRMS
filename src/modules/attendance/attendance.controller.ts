@@ -106,6 +106,16 @@ export class AttendanceController {
   }
 
   /**
+   * GET /api/v1/attendance/summary
+   * Today's attendance roll call summary (HR/Admin, Managers, Finance)
+   */
+  @Get('summary')
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN, Role.MANAGER, Role.FINANCE)
+  async getRollCallSummary(@CurrentUser() user: AuthenticatedUser) {
+    return this.attendanceService.getRollCallSummary(user.organizationId, user);
+  }
+
+  /**
    * POST /api/v1/attendance/regularize
    * Manual attendance regularization (HR/Admin and Managers)
    */

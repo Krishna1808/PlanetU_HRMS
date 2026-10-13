@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
+import { DonutChart } from './ReportCharts';
 
 export function LeavesPage({ user }: { user: any }) {
   const [balances, setBalances] = useState<any[]>([]);
   const [myRequests, setMyRequests] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
+  const [oooTimeline, setOooTimeline] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -86,17 +88,19 @@ export function LeavesPage({ user }: { user: any }) {
     try {
       setLoading(true);
       setError('');
-      const [balancesRes, requestsRes, typesRes, pendingRes] = await Promise.all([
+      const [balancesRes, requestsRes, typesRes, pendingRes, oooRes] = await Promise.all([
         api.getMyLeaveBalances().catch(() => ({ balances: [] })),
         api.getMyLeaveRequests().catch(() => []),
         api.getLeaveTypes().catch(() => []),
         isManagerOrAdmin ? api.getPendingLeaves().catch(() => []) : Promise.resolve([]),
+        api.getOutOfOfficeTimeline().catch(() => []),
       ]);
 
       setBalances(balancesRes.balances || []);
       setMyRequests(requestsRes || []);
       setLeaveTypes(typesRes || []);
       setPendingRequests(pendingRes || []);
+      setOooTimeline(oooRes || []);
       if (typesRes.length > 0 && !selectedLeaveTypeId) {
         setSelectedLeaveTypeId(typesRes[0].id);
       }
@@ -317,21 +321,74 @@ export function LeavesPage({ user }: { user: any }) {
 
       {error && <div className="card" style={{ color: '#dc2626' }}>{error}</div>}
 
-      {/* Live Balance Cards */}
-      <div className="card">
-        <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '14px' }}>My Live Leave Balances</h3>
-        {balances.length === 0 ? (
-          <div style={{ color: '#64748b', fontSize: '13px' }}>No leave balances available.</div>
+      {/* Team Out-Of-Office Strip */}
+      <div className="card" style={{ borderLeft: '4px solid #0284c7' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+          <div>
+            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Who's Out / Out-Of-Office Timeline</h3>
+            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+              Approved leaves today and scheduled over the next 14 calendar days across your organization.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span className="badge badge-active" style={{ background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }}>
+              {oooTimeline.filter((t) => t.isToday).length} Away Today
+            </span>
+            <span className="badge badge-role">
+              {oooTimeline.length} In Next 14 Days
+            </span>
+          </div>
+        </div>
+
+        {oooTimeline.length === 0 ? (
+          <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '6px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
+            🌴 No team members currently on leave or scheduled away in the next 14 days. Full workforce capacity!
+          </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
-            {balances.map((b) => (
-              <div key={b.leaveTypeId} style={{ background: '#f8fafc', padding: '16px', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>{b.leaveTypeName} ({b.leaveTypeCode})</div>
-                <div style={{ fontSize: '28px', fontWeight: 800, color: b.isPaid ? '#2563eb' : '#dc2626', margin: '6px 0' }}>
-                  {b.availableBalance}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '10px' }}>
+            {oooTimeline.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  background: item.isToday ? '#fef3c7' : '#f8fafc',
+                  border: item.isToday ? '1px solid #fde68a' : '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>
+                    {item.employeeName}
+                  </div>
+                  {item.isToday ? (
+                    <span style={{ fontSize: '10px', fontWeight: 700, background: '#f59e0b', color: '#ffffff', padding: '1px 6px', borderRadius: '4px' }}>
+                      Out Today
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#64748b' }}>
+                      {item.employeeCode}
+                    </span>
+                  )}
                 </div>
-                <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                  Allowed: {b.daysAllowedPerYear}d • Pending: {b.pendingDays}d
+
+                <div style={{ fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ padding: '1px 6px', background: '#e2e8f0', borderRadius: '4px', fontSize: '10px', fontWeight: 600 }}>
+                    {item.leaveTypeName}
+                  </span>
+                  {item.departmentName && (
+                    <span style={{ color: '#64748b', fontSize: '11px' }}>• {item.departmentName}</span>
+                  )}
+                </div>
+
+                <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
+                  <span>
+                    {new Date(item.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    {item.startDate !== item.endDate && ` - ${new Date(item.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}
+                  </span>
+                  <strong>{item.totalDays} day{item.totalDays !== 1 ? 's' : ''}{item.isHalfDay ? ' (Half)' : ''}</strong>
                 </div>
               </div>
             ))}
@@ -339,19 +396,92 @@ export function LeavesPage({ user }: { user: any }) {
         )}
       </div>
 
+      {/* Live Balance Cards */}
+      <div className="card">
+        <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '14px' }}>My Live Leave Balances</h3>
+        {balances.length === 0 ? (
+          <div style={{ color: '#64748b', fontSize: '13px' }}>No leave balances available.</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+            {balances.map((b) => {
+              const allowed = Number(b.daysAllowedPerYear) || 0;
+              const available = Number(b.availableBalance) || 0;
+              const used = Math.max(0, allowed - available);
+              const burnPercent = allowed > 0 ? Math.min(100, Math.round((used / allowed) * 100)) : 0;
+              const barColor = burnPercent > 85 ? '#dc2626' : burnPercent > 60 ? '#f59e0b' : '#2563eb';
+
+              return (
+                <div
+                  key={b.leaveTypeId}
+                  style={{
+                    background: '#f8fafc',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>{b.leaveTypeName}</span>
+                    <span className="badge badge-role" style={{ fontSize: '10px' }}>{b.leaveTypeCode}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', margin: '4px 0' }}>
+                    <span style={{ fontSize: '28px', fontWeight: 800, color: b.isPaid ? '#2563eb' : '#0f172a' }}>
+                      {b.availableBalance}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>days remaining</span>
+                  </div>
+
+                  {/* Quota Burn Progress Bar */}
+                  {allowed > 0 && (
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>
+                        <span>Burned: {used}d ({burnPercent}%)</span>
+                        <span>Annual Cap: {allowed}d</span>
+                      </div>
+                      <div style={{ width: '100%', height: '7px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            width: `${burnPercent}%`,
+                            height: '100%',
+                            background: barColor,
+                            borderRadius: '4px',
+                            transition: 'width 0.4s ease',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                    <span>{b.isPaid ? 'Paid Leave' : 'Unpaid (LWP)'}</span>
+                    {b.pendingDays > 0 && (
+                      <span style={{ color: '#d97706', fontWeight: 600 }}>{b.pendingDays}d pending approval</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Leave Policies Overview (Visible to HR Admin & Super Admin) */}
       {isHrOrSuperAdmin && (
         <div className="card" style={{ borderLeft: '4px solid #3b82f6' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Active Organization Leave Policies ({leaveTypes.length})</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: 600 }}>Active Organization Leave Policies & Quotas ({leaveTypes.length})</h3>
               <p style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
                 Managed policies configured for your organization. HR Admins and Super Admins can add new policies or credit days.
               </p>
             </div>
             <button
               className="btn btn-secondary"
-              style={{ fontSize: '12px', padding: '4px 10px' }}
+              style={{ fontSize: '12px', padding: '5px 12px' }}
               onClick={() => setShowAddPolicyModal(true)}
             >
               Define New Policy
@@ -361,37 +491,57 @@ export function LeavesPage({ user }: { user: any }) {
           {leaveTypes.length === 0 ? (
             <div style={{ color: '#64748b', fontSize: '13px' }}>No leave policies defined. Click 'Define New Policy' to add one.</div>
           ) : (
-            <div className="table-responsive">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Policy Name</th>
-                    <th>Code</th>
-                    <th>Type</th>
-                    <th>Quota (Days/Year)</th>
-                    <th>Accrual</th>
-                    <th>Carry Forward Max</th>
-                    <th>Approval Required</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaveTypes.map((type) => (
-                    <tr key={type.id}>
-                      <td><strong>{type.name}</strong></td>
-                      <td><span className="badge badge-role">{type.code}</span></td>
-                      <td>
-                        <span className={`badge ${type.isPaid ? 'badge-active' : 'badge-inactive'}`}>
-                          {type.isPaid ? 'Paid' : 'Unpaid (LWP)'}
-                        </span>
-                      </td>
-                      <td>{type.daysAllowedPerYear} days</td>
-                      <td style={{ textTransform: 'capitalize' }}>{type.accrualFrequency?.toLowerCase() || 'Monthly'}</td>
-                      <td>{type.carryForwardLimit} days</td>
-                      <td>{type.requiresApproval ? 'Yes' : 'No (Auto)'}</td>
+            <div style={{ display: 'grid', gridTemplateColumns: leaveTypes.length > 0 ? 'minmax(0, 2fr) minmax(240px, 1fr)' : '1fr', gap: '20px', alignItems: 'start' }}>
+              <div className="table-responsive">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Policy Name</th>
+                      <th>Code</th>
+                      <th>Type</th>
+                      <th>Quota (Days/Year)</th>
+                      <th>Accrual</th>
+                      <th>Carry Forward Max</th>
+                      <th>Approval Required</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {leaveTypes.map((type) => (
+                      <tr key={type.id}>
+                        <td><strong>{type.name}</strong></td>
+                        <td><span className="badge badge-role">{type.code}</span></td>
+                        <td>
+                          <span className={`badge ${type.isPaid ? 'badge-active' : 'badge-inactive'}`}>
+                            {type.isPaid ? 'Paid' : 'Unpaid (LWP)'}
+                          </span>
+                        </td>
+                        <td>{type.daysAllowedPerYear} days</td>
+                        <td style={{ textTransform: 'capitalize' }}>{type.accrualFrequency?.toLowerCase() || 'Monthly'}</td>
+                        <td>{type.carryForwardLimit} days</td>
+                        <td>{type.requiresApproval ? 'Yes' : 'No (Auto)'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Policy Allocation Donut */}
+              <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>
+                  Annual Policy Quotas
+                </h4>
+                <DonutChart
+                  data={leaveTypes.map((t) => ({
+                    label: t.name,
+                    value: Number(t.daysAllowedPerYear) || 1,
+                    sublabel: `${t.daysAllowedPerYear}d`,
+                  }))}
+                  size={160}
+                  thickness={20}
+                  centerTitle="Total Quota"
+                  centerValue={`${leaveTypes.reduce((s, t) => s + (Number(t.daysAllowedPerYear) || 0), 0)}d`}
+                />
+              </div>
             </div>
           )}
         </div>

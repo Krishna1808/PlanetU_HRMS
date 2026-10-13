@@ -1150,4 +1150,66 @@ export class LeaveService {
 
     return approvedLwp.reduce((sum, req) => sum + Number(req.totalDays), 0);
   }
+
+  /**
+   * Retrieves approved leaves currently active or starting within the next 14 days.
+   * Useful for Out-Of-Office team calendars and coverage planning.
+   */
+  async getOutOfOfficeTimeline(organizationId: string, currentUser: AuthenticatedUser) {
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+    const next14Days = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 14, 23, 59, 59));
+
+    const where: any = {
+      organizationId,
+      status: LeaveRequestStatus.APPROVED,
+      startDate: { lte: next14Days },
+      endDate: { gte: todayStart },
+    };
+
+    if (currentUser.role === Role.MANAGER && currentUser.employeeId) {
+      where.employee = {
+        OR: [
+          { reportingManagerId: currentUser.employeeId },
+          { id: currentUser.employeeId },
+        ],
+      };
+    }
+
+    const requests = await this.prisma.leaveRequest.findMany({
+      where,
+      include: {
+        employee: {
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+            department: { select: { name: true } },
+          },
+        },
+        leaveType: { select: { id: true, name: true, code: true, isPaid: true } },
+      },
+      orderBy: { startDate: 'asc' },
+    });
+
+    return requests.map((r) => {
+      const isToday =
+        new Date(r.startDate) <= todayStart && new Date(r.endDate) >= todayStart;
+      return {
+        id: r.id,
+        employeeId: r.employeeId,
+        employeeName: `${r.employee.firstName} ${r.employee.lastName}`,
+        employeeCode: r.employee.employeeCode,
+        departmentName: r.employee.department?.name,
+        leaveTypeName: r.leaveType.name,
+        leaveTypeCode: r.leaveType.code,
+        startDate: r.startDate,
+        endDate: r.endDate,
+        totalDays: Number(r.totalDays),
+        isHalfDay: r.isHalfDay,
+        isToday,
+      };
+    });
+  }
 }

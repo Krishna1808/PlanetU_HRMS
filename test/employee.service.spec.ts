@@ -571,6 +571,26 @@ describe('EmployeeService (Module 3: Employee Lifecycle)', () => {
         }),
       );
     });
+
+    it('returns aggregate summary metrics alongside paginated results', async () => {
+      mockPrisma.employee.count
+        .mockResolvedValueOnce(25) // query total
+        .mockResolvedValueOnce(20) // activeCount
+        .mockResolvedValueOnce(3)  // probationCount
+        .mockResolvedValueOnce(2)  // noticeCount
+        .mockResolvedValueOnce(5); // newHiresCount
+      mockPrisma.employee.findMany.mockResolvedValue([mockEmployee]);
+
+      const result = await service.listEmployees(orgId, { page: 1, limit: 10 }, hrAdmin);
+
+      expect(result.summary).toEqual({
+        totalHeadcount: 25,
+        activeCount: 20,
+        probationCount: 3,
+        noticeCount: 2,
+        newHiresThisMonth: 5,
+      });
+    });
   });
 
   // -------------------------------------------------------------------------

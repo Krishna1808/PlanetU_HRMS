@@ -35,7 +35,7 @@ export class AttendanceService {
    * Truncates a date to UTC midnight (YYYY-MM-DD) for uniform date indexing
    */
   private truncateToDateOnly(d: Date): Date {
-    return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   }
 
   // ---------------------------------------------------------------------------
@@ -433,7 +433,7 @@ export class AttendanceService {
   ): Promise<FinalizedPayableDaysDto> {
     const employee = await this.prisma.employee.findFirst({
       where: { id: employeeId, organizationId, deletedAt: null },
-      select: { id: true, employeeCode: true, firstName: true, lastName: true },
+      select: { id: true, employeeCode: true, firstName: true, lastName: true, locationId: true },
     });
 
     if (!employee) {
@@ -472,6 +472,26 @@ export class AttendanceService {
       include: { leaveType: true },
     });
 
+    // 3. Fetch company holidays in this calendar month
+    const holidays = (this.prisma as any).holiday
+      ? await (this.prisma as any).holiday.findMany({
+          where: {
+            organizationId,
+            date: { gte: startDate, lte: endDate },
+            isRestricted: false,
+            OR: [
+              { locationId: null },
+              ...(employee.locationId ? [{ locationId: employee.locationId }] : []),
+            ],
+          },
+        })
+      : [];
+    const holidayMap = new Map<string, any>();
+    for (const h of holidays) {
+      const hStr = h.date.toISOString().split('T')[0];
+      holidayMap.set(hStr, h);
+    }
+
     const dayOfWeekMap: DayOfWeek[] = [
       DayOfWeek.SUNDAY,
       DayOfWeek.MONDAY,
@@ -482,17 +502,27 @@ export class AttendanceService {
       DayOfWeek.SATURDAY,
     ];
 
+    // Determine current month bounds to prevent future dates from becoming false absences
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth() + 1;
+    const currentDay = now.getUTCDate();
+    const isCurrentMonth = (year === currentYear && month === currentMonth);
+
     let presentDays = 0;
     let halfDays = 0;
     let weeklyOffDays = 0;
     let paidLeaveDays = 0;
     let lwpDays = 0;
+    let holidayDays = 0;
     let unexcusedAbsenceDays = 0;
+    let upcomingScheduledDays = 0;
 
-    // 3. Reconcile day-by-day
+    // 4. Reconcile day-by-day
     for (let day = 1; day <= totalMonthDays; day++) {
       const currentCalDate = new Date(Date.UTC(year, month - 1, day));
       const dateKey = currentCalDate.toISOString().split('T')[0];
+      const isFutureDate = isCurrentMonth && day > currentDay;
 
       const record = recordMap.get(dateKey);
 
@@ -504,6 +534,8 @@ export class AttendanceService {
           halfDays += 1;
         } else if (record.status === AttendanceStatus.WEEKLY_OFF) {
           weeklyOffDays += 1;
+        } else if (record.status === AttendanceStatus.HOLIDAY) {
+          holidayDays += 1;
         } else if (record.status === AttendanceStatus.ON_LEAVE) {
           if (record.isPaid) {
             paidLeaveDays += record.isHalfDay ? 0.5 : 1.0;
@@ -514,7 +546,13 @@ export class AttendanceService {
           unexcusedAbsenceDays += 1;
         }
       } else {
-        // No explicit record exists: evaluate against Shift Roster & Leave Requests
+        // 1. Check if date is an official company holiday
+        if (holidayMap.has(dateKey)) {
+          holidayDays += 1;
+          continue;
+        }
+
+        // 2. Check Shift Roster for Weekly Off
         const shiftInfo = await this.shiftService.getEmployeeShiftForDate(
           organizationId,
           employeeId,
@@ -526,7 +564,7 @@ export class AttendanceService {
         if (isWeeklyOff) {
           weeklyOffDays += 1;
         } else {
-          // Check if employee has an approved leave covering this date
+          // 3. Check if employee has an approved leave covering this date
           const matchingLeave = approvedLeaves.find(
             (l) =>
               this.truncateToDateOnly(l.startDate) <= currentCalDate &&
@@ -540,17 +578,22 @@ export class AttendanceService {
               lwpDays += matchingLeave.isHalfDay ? 0.5 : 1.0;
             }
           } else {
-            // UNEXCUSED ABSENCE: Working day, no punch, no approved leave!
-            unexcusedAbsenceDays += 1;
+            if (isFutureDate) {
+              // Future date in active ongoing cycle: scheduled, not an unexcused absence
+              upcomingScheduledDays += 1;
+            } else {
+              // Working day, no punch, no approved leave, elapsed = UNEXCUSED ABSENCE
+              unexcusedAbsenceDays += 1;
+            }
           }
         }
       }
     }
 
     // Authoritative Payable Days:
-    // Every present day + half days (at 0.5) + paid leaves + weekly offs
+    // Every present day + half days (at 0.5) + paid leaves + weekly offs + paid holidays
     const payableDays =
-      presentDays + halfDays * 0.5 + paidLeaveDays + weeklyOffDays;
+      presentDays + halfDays * 0.5 + paidLeaveDays + weeklyOffDays + holidayDays;
 
     return {
       employeeId: employee.id,
@@ -563,9 +606,90 @@ export class AttendanceService {
       weeklyOffDays,
       paidLeaveDays,
       halfDays,
+      holidayDays,
       unexcusedAbsenceDays,
       lwpDays,
+      upcomingScheduledDays,
       payableDays: Math.min(totalMonthDays, payableDays),
+    };
+  }
+
+  /**
+   * Retrieves today's attendance roll call summary across the organization (or direct reports for Manager).
+   */
+  async getRollCallSummary(organizationId: string, currentUser: AuthenticatedUser) {
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0));
+    const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59));
+
+    const empWhere: any = {
+      organizationId,
+      deletedAt: null,
+      employmentStatus: 'ACTIVE',
+    };
+
+    if (currentUser.role === Role.MANAGER && currentUser.employeeId) {
+      empWhere.OR = [
+        { reportingManagerId: currentUser.employeeId },
+        { id: currentUser.employeeId },
+      ];
+    }
+
+    const [totalScheduled, todayRecords, activeLeaves] = await Promise.all([
+      this.prisma.employee.count({ where: empWhere }),
+      this.prisma.attendanceRecord.findMany({
+        where: {
+          organizationId,
+          date: { gte: todayStart, lte: todayEnd },
+          employee: empWhere,
+        },
+        select: { status: true, isLate: true, isHalfDay: true },
+      }),
+      this.prisma.leaveRequest.count({
+        where: {
+          organizationId,
+          status: LeaveRequestStatus.APPROVED,
+          startDate: { lte: todayEnd },
+          endDate: { gte: todayStart },
+          employee: empWhere,
+        },
+      }),
+    ]);
+
+    let present = 0;
+    let late = 0;
+    let halfDay = 0;
+    let explicitAbsent = 0;
+
+    for (const r of todayRecords) {
+      if (r.status === AttendanceStatus.PRESENT) {
+        present++;
+      } else if (r.status === AttendanceStatus.HALF_DAY) {
+        halfDay++;
+      } else if (r.status === AttendanceStatus.ABSENT) {
+        explicitAbsent++;
+      }
+      if (r.isLate) late++;
+    }
+
+    const totalPunched = present + halfDay;
+    const presenceRate = totalScheduled > 0
+      ? Number(((totalPunched / totalScheduled) * 100).toFixed(1))
+      : 0;
+
+    const onLeave = activeLeaves;
+    const unrecorded = Math.max(0, totalScheduled - totalPunched - onLeave);
+
+    return {
+      todayDate: todayStart.toISOString().split('T')[0],
+      totalScheduled,
+      present,
+      halfDay,
+      late,
+      onLeave,
+      unrecorded,
+      explicitAbsent,
+      presenceRate,
     };
   }
 }

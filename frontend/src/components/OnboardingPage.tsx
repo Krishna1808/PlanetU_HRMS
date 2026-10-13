@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
+import { DonutChart, CircularGauge } from './ReportCharts';
 
 interface OnboardingPageProps {
   user?: any;
@@ -238,6 +239,33 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
     }
   };
 
+  const totalCandidates = candidates.length;
+  const invitedCount = candidates.filter((c) => c.status === 'INVITED').length;
+  const submittedCount = candidates.filter((c) => c.status === 'SUBMITTED' || c.status === 'IN_PROGRESS').length;
+  const convertedCount = candidates.filter((c) => c.status === 'CONVERTED' || c.status === 'APPROVED').length;
+  const joiningSoonCount = candidates.filter((c) => {
+    if (c.status === 'CONVERTED' || !c.proposedJoiningDate) return false;
+    const days = Math.ceil((new Date(c.proposedJoiningDate).getTime() - Date.now()) / (1000 * 3600 * 24));
+    return days >= 0 && days <= 14;
+  }).length;
+
+  // Department Additions Donut Slices
+  const deptCountMap: Record<string, number> = {};
+  for (const c of candidates) {
+    const deptName = c.department?.name || 'Unassigned';
+    deptCountMap[deptName] = (deptCountMap[deptName] || 0) + 1;
+  }
+  const deptSlices = Object.entries(deptCountMap).map(([label, value]) => ({
+    label,
+    value,
+    sublabel: `${value} candidate${value > 1 ? 's' : ''}`,
+  }));
+
+  // Checklist Tasks Completion Rate
+  const overallMandatoryTasks = candidates.reduce((s, c) => s + (c.tasks?.filter((t: any) => t.isMandatory).length || 0), 0);
+  const completedMandatoryTasks = candidates.reduce((s, c) => s + (c.tasks?.filter((t: any) => t.isMandatory && t.status === 'COMPLETED').length || 0), 0);
+  const verificationRate = overallMandatoryTasks > 0 ? Math.round((completedMandatoryTasks / overallMandatoryTasks) * 100) : 0;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Header card */}
@@ -253,6 +281,54 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
             Invite New Candidate
           </button>
         </div>
+
+        {/* Onboarding Pipeline Metric Strip */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px', marginTop: '20px' }}>
+          <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Pipeline</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', marginTop: '4px' }}>{totalCandidates}</div>
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>All tracked candidates</div>
+          </div>
+          <div style={{ background: '#eff6ff', padding: '14px', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Invited / Sent</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#1d4ed8', marginTop: '4px' }}>{invitedCount}</div>
+            <div style={{ fontSize: '11px', color: '#3b82f6', marginTop: '2px' }}>Awaiting pre-board form</div>
+          </div>
+          <div style={{ background: '#fefce8', padding: '14px', borderRadius: '8px', border: '1px solid #fef08a' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Form Submitted</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#a16207', marginTop: '4px' }}>{submittedCount}</div>
+            <div style={{ fontSize: '11px', color: '#ca8a04', marginTop: '2px' }}>Checklist in progress</div>
+          </div>
+          <div style={{ background: '#ecfdf5', padding: '14px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Converted</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#047857', marginTop: '4px' }}>{convertedCount}</div>
+            <div style={{ fontSize: '11px', color: '#10b981', marginTop: '2px' }}>Profiles & logins live</div>
+          </div>
+          <div style={{ background: '#fdf4ff', padding: '14px', borderRadius: '8px', border: '1px solid #f5d0fe' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: '#9333ea', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Joining Soon</div>
+            <div style={{ fontSize: '24px', fontWeight: 700, color: '#7e22ce', marginTop: '4px' }}>{joiningSoonCount}</div>
+            <div style={{ fontSize: '11px', color: '#a855f7', marginTop: '2px' }}>Within next 14 days</div>
+          </div>
+        </div>
+
+        {/* Visual Analytics Panel */}
+        {candidates.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginTop: '16px' }}>
+            <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Candidate Intake by Department</div>
+              <DonutChart data={deptSlices} size={160} />
+            </div>
+            <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px', alignSelf: 'flex-start' }}>Mandatory Verification Velocity</div>
+              <CircularGauge
+                value={verificationRate}
+                label="Checklist Cleared"
+                sublabel={`${completedMandatoryTasks} of ${overallMandatoryTasks} verified`}
+                size={150}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Pipeline Filter Bar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', flexWrap: 'wrap', gap: '12px' }}>
@@ -379,10 +455,33 @@ export function OnboardingPage({ user: _user }: OnboardingPageProps) {
                         <span className={`badge ${getStatusBadgeClass(c.status)}`}>{c.status}</span>
                       </td>
                       <td>
-                        <div style={{ fontSize: '11px' }}>
-                          <span style={{ fontWeight: 600, color: allDone ? '#059669' : '#d97706' }}>
-                            {completedMandatory}/{mandatoryTasks.length} mandatory
-                          </span>
+                        <div style={{ minWidth: '130px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: 600, color: allDone ? '#059669' : '#d97706' }}>
+                              {completedMandatory}/{mandatoryTasks.length} mandatory
+                            </span>
+                            <span style={{ fontSize: '10px', color: '#64748b' }}>
+                              {mandatoryTasks.length > 0 ? Math.round((completedMandatory / mandatoryTasks.length) * 100) : 100}%
+                            </span>
+                          </div>
+                          <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                width: `${mandatoryTasks.length > 0 ? (completedMandatory / mandatoryTasks.length) * 100 : 100}%`,
+                                height: '100%',
+                                background: allDone ? '#10b981' : '#f59e0b',
+                                borderRadius: '3px',
+                                transition: 'width 0.3s ease',
+                              }}
+                            />
+                          </div>
+                          {allDone && c.status !== 'CONVERTED' && (
+                            <div style={{ marginTop: '4px' }}>
+                              <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: '#dcfce7', color: '#15803d', textTransform: 'uppercase' }}>
+                                Ready to Convert
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td>

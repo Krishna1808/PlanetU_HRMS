@@ -112,8 +112,37 @@ export const api = {
     }),
 
   // 3. Module 1: Employees
-  getEmployees: () =>
-    fetchJson<{ data: any[]; pagination: any }>('/employees?limit=50'),
+  getEmployees: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    departmentId?: string;
+    designationId?: string;
+    locationId?: string;
+    status?: string;
+  }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.append('page', String(params.page));
+    if (params?.limit) q.append('limit', String(params.limit));
+    else q.append('limit', '50');
+    if (params?.search) q.append('search', params.search);
+    if (params?.departmentId) q.append('departmentId', params.departmentId);
+    if (params?.designationId) q.append('designationId', params.designationId);
+    if (params?.locationId) q.append('locationId', params.locationId);
+    if (params?.status) q.append('status', params.status);
+    const queryStr = q.toString() ? `?${q.toString()}` : '';
+    return fetchJson<{
+      data: any[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+      summary?: {
+        totalHeadcount: number;
+        activeCount: number;
+        probationCount: number;
+        noticeCount: number;
+        newHiresThisMonth: number;
+      };
+    }>(`/employees${queryStr}`);
+  },
 
   getEmployeeById: (id: string) => fetchJson<any>(`/employees/${id}`),
 
@@ -180,6 +209,7 @@ export const api = {
   getMyAttendanceHistory: () => fetchJson<any[]>('/attendance/my-records'),
   getPayableDays: (employeeId: string, year: number, month: number) =>
     fetchJson<any>(`/attendance/payable-days/${employeeId}?year=${year}&month=${month}`),
+  getAttendanceSummary: () => fetchJson<any>('/attendance/summary'),
 
   // 6. Module 5: Leaves
   getLeaveTypes: () => fetchJson<any[]>('/leaves/types'),
@@ -204,6 +234,7 @@ export const api = {
       method: 'POST',
     }),
   getPendingLeaves: () => fetchJson<any[]>('/leaves/pending'),
+  getOutOfOfficeTimeline: () => fetchJson<any[]>('/leaves/out-of-office'),
   actionLeave: (id: string, action: 'APPROVE' | 'REJECT' | 'APPROVED' | 'REJECTED', rejectionReason?: string) => {
     const status = action.startsWith('APPROV') ? 'APPROVED' : 'REJECTED';
     return fetchJson<any>(`/leaves/${id}/action`, {

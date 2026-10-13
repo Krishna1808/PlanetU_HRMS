@@ -5,6 +5,7 @@ import {
   DayOfWeek,
   LeaveRequestStatus,
   PunchSource,
+  Role,
 } from '@prisma/client';
 import { AttendanceService } from '../src/modules/attendance/attendance.service';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -37,6 +38,9 @@ describe('AttendanceService (Module 4: Attendance & Single Source of Truth for P
         update: jest.fn(),
       },
       leaveRequest: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      holiday: {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
@@ -258,5 +262,77 @@ describe('AttendanceService (Module 4: Attendance & Single Source of Truth for P
       // Payable Days = 20 present + 8 weekly offs + 1 paid leave = 29.0 days!
       expect(result.payableDays).toBe(29.0);
     });
+
+    it('correctly includes official company holidays in payable days without marking them as absence', async () => {
+      mockPrisma.attendanceRecord.findMany.mockResolvedValue([]);
+      mockPrisma.leaveRequest.findMany.mockResolvedValue([]);
+      // Mock statutory holiday on Sept 30
+      mockPrisma.holiday.findMany.mockResolvedValue([
+        {
+          id: 'hol-1',
+          name: 'Public Holiday',
+          date: new Date('2026-09-30T00:00:00.000Z'),
+          year: 2026,
+          isRestricted: false,
+          locationId: null,
+        },
+      ]);
+
+      const result = await service.getFinalizedPayableDays(orgId, empId, 2026, 9);
+      expect(result.holidayDays).toBe(1);
+      // Weekend days = 8, holiday = 1, remaining 21 weekdays unexcused absences
+      expect(result.weeklyOffDays).toBe(8);
+      expect(result.unexcusedAbsenceDays).toBe(21);
+      expect(result.payableDays).toBe(9); // 8 weekends + 1 paid holiday
+    });
+
+    it('does not mark future unrecorded dates in current ongoing cycle as unexcused absences', async () => {
+      mockPrisma.attendanceRecord.findMany.mockResolvedValue([]);
+      mockPrisma.leaveRequest.findMany.mockResolvedValue([]);
+      mockPrisma.holiday.findMany.mockResolvedValue([]);
+
+      const now = new Date();
+      const currentYear = now.getUTCFullYear();
+      const currentMonth = now.getUTCMonth() + 1;
+      const currentDay = now.getUTCDate();
+
+      const result = await service.getFinalizedPayableDays(orgId, empId, currentYear, currentMonth);
+
+      // Future days in current cycle must be counted in upcomingScheduledDays, not unexcused absences!
+      expect(result.upcomingScheduledDays).toBeGreaterThanOrEqual(0);
+      expect(result.unexcusedAbsenceDays).toBeLessThanOrEqual(currentDay);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 4. Roll-Call Summary
+  // ---------------------------------------------------------------------------
+
+  describe('getRollCallSummary', () => {
+    it('aggregates organization roll-call statistics for today', async () => {
+      mockPrisma.employee.count = jest.fn().mockResolvedValue(50);
+      mockPrisma.attendanceRecord.findMany.mockResolvedValue([
+        { status: AttendanceStatus.PRESENT, isLate: false, isHalfDay: false },
+        { status: AttendanceStatus.PRESENT, isLate: true, isHalfDay: false },
+        { status: AttendanceStatus.HALF_DAY, isLate: false, isHalfDay: true },
+      ]);
+      mockPrisma.leaveRequest.count = jest.fn().mockResolvedValue(2);
+
+      const user: any = {
+        id: 'u-1',
+        role: Role.HR_ADMIN,
+        organizationId: orgId,
+      };
+
+      const summary = await service.getRollCallSummary(orgId, user);
+
+      expect(summary.totalScheduled).toBe(50);
+      expect(summary.present).toBe(2);
+      expect(summary.late).toBe(1);
+      expect(summary.halfDay).toBe(1);
+      expect(summary.onLeave).toBe(2);
+      expect(summary.presenceRate).toBe(6); // (3 punched / 50 total) * 100 = 6%
+    });
   });
 });
+

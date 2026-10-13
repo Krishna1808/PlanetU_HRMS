@@ -21,6 +21,64 @@ import { AuthenticatedUser } from '../../common/types/authenticated-user.interfa
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Helper to resolve a Manager's department and employee scoping filters.
+   */
+  private async getManagerScope(
+    organizationId: string,
+    currentUser: AuthenticatedUser,
+  ): Promise<{
+    departmentId: string | null;
+    departmentName: string | null;
+    employeeFilter: Prisma.EmployeeWhereInput;
+  }> {
+    let departmentId: string | null = null;
+    let departmentName: string | null = null;
+
+    if (currentUser.employeeId) {
+      const emp = await this.prisma.employee.findUnique({
+        where: { id: currentUser.employeeId },
+        select: {
+          departmentId: true,
+          department: { select: { id: true, name: true } },
+        },
+      });
+      if (emp?.departmentId) {
+        departmentId = emp.departmentId;
+        departmentName = emp.department?.name || null;
+      }
+
+      if (!departmentId) {
+        const headedDept = await this.prisma.department.findFirst({
+          where: { organizationId, headId: currentUser.employeeId },
+          select: { id: true, name: true },
+        });
+        if (headedDept) {
+          departmentId = headedDept.id;
+          departmentName = headedDept.name;
+        }
+      }
+    }
+
+    const employeeFilter: Prisma.EmployeeWhereInput = departmentId
+      ? {
+          OR: [
+            { departmentId },
+            ...(currentUser.employeeId ? [{ reportingManagerId: currentUser.employeeId }] : []),
+          ],
+        }
+      : currentUser.employeeId
+      ? {
+          OR: [
+            { reportingManagerId: currentUser.employeeId },
+            { id: currentUser.employeeId },
+          ],
+        }
+      : {};
+
+    return { departmentId, departmentName, employeeFilter };
+  }
+
   // ---------------------------------------------------------------------------
   // 1. Executive Overview & KPI Cards
   // ---------------------------------------------------------------------------
@@ -28,6 +86,7 @@ export class ReportsService {
   /**
    * Retrieves high-level company overview metrics across headcount, today's attendance,
    * current month payroll expense, and pending operational approvals.
+   * Scopes metrics to the manager's department if currentUser is a MANAGER.
    */
   async getExecutiveOverview(
     organizationId: string,
@@ -47,27 +106,42 @@ export class ReportsService {
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59),
     );
 
+    let managerScope: {
+      departmentId: string | null;
+      departmentName: string | null;
+      employeeFilter: Prisma.EmployeeWhereInput;
+    } | null = null;
+
+    if (currentUser.role === Role.MANAGER) {
+      managerScope = await this.getManagerScope(organizationId, currentUser);
+    }
+
+    const activeEmployeeWhere: Prisma.EmployeeWhereInput = {
+      organizationId,
+      deletedAt: null,
+      employmentStatus: {
+        notIn: [EmploymentStatus.RESIGNED, EmploymentStatus.TERMINATED],
+      },
+      ...(managerScope ? managerScope.employeeFilter : {}),
+    };
+
     // 1. Total active headcount & new hires / exits this month
     const [activeHeadcount, newHiresThisMonth, exitsThisMonth] = await Promise.all([
       this.prisma.employee.count({
-        where: {
-          organizationId,
-          deletedAt: null,
-          employmentStatus: {
-            notIn: [EmploymentStatus.RESIGNED, EmploymentStatus.TERMINATED],
-          },
-        },
+        where: activeEmployeeWhere,
       }),
       this.prisma.employee.count({
         where: {
           organizationId,
           dateOfJoining: { gte: startOfMonth, lte: endOfMonth },
+          ...(managerScope ? managerScope.employeeFilter : {}),
         },
       }),
       this.prisma.employee.count({
         where: {
           organizationId,
           dateOfExit: { gte: startOfMonth, lte: endOfMonth },
+          ...(managerScope ? managerScope.employeeFilter : {}),
         },
       }),
     ]);
@@ -79,6 +153,7 @@ export class ReportsService {
           organizationId,
           date: { gte: todayStart, lte: todayEnd },
           status: { in: [AttendanceStatus.PRESENT, AttendanceStatus.HALF_DAY] },
+          ...(managerScope ? { employee: managerScope.employeeFilter } : {}),
         },
       }),
       this.prisma.attendanceRecord.count({
@@ -86,6 +161,7 @@ export class ReportsService {
           organizationId,
           date: { gte: todayStart, lte: todayEnd },
           isLate: true,
+          ...(managerScope ? { employee: managerScope.employeeFilter } : {}),
         },
       }),
     ]);
@@ -95,7 +171,7 @@ export class ReportsService {
         ? Number(((todayPunches / activeHeadcount) * 100).toFixed(1))
         : 0;
 
-    // 3. Current month payroll expense (if user has permission to see financial data)
+    // 3. Current month payroll expense (Super Admin, HR Admin, Finance ONLY - never Manager)
     let currentMonthPayrollExpense = 0;
     const canSeePayroll =
       currentUser.role === Role.CLIENT_SUPER_ADMIN ||
@@ -120,15 +196,24 @@ export class ReportsService {
     // 4. Pending approvals count
     const [pendingLeaves, pendingExits, pendingOnboarding] = await Promise.all([
       this.prisma.leaveRequest.count({
-        where: { organizationId, status: LeaveRequestStatus.PENDING },
+        where: {
+          organizationId,
+          status: LeaveRequestStatus.PENDING,
+          ...(managerScope ? { employee: managerScope.employeeFilter } : {}),
+        },
       }),
       this.prisma.exitRequest.count({
-        where: { organizationId, status: ExitStatus.PENDING_APPROVAL },
+        where: {
+          organizationId,
+          status: ExitStatus.PENDING_APPROVAL,
+          ...(managerScope ? { employee: managerScope.employeeFilter } : {}),
+        },
       }),
       this.prisma.onboardingCandidate.count({
         where: {
           organizationId,
           status: { in: [OnboardingStatus.INVITED, OnboardingStatus.IN_PROGRESS, OnboardingStatus.SUBMITTED] },
+          ...(managerScope?.departmentId ? { departmentId: managerScope.departmentId } : {}),
         },
       }),
     ]);
@@ -147,6 +232,9 @@ export class ReportsService {
         onboardingCandidates: pendingOnboarding,
         total: pendingLeaves + pendingExits,
       },
+      departmentId: managerScope?.departmentId || null,
+      departmentName: managerScope?.departmentName || null,
+      isDepartmentScoped: currentUser.role === Role.MANAGER,
       updatedAt: now,
     };
   }
@@ -172,19 +260,15 @@ export class ReportsService {
       },
     };
 
-    if (query?.departmentId) {
+    if (currentUser?.role === Role.MANAGER) {
+      if (query?.departmentId) {
+        activeWhere.departmentId = query.departmentId;
+      } else {
+        const managerScope = await this.getManagerScope(organizationId, currentUser);
+        Object.assign(activeWhere, managerScope.employeeFilter);
+      }
+    } else if (query?.departmentId) {
       activeWhere.departmentId = query.departmentId;
-    }
-
-    if (
-      currentUser?.role === Role.MANAGER &&
-      currentUser.employeeId &&
-      !query?.departmentId
-    ) {
-      activeWhere.OR = [
-        { reportingManagerId: currentUser.employeeId },
-        { id: currentUser.employeeId },
-      ];
     }
 
     const [
@@ -318,22 +402,15 @@ export class ReportsService {
       date: { gte: startOfMonth, lte: endOfMonth },
     };
 
-    if (query.departmentId) {
+    if (currentUser.role === Role.MANAGER) {
+      if (query.departmentId) {
+        where.employee = { departmentId: query.departmentId };
+      } else {
+        const managerScope = await this.getManagerScope(organizationId, currentUser);
+        where.employee = managerScope.employeeFilter;
+      }
+    } else if (query.departmentId) {
       where.employee = { departmentId: query.departmentId };
-    }
-
-    // Role scoping: Managers without admin rights only see their team
-    if (
-      currentUser.role === Role.MANAGER &&
-      currentUser.employeeId &&
-      !query.departmentId
-    ) {
-      where.employee = {
-        OR: [
-          { reportingManagerId: currentUser.employeeId },
-          { id: currentUser.employeeId },
-        ],
-      };
     }
 
     const [statusGroups, latenessStats, records] = await Promise.all([

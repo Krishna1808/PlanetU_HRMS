@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
+import { DonutChart, CircularGauge } from './ReportCharts';
 
 interface OffboardingPageProps {
   user: any;
@@ -215,6 +216,41 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
     }
   };
 
+  // Offboarding Pipeline Analytics
+  const activeExits = requests.filter(
+    (r) => r.status !== 'COMPLETED' && r.status !== 'REJECTED'
+  ).length;
+  const pendingApprovalCount = requests.filter((r) => r.status === 'PENDING_APPROVAL').length;
+  const clearanceInProgressCount = requests.filter(
+    (r) => r.status === 'CLEARANCE_IN_PROGRESS' || r.status === 'APPROVED'
+  ).length;
+  const settlementPendingCount = requests.filter((r) => r.status === 'SETTLEMENT_PENDING').length;
+  const completedCount = requests.filter((r) => r.status === 'COMPLETED').length;
+
+  // Separation Reasons Composition Donut
+  const reasonMap: Record<string, number> = {};
+  for (const r of requests) {
+    const rawReason = r.exitInterview?.reasonCategory || r.exitType || 'RESIGNATION';
+    const formattedReason = rawReason.replace(/_/g, ' ');
+    reasonMap[formattedReason] = (reasonMap[formattedReason] || 0) + 1;
+  }
+  const reasonSlices = Object.entries(reasonMap).map(([label, value]) => ({
+    label,
+    value,
+    sublabel: `${value} case${value > 1 ? 's' : ''}`,
+  }));
+
+  // Clearance Checklists Overall Completion Velocity
+  let totalClearanceTasks = 0;
+  let clearedTasks = 0;
+  for (const r of requests) {
+    if (r.clearanceTasks && Array.isArray(r.clearanceTasks)) {
+      totalClearanceTasks += r.clearanceTasks.length;
+      clearedTasks += r.clearanceTasks.filter((t: any) => t.status === 'CLEARED').length;
+    }
+  }
+  const clearanceRate = totalClearanceTasks > 0 ? Math.round((clearedTasks / totalClearanceTasks) * 100) : 0;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Header & Overview */}
@@ -245,6 +281,54 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
           + Apply for Resignation
         </button>
       </div>
+
+      {/* Separation Pipeline Metric Strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+        <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Exits</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', marginTop: '4px' }}>{activeExits}</div>
+          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Open separation pipeline</div>
+        </div>
+        <div style={{ background: '#fefce8', padding: '14px', borderRadius: '8px', border: '1px solid #fef08a' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#ca8a04', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pending Approval</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#a16207', marginTop: '4px' }}>{pendingApprovalCount}</div>
+          <div style={{ fontSize: '11px', color: '#ca8a04', marginTop: '2px' }}>Awaiting manager/HR action</div>
+        </div>
+        <div style={{ background: '#f5f3ff', padding: '14px', borderRadius: '8px', border: '1px solid #ddd6fe' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clearance In Progress</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#6d28d9', marginTop: '4px' }}>{clearanceInProgressCount}</div>
+          <div style={{ fontSize: '11px', color: '#7c3aed', marginTop: '2px' }}>Asset & dept signoffs</div>
+        </div>
+        <div style={{ background: '#fdf2f8', padding: '14px', borderRadius: '8px', border: '1px solid #fbcfe8' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#db2777', textTransform: 'uppercase', letterSpacing: '0.05em' }}>FnF Settlement</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#be185d', marginTop: '4px' }}>{settlementPendingCount}</div>
+          <div style={{ fontSize: '11px', color: '#db2777', marginTop: '2px' }}>Finance payout calculation</div>
+        </div>
+        <div style={{ background: '#ecfdf5', padding: '14px', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Completed Exits</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#047857', marginTop: '4px' }}>{completedCount}</div>
+          <div style={{ fontSize: '11px', color: '#059669', marginTop: '2px' }}>Relieved & deactivated</div>
+        </div>
+      </div>
+
+      {/* Visual Analytics Panel */}
+      {requests.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+          <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px' }}>Separation Category & Reasons</div>
+            <DonutChart data={reasonSlices} size={160} />
+          </div>
+          <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '8px', alignSelf: 'flex-start' }}>Clearance Velocity</div>
+            <CircularGauge
+              value={clearanceRate}
+              label="Clearance Cleared"
+              sublabel={`${clearedTasks} of ${totalClearanceTasks} items signed off`}
+              size={150}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Notifications */}
       {errorMsg && (
@@ -390,9 +474,33 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
                     {new Date(req.resignationDate).toLocaleDateString()}
                   </td>
                   <td style={{ padding: '12px 16px', color: '#334155' }}>
-                    {req.approvedLastWorkingDay
-                      ? new Date(req.approvedLastWorkingDay).toLocaleDateString()
-                      : new Date(req.proposedLastWorkingDay).toLocaleDateString() + ' (Proposed)'}
+                    <div style={{ fontWeight: 600 }}>
+                      {req.approvedLastWorkingDay
+                        ? new Date(req.approvedLastWorkingDay).toLocaleDateString()
+                        : new Date(req.proposedLastWorkingDay).toLocaleDateString() + ' (Proposed)'}
+                    </div>
+                    {req.status !== 'COMPLETED' && req.status !== 'REJECTED' && (() => {
+                      const lwdStr = req.approvedLastWorkingDay || req.proposedLastWorkingDay;
+                      if (!lwdStr) return null;
+                      const daysLeft = Math.ceil((new Date(lwdStr).getTime() - Date.now()) / (1000 * 3600 * 24));
+                      if (daysLeft > 0) {
+                        return (
+                          <div style={{ marginTop: '3px' }}>
+                            <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: daysLeft <= 7 ? '#fee2e2' : '#fef3c7', color: daysLeft <= 7 ? '#b91c1c' : '#b45309', fontWeight: 600 }}>
+                              {daysLeft}d notice left
+                            </span>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div style={{ marginTop: '3px' }}>
+                            <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: '#f1f5f9', color: '#64748b', fontWeight: 600 }}>
+                              LWD Elapsed ({Math.abs(daysLeft)}d ago)
+                            </span>
+                          </div>
+                        );
+                      }
+                    })()}
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <span
