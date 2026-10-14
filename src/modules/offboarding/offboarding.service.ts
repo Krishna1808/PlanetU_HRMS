@@ -956,8 +956,9 @@ export class OffboardingService {
 
     const roleSafeItems = (currentUser.role === Role.FINANCE || currentUser.role === Role.MANAGER)
       ? items.map((item) => {
-          const safeEmployee = item.employee ? { ...item.employee } : item.employee;
-          if (safeEmployee) delete safeEmployee.personalEmail;
+          const safeEmployee = item.employee
+            ? { ...item.employee, personalEmail: undefined }
+            : item.employee;
           return { ...item, employee: safeEmployee, exitInterview: null };
         })
       : items;
@@ -1041,11 +1042,13 @@ export class OffboardingService {
     }
 
     if (currentUser.role === Role.FINANCE || currentUser.role === Role.MANAGER) {
-      const safeEmployee = exitRequest.employee ? { ...exitRequest.employee } : exitRequest.employee;
-      if (safeEmployee) {
-        delete safeEmployee.personalEmail;
-        if (currentUser.role === Role.FINANCE) delete safeEmployee.phone;
-      }
+      const safeEmployee = exitRequest.employee
+        ? {
+            ...exitRequest.employee,
+            personalEmail: undefined,
+            ...(currentUser.role === Role.FINANCE ? { phone: undefined } : {}),
+          }
+        : exitRequest.employee;
       return { ...exitRequest, employee: safeEmployee, exitInterview: null };
     }
 
