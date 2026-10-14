@@ -230,9 +230,8 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
   };
 
   const canEditPosition =
-    !currentUser ||
-    currentUser.role === 'CLIENT_SUPER_ADMIN' ||
-    currentUser.role === 'HR_ADMIN';
+    currentUser?.role === 'CLIENT_SUPER_ADMIN' ||
+    currentUser?.role === 'HR_ADMIN';
 
   const canTerminate =
     (currentUser?.role === 'CLIENT_SUPER_ADMIN' || currentUser?.role === 'HR_ADMIN') &&
