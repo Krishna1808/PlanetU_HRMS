@@ -220,7 +220,11 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
   const activeExits = requests.filter(
     (r) => r.status !== 'COMPLETED' && r.status !== 'REJECTED'
   ).length;
-  const pendingApprovalCount = requests.filter((r) => r.status === 'PENDING_APPROVAL').length;
+  const pendingApprovalCount = requests.filter(
+    (r) =>
+      r.status === 'PENDING_APPROVAL' &&
+      (!isManager || r.employee?.reportingManager?.id === user.employeeId),
+  ).length;
   const clearanceInProgressCount = requests.filter(
     (r) => r.status === 'CLEARANCE_IN_PROGRESS' || r.status === 'APPROVED'
   ).length;
