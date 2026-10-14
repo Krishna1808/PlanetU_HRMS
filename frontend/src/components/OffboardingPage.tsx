@@ -521,7 +521,10 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                       {/* Action Approval */}
-                      {req.status === 'PENDING_APPROVAL' && (isHrOrAdmin || isManager) && (
+                      {req.status === 'PENDING_APPROVAL' && (
+                        isHrOrAdmin ||
+                        (isManager && req.employee?.reportingManager?.id === user.employeeId)
+                      ) && (
                         <button
                           className="btn btn-secondary"
                           style={{ padding: '4px 10px', fontSize: '11px' }}
@@ -913,7 +916,11 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
                       {task.status}
                     </span>
 
-                    {(isHrOrAdmin || isManager || isFinance) && task.status !== 'CLEARED' && (
+                    {(
+                      isHrOrAdmin ||
+                      (isManager && task.departmentType === 'MANAGER') ||
+                      (isFinance && task.departmentType === 'FINANCE')
+                    ) && task.status !== 'CLEARED' && (
                       <button
                         className="btn btn-secondary"
                         style={{ padding: '3px 8px', fontSize: '11px', background: '#22c55e', color: '#ffffff' }}
