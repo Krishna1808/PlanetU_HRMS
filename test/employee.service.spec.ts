@@ -572,6 +572,51 @@ describe('EmployeeService (Module 3: Employee Lifecycle)', () => {
       );
     });
 
+    it('scopes manager directory rows and KPI counts to their department plus direct reports', async () => {
+      const manager: AuthenticatedUser = {
+        id: 'user-mgr-1',
+        organizationId: orgId,
+        email: 'manager@planetu.com',
+        role: Role.MANAGER,
+        employeeId: 'emp-manager-1',
+      };
+      mockPrisma.employee.findFirst.mockResolvedValue({
+        id: manager.employeeId,
+        organizationId: orgId,
+        departmentId: deptId,
+        deletedAt: null,
+      });
+      mockPrisma.employee.count.mockResolvedValue(1);
+      mockPrisma.employee.findMany.mockResolvedValue([mockEmployee]);
+
+      await service.listEmployees(orgId, {}, manager);
+
+      const listArgs = mockPrisma.employee.findMany.mock.calls[0][0] as any;
+      expect(listArgs.where.AND).toEqual([
+        expect.objectContaining({
+          OR: expect.arrayContaining([
+            { reportingManagerId: manager.employeeId },
+            { id: manager.employeeId },
+            { departmentId: deptId },
+          ]),
+        }),
+      ]);
+
+      const countArgs = mockPrisma.employee.count.mock.calls.slice(1).map((call: any[]) => call[0]);
+      expect(countArgs).toHaveLength(4);
+      for (const args of countArgs) {
+        expect(args.where.AND).toEqual([
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              { reportingManagerId: manager.employeeId },
+              { id: manager.employeeId },
+              { departmentId: deptId },
+            ]),
+          }),
+        ]);
+      }
+    });
+
     it('returns aggregate summary metrics alongside paginated results', async () => {
       mockPrisma.employee.count
         .mockResolvedValueOnce(25) // query total
