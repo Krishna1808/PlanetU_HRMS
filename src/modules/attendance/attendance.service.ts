@@ -641,8 +641,16 @@ export class AttendanceService {
       employmentStatus: 'ACTIVE',
     };
 
-    if (currentUser.role === Role.MANAGER && currentUser.employeeId) {
+    if (currentUser.role === Role.MANAGER) {
+      if (!currentUser.employeeId) {
+        throw new ForbiddenException('Manager account is not linked to an employee record');
+      }
+      const managerEmployee = await this.prisma.employee.findFirst({
+        where: { id: currentUser.employeeId, organizationId, deletedAt: null },
+        select: { departmentId: true },
+      });
       empWhere.OR = [
+        ...(managerEmployee?.departmentId ? [{ departmentId: managerEmployee.departmentId }] : []),
         { reportingManagerId: currentUser.employeeId },
         { id: currentUser.employeeId },
       ];
