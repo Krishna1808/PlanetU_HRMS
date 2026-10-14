@@ -61,7 +61,7 @@ export class EmployeesController {
    */
   @Get('org-chart')
   async getOrgChart(@CurrentUser() user: AuthenticatedUser) {
-    return this.employeeService.getOrgChart(user.organizationId);
+    return this.employeeService.getOrgChart(user.organizationId, user);
   }
 
   /**
