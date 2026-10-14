@@ -281,6 +281,53 @@ describe('OffboardingService (Module 9: Offboarding & Exit Management)', () => {
   // 3. Department Clearance Checklists
   // ---------------------------------------------------------------------------
   describe('updateClearanceTask', () => {
+    it('prevents Finance from updating non-Finance clearance tasks', async () => {
+      const financeUser: AuthenticatedUser = {
+        id: 'user-finance-1',
+        organizationId: orgId,
+        email: 'finance@alpha.com',
+        role: Role.FINANCE,
+        employeeId: null,
+      };
+      mockPrisma.exitClearanceTask.findFirst.mockResolvedValue({
+        id: 'task-it-1',
+        organizationId: orgId,
+        exitRequestId: exitReqId,
+        departmentType: ExitClearanceDepartment.IT,
+        exitRequest: { employee: { id: empId, departmentId: 'dept-eng', reportingManagerId: managerEmpId } },
+      });
+
+      await expect(
+        service.updateClearanceTask(
+          orgId,
+          'task-it-1',
+          { status: ClearanceStatus.CLEARED },
+          financeUser,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.exitClearanceTask.update).not.toHaveBeenCalled();
+    });
+
+    it('prevents Managers from updating IT or Finance clearance tasks', async () => {
+      mockPrisma.exitClearanceTask.findFirst.mockResolvedValue({
+        id: 'task-it-1',
+        organizationId: orgId,
+        exitRequestId: exitReqId,
+        departmentType: ExitClearanceDepartment.IT,
+        exitRequest: { employee: { id: empId, departmentId: 'dept-eng', reportingManagerId: managerEmpId } },
+      });
+
+      await expect(
+        service.updateClearanceTask(
+          orgId,
+          'task-it-1',
+          { status: ClearanceStatus.CLEARED },
+          mockManagerUser,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockPrisma.exitClearanceTask.update).not.toHaveBeenCalled();
+    });
+
     it('updates clearance task status and advances exit status when all mandatory tasks are done', async () => {
       mockPrisma.exitClearanceTask.findFirst.mockResolvedValue({
         id: 'task-it-1',
@@ -422,6 +469,92 @@ describe('OffboardingService (Module 9: Offboarding & Exit Management)', () => {
       expect(Number(result.totalAdditions)).toBeGreaterThan(0);
       expect(Number(result.netSettlementAmount)).toBeGreaterThan(0);
       expect(result.status).toBe(FnFStatus.DRAFT);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Role-scoped exit visibility and finance data minimization
+  // ---------------------------------------------------------------------------
+  describe('role-scoped exit request access', () => {
+    it('scopes manager exit-request lists to their department and direct reports', async () => {
+      mockPrisma.employee.findFirst.mockResolvedValue({
+        id: managerEmpId,
+        organizationId: orgId,
+        departmentId: 'dept-eng',
+        deletedAt: null,
+      });
+      mockPrisma.exitRequest.count.mockResolvedValue(0);
+      mockPrisma.exitRequest.findMany.mockResolvedValue([]);
+
+      await service.listExitRequests(orgId, {}, mockManagerUser);
+
+      expect(mockPrisma.exitRequest.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: orgId,
+            AND: [
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  { employeeId: managerEmpId },
+                  { employee: { departmentId: 'dept-eng' } },
+                  { employee: { reportingManagerId: managerEmpId } },
+                ]),
+              }),
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('removes exit interview and personal email from finance list responses', async () => {
+      const financeUser: AuthenticatedUser = {
+        id: 'user-finance-1',
+        organizationId: orgId,
+        email: 'finance@alpha.com',
+        role: Role.FINANCE,
+        employeeId: null,
+      };
+      mockPrisma.exitRequest.count.mockResolvedValue(1);
+      mockPrisma.exitRequest.findMany.mockResolvedValue([{
+        id: exitReqId,
+        employeeId: empId,
+        employee: { id: empId, firstName: 'Rohan', personalEmail: 'personal@example.com' },
+        exitInterview: { feedback: 'confidential feedback' },
+        fnfSettlement: { id: 'fnf-1', status: FnFStatus.DRAFT },
+        clearanceTasks: [],
+      }]);
+
+      const result = await service.listExitRequests(orgId, {}, financeUser);
+
+      expect(result.data[0].employee.personalEmail).toBeUndefined();
+      expect(result.data[0].exitInterview).toBeNull();
+      expect(result.data[0].fnfSettlement).toEqual({ id: 'fnf-1', status: FnFStatus.DRAFT });
+    });
+
+    it('blocks managers from opening exit requests outside their department and direct reports', async () => {
+      mockPrisma.exitRequest.findFirst.mockResolvedValue({
+        id: exitReqId,
+        organizationId: orgId,
+        employeeId: empId,
+        employee: {
+          id: empId,
+          department: { id: 'dept-other' },
+          reportingManager: { id: 'manager-other' },
+        },
+        clearanceTasks: [],
+        exitInterview: null,
+        fnfSettlement: null,
+      });
+      mockPrisma.employee.findFirst.mockResolvedValue({
+        id: managerEmpId,
+        organizationId: orgId,
+        departmentId: 'dept-eng',
+        deletedAt: null,
+      });
+
+      await expect(
+        service.getExitRequestById(orgId, exitReqId, mockManagerUser),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

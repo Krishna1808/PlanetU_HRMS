@@ -3,6 +3,7 @@ import React from 'react';
 import { api } from './api';
 import { LoginPage } from './components/LoginPage';
 import { ExecutiveDashboardPage } from './components/ExecutiveDashboardPage';
+import { FinanceDashboardPage } from './components/FinanceDashboardPage';
 import { EssDashboardPage } from './components/EssDashboardPage';
 import { EmployeeListPage } from './components/EmployeeListPage';
 import { AddEmployeeForm } from './components/AddEmployeeForm';
@@ -50,7 +51,7 @@ const ALL_TABS: NavTabItem[] = [
     label: 'Executive Overview',
     icon: 'LayoutDashboard',
     section: 'WORKSPACE',
-    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'],
+    allowedRoles: ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER', 'FINANCE'],
   },
   {
     key: 'ess',
@@ -178,7 +179,7 @@ export default function App() {
       .getMe()
       .then((profile) => {
         setUser(profile);
-        if (profile?.role && ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'].includes(profile.role)) {
+        if (profile?.role && ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER', 'FINANCE'].includes(profile.role)) {
           setActiveTab('overview');
         } else {
           setActiveTab('ess');
@@ -203,6 +204,9 @@ export default function App() {
     return baseTabs.map((t) => {
       if (t.key === 'overview' && user.role === 'MANAGER') {
         return { ...t, label: 'Department Overview' };
+      }
+      if (t.key === 'overview' && user.role === 'FINANCE') {
+        return { ...t, label: 'Finance Overview' };
       }
       return t;
     });
@@ -284,7 +288,7 @@ export default function App() {
         <LoginPage
           onLoginSuccess={(u) => {
             setUser(u);
-            if (u?.role && ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'].includes(u.role)) {
+            if (u?.role && ['CLIENT_SUPER_ADMIN', 'HR_ADMIN', 'MANAGER', 'FINANCE'].includes(u.role)) {
               setActiveTab('overview');
             } else {
               setActiveTab('ess');
@@ -437,6 +441,7 @@ export default function App() {
                     return (
                       <button
                         key={t.key}
+                        aria-current={isActive ? 'page' : undefined}
                         onClick={() => {
                           setActiveTab(t.key);
                           if (t.key === 'employees') {
@@ -455,7 +460,8 @@ export default function App() {
                           justifyContent: showCollapsed ? 'center' : 'flex-start',
                           padding: showCollapsed ? '10px 0' : '9px 12px',
                           borderRadius: '6px',
-                          border: 'none',
+                          border: isActive ? '1px solid rgba(147, 197, 253, 0.45)' : '1px solid transparent',
+                          boxShadow: isActive ? 'inset 3px 0 0 #93c5fd' : 'none',
                           background: isActive ? '#2563eb' : 'transparent',
                           color: isActive ? '#ffffff' : '#cbd5e1',
                           fontWeight: isActive ? 600 : 500,
@@ -742,7 +748,11 @@ export default function App() {
         <main className="app-main-content" style={{ flex: 1, padding: isMobile ? '14px 12px' : '24px 28px', overflowY: 'auto' }}>
           <div key={activeTab} className="tab-page-enter" style={{ maxWidth: '1240px', margin: '0 auto', width: '100%' }}>
             {activeTab === 'overview' && (
-              <ExecutiveDashboardPage user={user} onNavigateTab={handleNavigateTab} />
+              user?.role === 'FINANCE' ? (
+                <FinanceDashboardPage user={user} onNavigateTab={handleNavigateTab} />
+              ) : (
+                <ExecutiveDashboardPage user={user} onNavigateTab={handleNavigateTab} />
+              )
             )}
 
             {activeTab === 'ess' && <EssDashboardPage />}

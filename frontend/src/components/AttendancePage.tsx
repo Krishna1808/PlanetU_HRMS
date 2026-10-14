@@ -3,6 +3,13 @@ import { api } from '../api';
 import { CircularGauge } from './ReportCharts';
 import { showToast } from './Toast';
 
+const toDateInputValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export function AttendancePage({ user }: { user?: any } = {}) {
   const [todayState, setTodayState] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
@@ -12,9 +19,20 @@ export function AttendancePage({ user }: { user?: any } = {}) {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [attendanceSummary, setAttendanceSummary] = useState<any>(null);
+  const [teamRecords, setTeamRecords] = useState<any[]>([]);
+  const [recordsStartDate, setRecordsStartDate] = useState(() => {
+    const date = new Date();
+    date.setDate(1);
+    return toDateInputValue(date);
+  });
+  const [recordsEndDate, setRecordsEndDate] = useState(() => toDateInputValue(new Date()));
 
   const isManagerOrAdmin =
     user?.role === 'MANAGER' ||
+    user?.role === 'HR_ADMIN' ||
+    user?.role === 'CLIENT_SUPER_ADMIN' ||
+    user?.role === 'FINANCE';
+  const canQueryPayableDays =
     user?.role === 'HR_ADMIN' ||
     user?.role === 'CLIENT_SUPER_ADMIN' ||
     user?.role === 'FINANCE';
@@ -30,17 +48,21 @@ export function AttendancePage({ user }: { user?: any } = {}) {
     try {
       setLoading(true);
       setError('');
-      const [today, records, emps, summary] = await Promise.all([
+      const [today, records, emps, summary, teamAttendance] = await Promise.all([
         api.getTodayAttendance().catch(() => null),
         api.getMyAttendanceHistory().catch(() => []),
-        api.getEmployees().catch(() => ({ data: [] })),
+        api.getEmployees({ limit: 100 }).catch(() => ({ data: [] })),
         api.getAttendanceSummary().catch(() => null),
+        isManagerOrAdmin
+          ? api.getAttendanceRecords({ startDate: recordsStartDate, endDate: recordsEndDate }).catch(() => [])
+          : Promise.resolve([]),
       ]);
       setTodayState(today);
       setHistory(records || []);
       setEmployees(emps.data || []);
       setAttendanceSummary(summary);
-      if (emps.data?.length > 0) setQueryEmpId(emps.data[0].id);
+      setTeamRecords(teamAttendance || []);
+      if (emps.data?.length > 0) setQueryEmpId((current) => current || emps.data[0].id);
     } catch (err: any) {
       setError(err.message || 'Failed to load attendance');
     } finally {
@@ -228,15 +250,16 @@ export function AttendancePage({ user }: { user?: any } = {}) {
         </div>
       )}
 
-      {/* Authoritative Single Source of Truth for Payroll Contract Tester */}
+      {/* Payable-days query is limited to roles authorized by the backend. */}
+      {canQueryPayableDays && (
       <div className="card" style={{ borderLeft: '4px solid #2563eb' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 600 }}>
             Authoritative Payable Days Query (Attendance Contract for Payroll)
           </h3>
-          {isManagerOrAdmin && (
-            <span className="badge badge-active">Leadership Access</span>
-          )}
+          <span className="badge badge-active">
+            {user?.role === 'FINANCE' ? 'Payroll Access' : 'Admin Access'}
+          </span>
         </div>
         <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
           Payroll consumes <code>AttendanceService.getFinalizedPayableDays</code> directly. Test the single source of truth contract for any employee and month:
@@ -350,6 +373,102 @@ export function AttendancePage({ user }: { user?: any } = {}) {
           </div>
         )}
       </div>
+      )}
+
+      {/* Role-scoped team attendance: read-only for Finance; Manager scope is enforced by the API. */}
+      {isManagerOrAdmin && (
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Team Attendance Records</h3>
+              <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0' }}>
+                {user?.role === 'FINANCE'
+                  ? 'Read-only attendance details for payroll review.'
+                  : user?.role === 'MANAGER'
+                    ? 'Your department and your direct reports in other departments.'
+                    : 'Organization attendance records.'}
+              </p>
+            </div>
+            <span className="badge badge-active">{teamRecords.length} records</span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '12px', color: '#475569', fontWeight: 600 }}>
+              From
+              <input
+                type="date"
+                value={recordsStartDate}
+                max={recordsEndDate}
+                onChange={(event) => setRecordsStartDate(event.target.value)}
+                style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 400 }}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: '5px', fontSize: '12px', color: '#475569', fontWeight: 600 }}>
+              To
+              <input
+                type="date"
+                value={recordsEndDate}
+                min={recordsStartDate}
+                max={toDateInputValue(new Date())}
+                onChange={(event) => setRecordsEndDate(event.target.value)}
+                style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '6px', fontWeight: 400 }}
+              />
+            </label>
+            <button className="btn btn-primary" onClick={loadAttendance} disabled={loading || !recordsStartDate || !recordsEndDate}>
+              {loading ? 'Loading…' : 'Apply date range'}
+            </button>
+          </div>
+
+          {loading ? (
+            <div style={{ padding: '18px 0', color: '#64748b', fontSize: '13px' }}>Loading attendance records…</div>
+          ) : teamRecords.length === 0 ? (
+            <div style={{ padding: '22px 12px', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '8px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
+              No attendance records were found for this date range.
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Department</th>
+                    <th>Date</th>
+                    <th>Check In</th>
+                    <th>Check Out</th>
+                    <th>Late By</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamRecords.slice(0, 100).map((record) => (
+                    <tr key={record.id}>
+                      <td>
+                        <div style={{ fontWeight: 650, color: '#0f172a' }}>{record.employee?.firstName} {record.employee?.lastName}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>{record.employee?.employeeCode || '—'}</div>
+                      </td>
+                      <td>{record.employee?.department?.name || '—'}</td>
+                      <td>{new Date(record.date).toLocaleDateString()}</td>
+                      <td>{record.checkInTime ? new Date(record.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                      <td>{record.checkOutTime ? new Date(record.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                      <td>{record.isLate ? `${record.lateMinutes || 0} min` : '—'}</td>
+                      <td>
+                        <span className={record.status === 'PRESENT' ? 'badge badge-active' : 'badge badge-inactive'}>
+                          {String(record.status || 'UNKNOWN').replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {teamRecords.length > 100 && (
+                <p style={{ fontSize: '12px', color: '#64748b', marginTop: '10px' }}>
+                  Showing the latest 100 of {teamRecords.length} records. Narrow the date range to see a smaller period.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Punch History */}
       <div className="card">

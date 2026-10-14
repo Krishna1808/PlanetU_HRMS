@@ -29,6 +29,16 @@ const SENSITIVE_FINANCIAL_FIELDS = [
   'uanNumber',
 ];
 
+const SENSITIVE_PERSONAL_FIELDS = [
+  'dateOfBirth',
+  'gender',
+  'currentAddress',
+  'permanentAddress',
+  'emergencyContactName',
+  'emergencyContactPhone',
+  'emergencyContactRelation',
+];
+
 @Injectable()
 export class EmployeeRbacService {
   /**
@@ -94,10 +104,38 @@ export class EmployeeRbacService {
     // Clone record to avoid mutating internal objects
     const sanitized = { ...employee };
 
+    // Finance needs employee identifiers for payroll/attendance workflows, not personal contact or financial profile data.
+    if (viewer.role === Role.FINANCE) {
+      return {
+        id: employee.id,
+        employeeCode: employee.employeeCode,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        department: employee.department,
+        designation: employee.designation,
+        grade: employee.grade,
+        location: employee.location,
+        reportingManager: employee.reportingManager
+          ? {
+              id: employee.reportingManager.id,
+              employeeCode: employee.reportingManager.employeeCode,
+              firstName: employee.reportingManager.firstName,
+              lastName: employee.reportingManager.lastName,
+            }
+          : null,
+        employmentType: employee.employmentType,
+        employmentStatus: employee.employmentStatus,
+        dateOfJoining: employee.dateOfJoining,
+      };
+    }
+
     // If Manager viewing a direct subordinate
     if (viewer.role === Role.MANAGER && isDirectReport) {
       // Strip financial/bank data
       for (const field of SENSITIVE_FINANCIAL_FIELDS) {
+        delete sanitized[field];
+      }
+      for (const field of SENSITIVE_PERSONAL_FIELDS) {
         delete sanitized[field];
       }
       return sanitized;

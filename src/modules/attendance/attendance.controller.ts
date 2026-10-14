@@ -90,10 +90,10 @@ export class AttendanceController {
 
   /**
    * GET /api/v1/attendance/records
-   * Query company-wide attendance records (HR/Admin and Managers for their direct reports)
+   * Query attendance records within the authenticated role's visibility scope
    */
   @Get('records')
-  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN, Role.MANAGER)
+  @Roles(Role.CLIENT_SUPER_ADMIN, Role.HR_ADMIN, Role.MANAGER, Role.FINANCE)
   async queryRecords(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: QueryAttendanceDto,

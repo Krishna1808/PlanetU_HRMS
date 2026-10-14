@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from './Modal';
 
@@ -19,6 +19,8 @@ export const EmployeeListPage: React.FC<Props> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 0 });
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   // Authoritative organization-wide KPI metrics from backend
@@ -59,26 +61,40 @@ export const EmployeeListPage: React.FC<Props> = ({
     setLoading(true);
     setError('');
     try {
-      const [empRes, deptRes, meRes] = await Promise.all([
-        api.getEmployees(),
-        api.getDepartments().catch(() => []),
-        api.getMe().catch(() => null),
-      ]);
+      const empRes = await api.getEmployees({
+        page: currentPage,
+        limit: 50,
+        search: searchQuery.trim() || undefined,
+        departmentId: selectedDeptFilter || undefined,
+        status: selectedStatusFilter || undefined,
+      });
       const empList = empRes.data || [];
       setEmployees(empList);
+      const nextPagination = empRes.pagination || {
+        page: currentPage,
+        limit: 50,
+        total: empList.length,
+        totalPages: empList.length ? 1 : 0,
+      };
+      setPagination(nextPagination);
+      const safePage = nextPagination.totalPages > 0
+        ? Math.min(currentPage, nextPagination.totalPages)
+        : 1;
+      if (safePage !== currentPage) {
+        setCurrentPage(safePage);
+        return;
+      }
       if (empRes.summary) {
         setSummary(empRes.summary);
       } else {
         setSummary({
-          totalHeadcount: empList.length,
+          totalHeadcount: empRes.pagination?.total ?? empList.length,
           activeCount: empList.filter((e: any) => e.employmentStatus === 'ACTIVE' || !e.employmentStatus).length,
           probationCount: empList.filter((e: any) => e.employmentStatus === 'PROBATION').length,
           noticeCount: empList.filter((e: any) => e.employmentStatus === 'NOTICE_PERIOD').length,
           newHiresThisMonth: 0,
         });
       }
-      setDepartments(deptRes || []);
-      setCurrentUser(meRes);
     } catch (err: any) {
       setError(err.message || 'Failed to load employees');
     } finally {
@@ -87,32 +103,24 @@ export const EmployeeListPage: React.FC<Props> = ({
   };
 
   useEffect(() => {
-    loadData();
+    Promise.all([
+      api.getDepartments().catch(() => []),
+      api.getMe().catch(() => null),
+    ]).then(([deptRes, meRes]) => {
+      setDepartments(deptRes || []);
+      setCurrentUser(meRes);
+    });
   }, []);
 
-  const filteredEmployees = useMemo(() => {
-    return employees.filter((emp) => {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesSearch =
-        !q ||
-        emp.employeeCode?.toLowerCase().includes(q) ||
-        emp.firstName?.toLowerCase().includes(q) ||
-        emp.lastName?.toLowerCase().includes(q) ||
-        `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(q) ||
-        emp.personalEmail?.toLowerCase().includes(q) ||
-        emp.user?.email?.toLowerCase().includes(q) ||
-        emp.department?.name?.toLowerCase().includes(q) ||
-        emp.designation?.name?.toLowerCase().includes(q);
+  // Search and filters are server-side so users can find employees beyond the current page.
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      loadData();
+    }, searchQuery ? 300 : 0);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery, selectedDeptFilter, selectedStatusFilter, currentPage]);
 
-      const matchesDept =
-        !selectedDeptFilter || emp.departmentId === selectedDeptFilter || emp.department?.id === selectedDeptFilter;
-
-      const matchesStatus =
-        !selectedStatusFilter || emp.employmentStatus === selectedStatusFilter;
-
-      return matchesSearch && matchesDept && matchesStatus;
-    });
-  }, [employees, searchQuery, selectedDeptFilter, selectedStatusFilter]);
+  const filteredEmployees = employees;
 
   const isHrOrAdmin =
     currentUser?.role === 'CLIENT_SUPER_ADMIN' || currentUser?.role === 'HR_ADMIN';
@@ -187,13 +195,17 @@ export const EmployeeListPage: React.FC<Props> = ({
             </span>
           </div>
           <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-            View profiles, designations, reporting hierarchies, and employment statuses across the enterprise.
+            {currentUser?.role === 'MANAGER'
+              ? 'View employees in your department and your direct reports across departments.'
+              : 'View profiles, designations, reporting hierarchies, and employment statuses across the enterprise.'}
           </p>
         </div>
 
-        <button className="btn btn-primary" onClick={onNavigateAdd} style={{ padding: '8px 18px', fontSize: '13px' }}>
-          + Add New Employee
-        </button>
+        {isHrOrAdmin && (
+          <button className="btn btn-primary" onClick={onNavigateAdd} style={{ padding: '8px 18px', fontSize: '13px' }}>
+            + Add New Employee
+          </button>
+        )}
       </div>
 
       {terminateSuccess && (
@@ -350,7 +362,10 @@ export const EmployeeListPage: React.FC<Props> = ({
             type="text"
             placeholder="Search by name, employee code, role, or department..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             style={{
               paddingLeft: '32px',
               paddingRight: searchQuery ? '30px' : '10px',
@@ -360,7 +375,10 @@ export const EmployeeListPage: React.FC<Props> = ({
           />
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery('')}
+              onClick={() => {
+                setSearchQuery('');
+                setCurrentPage(1);
+              }}
               style={{
                 position: 'absolute',
                 right: '8px',
@@ -382,7 +400,10 @@ export const EmployeeListPage: React.FC<Props> = ({
         <div style={{ minWidth: '170px' }}>
           <select
             value={selectedDeptFilter}
-            onChange={(e) => setSelectedDeptFilter(e.target.value)}
+            onChange={(e) => {
+              setSelectedDeptFilter(e.target.value);
+              setCurrentPage(1);
+            }}
             style={{ width: '100%', fontSize: '13px' }}
           >
             <option value="">All Departments</option>
@@ -397,7 +418,10 @@ export const EmployeeListPage: React.FC<Props> = ({
         <div style={{ minWidth: '150px' }}>
           <select
             value={selectedStatusFilter}
-            onChange={(e) => setSelectedStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setSelectedStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
             style={{ width: '100%', fontSize: '13px' }}
           >
             <option value="">All Statuses</option>
@@ -461,6 +485,7 @@ export const EmployeeListPage: React.FC<Props> = ({
               setSearchQuery('');
               setSelectedDeptFilter('');
               setSelectedStatusFilter('');
+              setCurrentPage(1);
             }}
             style={{ fontSize: '12px', padding: '6px 10px' }}
           >
@@ -491,7 +516,10 @@ export const EmployeeListPage: React.FC<Props> = ({
             <button
               key={chip.label}
               type="button"
-              onClick={() => setSelectedStatusFilter(isSelected && chip.value ? '' : chip.value)}
+              onClick={() => {
+                setSelectedStatusFilter(isSelected && chip.value ? '' : chip.value);
+                setCurrentPage(1);
+              }}
               style={{
                 padding: '3px 10px',
                 borderRadius: '999px',
@@ -518,7 +546,10 @@ export const EmployeeListPage: React.FC<Props> = ({
                 <button
                   key={dept.id}
                   type="button"
-                  onClick={() => setSelectedDeptFilter(isDeptSelected ? '' : dept.id)}
+                  onClick={() => {
+                    setSelectedDeptFilter(isDeptSelected ? '' : dept.id);
+                    setCurrentPage(1);
+                  }}
                   style={{
                     padding: '3px 10px',
                     borderRadius: '999px',
@@ -536,6 +567,17 @@ export const EmployeeListPage: React.FC<Props> = ({
               );
             })}
           </>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px', color: '#64748b', fontSize: '12px' }}>
+        <span>
+          {loading
+            ? 'Updating employee results…'
+            : `Showing ${employees.length ? (currentPage - 1) * pagination.limit + 1 : 0}–${Math.min(currentPage * pagination.limit, pagination.total)} of ${pagination.total} matching employees`}
+        </span>
+        {(searchQuery || selectedDeptFilter || selectedStatusFilter) && (
+          <span style={{ color: '#475569' }}>Filters applied to the full directory</span>
         )}
       </div>
 
@@ -566,19 +608,23 @@ export const EmployeeListPage: React.FC<Props> = ({
             margin: '12px 0',
           }}
         >
-          {employees.length === 0 ? (
+          {employees.length === 0 && !searchQuery && !selectedDeptFilter && !selectedStatusFilter ? (
             <div>
               <strong style={{ fontSize: '15px', color: '#1e293b' }}>No employees found in the directory</strong>
               <p style={{ fontSize: '13px', marginTop: '4px' }}>
-                Click below to onboard your first team member!
+                {isHrOrAdmin
+                  ? 'Add your first team member to get started.'
+                  : 'No employees are currently visible in your department or direct reports.'}
               </p>
-              <button
-                className="btn btn-primary"
-                onClick={onNavigateAdd}
-                style={{ marginTop: '14px' }}
-              >
-                + Add Employee
-              </button>
+              {isHrOrAdmin && (
+                <button
+                  className="btn btn-primary"
+                  onClick={onNavigateAdd}
+                  style={{ marginTop: '14px' }}
+                >
+                  + Add Employee
+                </button>
+              )}
             </div>
           ) : (
             <div>
@@ -592,6 +638,7 @@ export const EmployeeListPage: React.FC<Props> = ({
                   setSearchQuery('');
                   setSelectedDeptFilter('');
                   setSelectedStatusFilter('');
+                  setCurrentPage(1);
                 }}
                 style={{ marginTop: '12px' }}
               >
@@ -941,6 +988,32 @@ export const EmployeeListPage: React.FC<Props> = ({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!loading && pagination.totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', padding: '14px 0 4px' }}>
+          <span style={{ color: '#64748b', fontSize: '12px' }}>
+            Page {pagination.page} of {pagination.totalPages}
+          </span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={currentPage >= pagination.totalPages}
+              onClick={() => setCurrentPage((page) => Math.min(pagination.totalPages, page + 1))}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 

@@ -368,6 +368,25 @@ export const ExecutiveDashboardPage: React.FC<Props> = ({ user, onNavigateTab })
               >
                 Exits: <strong>{overview?.pendingApprovals?.exits ?? 0}</strong>
               </button>
+              {!isManager && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateTab('onboarding')}
+                  style={{
+                    background: '#f1f5f9',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '2px 6px',
+                    fontSize: '11px',
+                    color: '#1e293b',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                  title="Review onboarding candidates"
+                >
+                  Onboarding: <strong>{overview?.pendingApprovals?.onboardingCandidates ?? 0}</strong>
+                </button>
+              )}
             </div>
           </div>
 

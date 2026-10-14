@@ -176,11 +176,30 @@ export class EmployeeService {
     const isHrOrAdmin =
       viewer.role === Role.CLIENT_SUPER_ADMIN || viewer.role === Role.HR_ADMIN;
 
+    let managerScope: Prisma.EmployeeWhereInput | undefined;
+    if (viewer.role === Role.MANAGER) {
+      if (!viewer.employeeId) {
+        throw new ForbiddenException('Manager account is not linked to an employee record');
+      }
+      const managerEmployee = await this.prisma.employee.findFirst({
+        where: { id: viewer.employeeId, organizationId, deletedAt: null },
+        select: { departmentId: true },
+      });
+      managerScope = {
+        OR: [
+          { reportingManagerId: viewer.employeeId },
+          { id: viewer.employeeId },
+          ...(managerEmployee?.departmentId ? [{ departmentId: managerEmployee.departmentId }] : []),
+        ],
+      };
+    }
+
     const employee = await this.prisma.employee.findFirst({
       where: {
         id: employeeId,
         organizationId,
         ...(isHrOrAdmin ? {} : { deletedAt: null }),
+        ...(managerScope ? { AND: [managerScope] } : {}),
       },
       include: {
         department: { select: { id: true, name: true, codePrefix: true } },
@@ -522,6 +541,26 @@ export class EmployeeService {
       organizationId,
       ...(query.status === EmploymentStatus.TERMINATED ? {} : { deletedAt: null }),
     };
+    // Managers should only browse their department and direct reports, never the full tenant directory.
+    const summaryWhere: Prisma.EmployeeWhereInput = { organizationId, deletedAt: null };
+    if (viewer.role === Role.MANAGER) {
+      if (!viewer.employeeId) {
+        throw new ForbiddenException('Manager account is not linked to an employee record');
+      }
+      const managerEmployee = await this.prisma.employee.findFirst({
+        where: { id: viewer.employeeId, organizationId, deletedAt: null },
+        select: { departmentId: true },
+      });
+      const managerScope: Prisma.EmployeeWhereInput = {
+        OR: [
+          { reportingManagerId: viewer.employeeId },
+          { id: viewer.employeeId },
+          ...(managerEmployee?.departmentId ? [{ departmentId: managerEmployee.departmentId }] : []),
+        ],
+      };
+      where.AND = [...(Array.isArray(where.AND) ? where.AND : []), managerScope];
+      summaryWhere.AND = [managerScope];
+    }
 
     if (query.departmentId) where.departmentId = query.departmentId;
     if (query.designationId) where.designationId = query.designationId;
@@ -535,6 +574,8 @@ export class EmployeeService {
         { lastName: { contains: search, mode: 'insensitive' } },
         { employeeCode: { contains: search, mode: 'insensitive' } },
         { personalEmail: { contains: search, mode: 'insensitive' } },
+        { department: { name: { contains: search, mode: 'insensitive' } } },
+        { designation: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -561,16 +602,16 @@ export class EmployeeService {
           },
         }),
         this.prisma.employee.count({
-          where: { organizationId, deletedAt: null, employmentStatus: EmploymentStatus.ACTIVE },
+          where: { ...summaryWhere, employmentStatus: EmploymentStatus.ACTIVE },
         }),
         this.prisma.employee.count({
-          where: { organizationId, deletedAt: null, employmentStatus: EmploymentStatus.PROBATION },
+          where: { ...summaryWhere, employmentStatus: EmploymentStatus.PROBATION },
         }),
         this.prisma.employee.count({
-          where: { organizationId, deletedAt: null, employmentStatus: EmploymentStatus.NOTICE_PERIOD },
+          where: { ...summaryWhere, employmentStatus: EmploymentStatus.NOTICE_PERIOD },
         }),
         this.prisma.employee.count({
-          where: { organizationId, deletedAt: null, dateOfJoining: { gte: startOfMonth, lte: endOfMonth } },
+          where: { ...summaryWhere, dateOfJoining: { gte: startOfMonth, lte: endOfMonth } },
         }),
       ]);
 
@@ -722,12 +763,29 @@ export class EmployeeService {
   /**
    * FR-EMP-004: Org Chart view derived from reportingManagerId
    */
-  async getOrgChart(organizationId: string) {
+  async getOrgChart(organizationId: string, viewer?: AuthenticatedUser) {
+    const where: Prisma.EmployeeWhereInput = {
+      organizationId,
+      deletedAt: null,
+    };
+
+    if (viewer?.role === Role.MANAGER) {
+      if (!viewer.employeeId) {
+        throw new ForbiddenException('Manager account is not linked to an employee record');
+      }
+      const managerEmployee = await this.prisma.employee.findFirst({
+        where: { id: viewer.employeeId, organizationId, deletedAt: null },
+        select: { departmentId: true },
+      });
+      where.OR = [
+        ...(managerEmployee?.departmentId ? [{ departmentId: managerEmployee.departmentId }] : []),
+        { reportingManagerId: viewer.employeeId },
+        { id: viewer.employeeId },
+      ];
+    }
+
     const employees = await this.prisma.employee.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-      },
+      where,
       select: {
         id: true,
         employeeCode: true,

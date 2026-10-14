@@ -365,11 +365,53 @@ export class OffboardingService {
   ) {
     const task = await this.prisma.exitClearanceTask.findFirst({
       where: { id: taskId, organizationId },
-      include: { exitRequest: true },
+      include: {
+        exitRequest: {
+          include: {
+            employee: {
+              select: { id: true, departmentId: true, reportingManagerId: true },
+            },
+          },
+        },
+      },
     });
 
     if (!task) {
       throw new NotFoundException(`Clearance task '${taskId}' not found`);
+    }
+
+    const isHrOrAdmin =
+      currentUser.role === Role.CLIENT_SUPER_ADMIN || currentUser.role === Role.HR_ADMIN;
+
+    if (!isHrOrAdmin) {
+      if (currentUser.role === Role.FINANCE) {
+        if (task.departmentType !== ExitClearanceDepartment.FINANCE) {
+          throw new ForbiddenException('Finance can only update Finance clearance tasks');
+        }
+      } else if (currentUser.role === Role.MANAGER) {
+        if (!currentUser.employeeId) {
+          throw new ForbiddenException('Manager account is not linked to an employee record');
+        }
+        if (task.departmentType !== ExitClearanceDepartment.MANAGER) {
+          throw new ForbiddenException('Managers can only update Manager clearance tasks');
+        }
+
+        const managerEmployee = await this.prisma.employee.findFirst({
+          where: { id: currentUser.employeeId, organizationId, deletedAt: null },
+          select: { departmentId: true },
+        });
+        const targetEmployee = task.exitRequest?.employee;
+        const isSameDepartment = Boolean(
+          managerEmployee?.departmentId &&
+          targetEmployee?.departmentId === managerEmployee.departmentId,
+        );
+        const isDirectReport = targetEmployee?.reportingManagerId === currentUser.employeeId;
+        if (!isSameDepartment && !isDirectReport) {
+          throw new ForbiddenException('You can only update Manager clearance tasks for your department or direct reports');
+        }
+      } else {
+        throw new ForbiddenException('You are not authorized to update clearance tasks');
+      }
     }
 
     const updatedTask = await this.prisma.exitClearanceTask.update({
@@ -852,11 +894,23 @@ export class OffboardingService {
     // Role-based visibility scoping
     if (currentUser.role === Role.EMPLOYEE) {
       where.employeeId = currentUser.employeeId ?? undefined;
-    } else if (currentUser.role === Role.MANAGER && currentUser.employeeId) {
-      where.OR = [
-        { employeeId: currentUser.employeeId },
-        { employee: { reportingManagerId: currentUser.employeeId } },
-      ];
+    } else if (currentUser.role === Role.MANAGER) {
+      if (!currentUser.employeeId) {
+        throw new ForbiddenException('Manager account is not linked to an employee record');
+      }
+      const managerEmployee = await this.prisma.employee.findFirst({
+        where: { id: currentUser.employeeId, organizationId, deletedAt: null },
+        select: { departmentId: true },
+      });
+      where.AND = [{
+        OR: [
+          { employeeId: currentUser.employeeId },
+          ...(managerEmployee?.departmentId
+            ? [{ employee: { departmentId: managerEmployee.departmentId } }]
+            : []),
+          { employee: { reportingManagerId: currentUser.employeeId } },
+        ],
+      }];
     }
 
     if (query.search) {
@@ -900,8 +954,17 @@ export class OffboardingService {
       }),
     ]);
 
+    const roleSafeItems = (currentUser.role === Role.FINANCE || currentUser.role === Role.MANAGER)
+      ? items.map((item) => {
+          const safeEmployee = item.employee
+            ? { ...item.employee, personalEmail: undefined }
+            : item.employee;
+          return { ...item, employee: safeEmployee, exitInterview: null };
+        })
+      : items;
+
     return {
-      data: items,
+      data: roleSafeItems,
       pagination: {
         page,
         limit,
@@ -951,12 +1014,42 @@ export class OffboardingService {
       throw new NotFoundException(`Exit request '${requestId}' not found`);
     }
 
-    // Visibility guard
+    // Visibility guards for non-HR roles.
     if (
       currentUser.role === Role.EMPLOYEE &&
       currentUser.employeeId !== exitRequest.employeeId
     ) {
       throw new ForbiddenException('Access denied to other employees exit requests');
+    }
+
+    if (currentUser.role === Role.MANAGER) {
+      if (!currentUser.employeeId) {
+        throw new ForbiddenException('Manager account is not linked to an employee record');
+      }
+      const managerEmployee = await this.prisma.employee.findFirst({
+        where: { id: currentUser.employeeId, organizationId, deletedAt: null },
+        select: { departmentId: true },
+      });
+      const isOwnRequest = exitRequest.employeeId === currentUser.employeeId;
+      const isSameDepartment = Boolean(
+        managerEmployee?.departmentId &&
+        exitRequest.employee?.department?.id === managerEmployee.departmentId,
+      );
+      const isDirectReport = exitRequest.employee?.reportingManager?.id === currentUser.employeeId;
+      if (!isOwnRequest && !isSameDepartment && !isDirectReport) {
+        throw new ForbiddenException('Access denied to exit requests outside your department and direct reports');
+      }
+    }
+
+    if (currentUser.role === Role.FINANCE || currentUser.role === Role.MANAGER) {
+      const safeEmployee = exitRequest.employee
+        ? {
+            ...exitRequest.employee,
+            personalEmail: undefined,
+            phone: undefined,
+          }
+        : exitRequest.employee;
+      return { ...exitRequest, employee: safeEmployee, exitInterview: null };
     }
 
     return exitRequest;
