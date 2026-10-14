@@ -591,7 +591,10 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
         </div>
       </div>
 
-      {/* EMPLOYEE DOCUMENTS & OFFICIAL RECORDS */}
+      {/* Documents are visible only to HR/Admin and the employee viewing their own profile. */}
+      {(currentUser?.role === 'CLIENT_SUPER_ADMIN' ||
+        currentUser?.role === 'HR_ADMIN' ||
+        currentUser?.employeeId === employee?.id) && (
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px', marginBottom: '16px' }}>
           <div>
@@ -710,6 +713,7 @@ export const EmployeeProfileView: React.FC<Props> = ({ employeeId, onBack }) => 
           </div>
         )}
       </div>
+      )}
 
       {/* EDIT POSITION & DESIGNATION MODAL */}
       {showEditPositionModal && (
