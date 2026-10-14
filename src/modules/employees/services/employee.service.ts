@@ -574,6 +574,8 @@ export class EmployeeService {
         { lastName: { contains: search, mode: 'insensitive' } },
         { employeeCode: { contains: search, mode: 'insensitive' } },
         { personalEmail: { contains: search, mode: 'insensitive' } },
+        { department: { name: { contains: search, mode: 'insensitive' } } },
+        { designation: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
