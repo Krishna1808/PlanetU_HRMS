@@ -120,7 +120,8 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       expect(overview.exitsThisMonth).toBe(2);
       expect(overview.presenceRate).toBe(90); // 45/50 = 90%
       expect(overview.currentMonthPayrollExpense).toBe(1250000);
-      expect(overview.pendingApprovals.total).toBe(4);
+      expect(overview.pendingApprovals.onboardingCandidates).toBe(4);
+      expect(overview.pendingApprovals.total).toBe(8);
     });
 
     it('scopes overview metrics to manager department and hides company payroll', async () => {
@@ -154,6 +155,16 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       expect(overview.departmentName).toBe('Engineering');
       expect(overview.isDepartmentScoped).toBe(true);
       expect(overview.pendingApprovals.leaves).toBe(2);
+      expect(overview.pendingApprovals.onboardingCandidates).toBe(0);
+      expect(mockPrisma.leaveRequest.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: orgId,
+            status: LeaveRequestStatus.PENDING,
+            employee: { reportingManagerId: mockManagerUser.employeeId },
+          }),
+        }),
+      );
     });
   });
 
