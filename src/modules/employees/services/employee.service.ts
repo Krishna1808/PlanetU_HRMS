@@ -763,13 +763,13 @@ export class EmployeeService {
   /**
    * FR-EMP-004: Org Chart view derived from reportingManagerId
    */
-  async getOrgChart(organizationId: string, viewer: AuthenticatedUser) {
+  async getOrgChart(organizationId: string, viewer?: AuthenticatedUser) {
     const where: Prisma.EmployeeWhereInput = {
       organizationId,
       deletedAt: null,
     };
 
-    if (viewer.role === Role.MANAGER) {
+    if (viewer?.role === Role.MANAGER) {
       if (!viewer.employeeId) {
         throw new ForbiddenException('Manager account is not linked to an employee record');
       }
