@@ -954,7 +954,7 @@ export class OffboardingService {
       }),
     ]);
 
-    const roleSafeItems = currentUser.role === Role.FINANCE
+    const roleSafeItems = [Role.FINANCE, Role.MANAGER].includes(currentUser.role)
       ? items.map((item) => {
           const safeEmployee = item.employee ? { ...item.employee } : item.employee;
           if (safeEmployee) delete safeEmployee.personalEmail;
@@ -1040,11 +1040,11 @@ export class OffboardingService {
       }
     }
 
-    if (currentUser.role === Role.FINANCE) {
+    if ([Role.FINANCE, Role.MANAGER].includes(currentUser.role)) {
       const safeEmployee = exitRequest.employee ? { ...exitRequest.employee } : exitRequest.employee;
       if (safeEmployee) {
         delete safeEmployee.personalEmail;
-        delete safeEmployee.phone;
+        if (currentUser.role === Role.FINANCE) delete safeEmployee.phone;
       }
       return { ...exitRequest, employee: safeEmployee, exitInterview: null };
     }
