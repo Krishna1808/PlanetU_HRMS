@@ -365,11 +365,53 @@ export class OffboardingService {
   ) {
     const task = await this.prisma.exitClearanceTask.findFirst({
       where: { id: taskId, organizationId },
-      include: { exitRequest: true },
+      include: {
+        exitRequest: {
+          include: {
+            employee: {
+              select: { id: true, departmentId: true, reportingManagerId: true },
+            },
+          },
+        },
+      },
     });
 
     if (!task) {
       throw new NotFoundException(`Clearance task '${taskId}' not found`);
+    }
+
+    const isHrOrAdmin =
+      currentUser.role === Role.CLIENT_SUPER_ADMIN || currentUser.role === Role.HR_ADMIN;
+
+    if (!isHrOrAdmin) {
+      if (currentUser.role === Role.FINANCE) {
+        if (task.departmentType !== ExitClearanceDepartment.FINANCE) {
+          throw new ForbiddenException('Finance can only update Finance clearance tasks');
+        }
+      } else if (currentUser.role === Role.MANAGER) {
+        if (!currentUser.employeeId) {
+          throw new ForbiddenException('Manager account is not linked to an employee record');
+        }
+        if (task.departmentType !== ExitClearanceDepartment.MANAGER) {
+          throw new ForbiddenException('Managers can only update Manager clearance tasks');
+        }
+
+        const managerEmployee = await this.prisma.employee.findFirst({
+          where: { id: currentUser.employeeId, organizationId, deletedAt: null },
+          select: { departmentId: true },
+        });
+        const targetEmployee = task.exitRequest?.employee;
+        const isSameDepartment = Boolean(
+          managerEmployee?.departmentId &&
+          targetEmployee?.departmentId === managerEmployee.departmentId,
+        );
+        const isDirectReport = targetEmployee?.reportingManagerId === currentUser.employeeId;
+        if (!isSameDepartment && !isDirectReport) {
+          throw new ForbiddenException('You can only update Manager clearance tasks for your department or direct reports');
+        }
+      } else {
+        throw new ForbiddenException('You are not authorized to update clearance tasks');
+      }
     }
 
     const updatedTask = await this.prisma.exitClearanceTask.update({
