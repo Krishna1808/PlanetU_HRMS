@@ -31,6 +31,10 @@ export function AttendancePage({ user }: { user?: any } = {}) {
     user?.role === 'HR_ADMIN' ||
     user?.role === 'CLIENT_SUPER_ADMIN' ||
     user?.role === 'FINANCE';
+  const canQueryPayableDays =
+    user?.role === 'HR_ADMIN' ||
+    user?.role === 'CLIENT_SUPER_ADMIN' ||
+    user?.role === 'FINANCE';
 
   // Payable days calculator tester
   const [queryEmpId, setQueryEmpId] = useState('');
@@ -242,15 +246,16 @@ export function AttendancePage({ user }: { user?: any } = {}) {
         </div>
       )}
 
-      {/* Authoritative Single Source of Truth for Payroll Contract Tester */}
+      {/* Payable-days query is limited to roles authorized by the backend. */}
+      {canQueryPayableDays && (
       <div className="card" style={{ borderLeft: '4px solid #2563eb' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 600 }}>
             Authoritative Payable Days Query (Attendance Contract for Payroll)
           </h3>
-          {isManagerOrAdmin && (
-            <span className="badge badge-active">Leadership Access</span>
-          )}
+          <span className="badge badge-active">
+            {user?.role === 'FINANCE' ? 'Payroll Access' : 'Admin Access'}
+          </span>
         </div>
         <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
           Payroll consumes <code>AttendanceService.getFinalizedPayableDays</code> directly. Test the single source of truth contract for any employee and month:
@@ -364,6 +369,7 @@ export function AttendancePage({ user }: { user?: any } = {}) {
           </div>
         )}
       </div>
+      )}
 
       {/* Role-scoped team attendance: read-only for Finance; Manager scope is enforced by the API. */}
       {isManagerOrAdmin && (
