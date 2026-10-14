@@ -187,13 +187,17 @@ export const EmployeeListPage: React.FC<Props> = ({
             </span>
           </div>
           <p style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-            View profiles, designations, reporting hierarchies, and employment statuses across the enterprise.
+            {currentUser?.role === 'MANAGER'
+              ? 'View employees in your department and your direct reports across departments.'
+              : 'View profiles, designations, reporting hierarchies, and employment statuses across the enterprise.'}
           </p>
         </div>
 
-        <button className="btn btn-primary" onClick={onNavigateAdd} style={{ padding: '8px 18px', fontSize: '13px' }}>
-          + Add New Employee
-        </button>
+        {isHrOrAdmin && (
+          <button className="btn btn-primary" onClick={onNavigateAdd} style={{ padding: '8px 18px', fontSize: '13px' }}>
+            + Add New Employee
+          </button>
+        )}
       </div>
 
       {terminateSuccess && (
@@ -570,15 +574,19 @@ export const EmployeeListPage: React.FC<Props> = ({
             <div>
               <strong style={{ fontSize: '15px', color: '#1e293b' }}>No employees found in the directory</strong>
               <p style={{ fontSize: '13px', marginTop: '4px' }}>
-                Click below to onboard your first team member!
+                {isHrOrAdmin
+                  ? 'Add your first team member to get started.'
+                  : 'No employees are currently visible in your department or direct reports.'}
               </p>
-              <button
-                className="btn btn-primary"
-                onClick={onNavigateAdd}
-                style={{ marginTop: '14px' }}
-              >
-                + Add Employee
-              </button>
+              {isHrOrAdmin && (
+                <button
+                  className="btn btn-primary"
+                  onClick={onNavigateAdd}
+                  style={{ marginTop: '14px' }}
+                >
+                  + Add Employee
+                </button>
+              )}
             </div>
           ) : (
             <div>
