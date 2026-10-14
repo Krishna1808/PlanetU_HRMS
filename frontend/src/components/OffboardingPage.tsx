@@ -273,13 +273,15 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
             Manage employee separations, multi-department clearance checklists, and statutory Full & Final (FnF) settlements.
           </p>
         </div>
-        <button
-          className="btn btn-primary"
-          style={{ background: '#2563eb', color: '#ffffff', padding: '10px 18px', fontWeight: 600 }}
-          onClick={() => setShowApplyModal(true)}
-        >
-          + Apply for Resignation
-        </button>
+        {user.role !== 'FINANCE' && (
+          <button
+            className="btn btn-primary"
+            style={{ background: '#2563eb', color: '#ffffff', padding: '10px 18px', fontWeight: 600 }}
+            onClick={() => setShowApplyModal(true)}
+          >
+            + Apply for Resignation
+          </button>
+        )}
       </div>
 
       {/* Separation Pipeline Metric Strip */}
@@ -549,14 +551,16 @@ export const OffboardingPage: React.FC<OffboardingPageProps> = ({ user }) => {
                         {req.clearanceTasks?.length || 0})
                       </button>
 
-                      {/* Exit Interview */}
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: '4px 10px', fontSize: '11px' }}
-                        onClick={() => setShowInterviewModal(req)}
-                      >
-                        {req.exitInterview ? 'Interview Done' : 'Interview'}
-                      </button>
+                      {/* Exit interviews are limited to HR/Admin and the employee's own request. */}
+                      {(isHrOrAdmin || (user.role === 'EMPLOYEE' && req.employeeId === user.employeeId)) && (
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '4px 10px', fontSize: '11px' }}
+                          onClick={() => setShowInterviewModal(req)}
+                        >
+                          {req.exitInterview ? 'Interview Done' : 'Interview'}
+                        </button>
+                      )}
 
                       {/* FnF Settlement */}
                       {(isHrOrAdmin || isFinance) && (
