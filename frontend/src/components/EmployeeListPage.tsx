@@ -362,7 +362,10 @@ export const EmployeeListPage: React.FC<Props> = ({
             type="text"
             placeholder="Search by name, employee code, role, or department..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             style={{
               paddingLeft: '32px',
               paddingRight: searchQuery ? '30px' : '10px',
@@ -372,7 +375,10 @@ export const EmployeeListPage: React.FC<Props> = ({
           />
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery('')}
+              onClick={() => {
+                setSearchQuery('');
+                setCurrentPage(1);
+              }}
               style={{
                 position: 'absolute',
                 right: '8px',
