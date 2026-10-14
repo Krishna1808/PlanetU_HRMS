@@ -109,5 +109,4 @@ export interface EssDashboardResponse {
     date: string;
     years?: number;
   }>;
-  punctualityStreak?: number;
 }

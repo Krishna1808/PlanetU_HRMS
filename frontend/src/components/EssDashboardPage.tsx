@@ -480,7 +480,6 @@ export function EssDashboardPage() {
     upcomingHolidays,
     whosOutToday = [],
     upcomingCelebrations = [],
-    punctualityStreak = 0,
   } = data;
 
   return (
@@ -778,25 +777,6 @@ export function EssDashboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Icons.Clock size={18} color="#2563eb" />
               <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Today's Attendance</h3>
-              {punctualityStreak > 0 && (
-                <span
-                  title={`${punctualityStreak} consecutive on-time check-in${punctualityStreak > 1 ? 's' : ''} this month`}
-                  style={{
-                    background: '#fef3c7',
-                    color: '#b45309',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    border: '1px solid #fde68a',
-                  }}
-                >
-                  🔥 {punctualityStreak}-day streak
-                </span>
-              )}
             </div>
             <span
               className={`badge ${

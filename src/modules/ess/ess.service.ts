@@ -424,25 +424,6 @@ export class EssService {
       }
     }
 
-    // 11. Punctuality Streak (consecutive on-time punches in the current month)
-    const monthStart = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1));
-    const recentPunches = await this.prisma.attendanceRecord.findMany({
-      where: {
-        organizationId,
-        employeeId,
-        date: { gte: monthStart },
-        checkInTime: { not: null },
-      },
-      orderBy: { date: 'desc' },
-      select: { isLate: true },
-    });
-
-    let punctualityStreak = 0;
-    for (const p of recentPunches) {
-      if (!p.isLate) punctualityStreak++;
-      else break;
-    }
-
     return {
       profile,
       shift,
@@ -453,7 +434,6 @@ export class EssService {
       upcomingHolidays,
       whosOutToday,
       upcomingCelebrations,
-      punctualityStreak,
       ...(managerOverview && { managerOverview }),
     };
   }
