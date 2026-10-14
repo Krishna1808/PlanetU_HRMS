@@ -103,6 +103,29 @@ describe('EmployeeRbacService (FR-EMP-006 & FR-EMP-008)', () => {
       expect(result.uanNumber).toBeUndefined();
     });
 
+    it('Finance viewing another employee sees payroll identifiers without personal or bank details', () => {
+      const financeViewer: AuthenticatedUser = {
+        id: 'user-finance',
+        organizationId: 'org-1',
+        email: 'finance@example.com',
+        role: Role.FINANCE,
+        employeeId: null,
+      };
+
+      const result = rbacService.sanitizeEmployeeProfile(mockFullEmployee, financeViewer);
+
+      expect(result.id).toBe('emp-100');
+      expect(result.employeeCode).toBe('ENG-0001');
+      expect(result.firstName).toBe('John');
+      expect(result.department.name).toBe('Engineering');
+      expect(result.personalEmail).toBeUndefined();
+      expect(result.phone).toBeUndefined();
+      expect(result.baseSalary).toBeUndefined();
+      expect(result.bankName).toBeUndefined();
+      expect(result.accountNumber).toBeUndefined();
+      expect(result.panNumber).toBeUndefined();
+    });
+
     it('Colleague viewing peer employee sees public directory info only', () => {
       const peerViewer: AuthenticatedUser = {
         id: 'user-peer',
