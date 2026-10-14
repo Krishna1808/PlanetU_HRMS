@@ -44,6 +44,7 @@ export interface EssLeaveBalanceItem {
   accruedDays: number;
   usedDays: number;
   availableBalance: number;
+  projectedYearEndBalance?: number;
 }
 
 export interface EssRecentLeaveItem {
@@ -93,4 +94,20 @@ export interface EssDashboardResponse {
   latestPayslip: EssLatestPayslipItem | null;
   upcomingHolidays?: EssUpcomingHolidayItem[];
   managerOverview?: EssManagerOverview;
+  whosOutToday?: Array<{
+    id: string;
+    name: string;
+    employeeCode: string;
+    status: string;
+    details: string;
+  }>;
+  upcomingCelebrations?: Array<{
+    id: string;
+    name: string;
+    department: string;
+    type: 'BIRTHDAY' | 'WORK_ANNIVERSARY';
+    date: string;
+    years?: number;
+  }>;
+  punctualityStreak?: number;
 }

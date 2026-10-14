@@ -150,7 +150,27 @@ export class ReportsService {
       }),
     ]);
 
-    // 2. Today's presence & lateness
+    // Calculate Monthly Attrition Rate (%) with headcount average
+    // Average Headcount = activeHeadcount - (newHires / 2) + (exits / 2)
+    const avgHeadcount = Math.max(
+      1,
+      activeHeadcount - newHiresThisMonth / 2 + exitsThisMonth / 2,
+    );
+    const monthlyAttritionRate = Number(((exitsThisMonth / avgHeadcount) * 100).toFixed(1));
+
+    // Previous month attrition comparison
+    const prevMonthStart = new Date(Date.UTC(currentYear, currentMonth - 2, 1));
+    const prevMonthEnd = new Date(Date.UTC(currentYear, currentMonth - 1, 0, 23, 59, 59));
+    const exitsPrevMonth = await this.prisma.employee.count({
+      where: {
+        organizationId,
+        dateOfExit: { gte: prevMonthStart, lte: prevMonthEnd },
+        ...(managerScope ? managerScope.employeeFilter : {}),
+      },
+    });
+    const prevMonthAttritionRate = Number(((exitsPrevMonth / avgHeadcount) * 100).toFixed(1));
+
+    // 2. Today's presence, lateness, and On-Time Arrival Rate
     const [todayPunches, todayLatePunches] = await Promise.all([
       this.prisma.attendanceRecord.count({
         where: {
@@ -175,8 +195,101 @@ export class ReportsService {
         ? Number(((todayPunches / activeHeadcount) * 100).toFixed(1))
         : 0;
 
-    // 3. Current month payroll expense (Super Admin, HR Admin, Finance ONLY - never Manager)
+    const todayOnTimePunches = Math.max(0, todayPunches - todayLatePunches);
+    const onTimeArrivalRate =
+      todayPunches > 0
+        ? Number(((todayOnTimePunches / todayPunches) * 100).toFixed(1))
+        : 100;
+
+    // 3. Average Employee Tenure
+    const activeEmployees = await this.prisma.employee.findMany({
+      where: activeEmployeeWhere,
+      select: { dateOfJoining: true },
+    });
+    let totalTenureDays = 0;
+    for (const emp of activeEmployees) {
+      const joining = new Date(emp.dateOfJoining);
+      if (!isNaN(joining.getTime())) {
+        const diffDays = Math.max(0, (now.getTime() - joining.getTime()) / (1000 * 60 * 60 * 24));
+        totalTenureDays += diffDays;
+      }
+    }
+    const averageTenureYears =
+      activeEmployees.length > 0
+        ? Number((totalTenureDays / activeEmployees.length / 365.25).toFixed(1))
+        : 0;
+
+    // 4. Who's Out Today (Real-time Team Availability)
+    const [activeLeavesToday, absentRecordsToday] = await Promise.all([
+      this.prisma.leaveRequest.findMany({
+        where: {
+          organizationId,
+          status: LeaveRequestStatus.APPROVED,
+          startDate: { lte: todayEnd },
+          endDate: { gte: todayStart },
+          ...(managerScope ? { employee: managerScope.employeeFilter } : {}),
+        },
+        select: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              employeeCode: true,
+              department: { select: { name: true } },
+            },
+          },
+          leaveType: { select: { name: true, code: true } },
+        },
+        take: 12,
+      }),
+      this.prisma.attendanceRecord.findMany({
+        where: {
+          organizationId,
+          date: { gte: todayStart, lte: todayEnd },
+          status: AttendanceStatus.ABSENT,
+          ...(managerScope ? { employee: managerScope.employeeFilter } : {}),
+        },
+        select: {
+          employee: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              employeeCode: true,
+              department: { select: { name: true } },
+            },
+          },
+        },
+        take: 12,
+      }),
+    ]);
+
+    const leaveEmpIds = new Set(activeLeavesToday.map((l) => l.employee.id));
+    const whosOutToday = [
+      ...activeLeavesToday.map((l) => ({
+        id: l.employee.id,
+        name: `${l.employee.firstName} ${l.employee.lastName}`.trim(),
+        employeeCode: l.employee.employeeCode,
+        department: l.employee.department?.name || 'Department',
+        status: 'ON_LEAVE' as const,
+        details: l.leaveType.name,
+      })),
+      ...absentRecordsToday
+        .filter((a) => !leaveEmpIds.has(a.employee.id))
+        .map((a) => ({
+          id: a.employee.id,
+          name: `${a.employee.firstName} ${a.employee.lastName}`.trim(),
+          employeeCode: a.employee.employeeCode,
+          department: a.employee.department?.name || 'Department',
+          status: 'ABSENT' as const,
+          details: 'Unexcused Absence',
+        })),
+    ].slice(0, 10);
+
+    // 5. Current month payroll expense & LOP deduction
     let currentMonthPayrollExpense = 0;
+    let latestBatchLopAmount = 0;
     const canSeePayroll =
       currentUser.role === Role.CLIENT_SUPER_ADMIN ||
       currentUser.role === Role.HR_ADMIN ||
@@ -189,15 +302,23 @@ export class ReportsService {
           year: currentYear,
           month: currentMonth,
         },
+        include: {
+          payslips: {
+            select: { nominalGross: true, earnedGross: true },
+          },
+        },
         orderBy: { createdAt: 'desc' },
       });
 
       if (latestBatch) {
         currentMonthPayrollExpense = Number(latestBatch.totalNetPay);
+        for (const slip of latestBatch.payslips) {
+          latestBatchLopAmount += Math.max(0, Number(slip.nominalGross) - Number(slip.earnedGross));
+        }
       }
     }
 
-    // 4. Pending actions. Managers can act only on direct-report approvals,
+    // 6. Pending actions. Managers can act only on direct-report approvals,
     // even though they can read department-wide workforce and exit information.
     const managerApprovalFilter: Prisma.EmployeeWhereInput | null =
       currentUser.role === Role.MANAGER && currentUser.employeeId
@@ -239,8 +360,16 @@ export class ReportsService {
       exitsThisMonth,
       todayPunches,
       todayLatePunches,
+      todayOnTimePunches,
+      onTimeArrivalRate,
+      monthlyAttritionRate,
+      prevMonthAttritionRate,
+      avgHeadcount,
+      averageTenureYears,
+      whosOutToday,
       presenceRate,
       currentMonthPayrollExpense: canSeePayroll ? currentMonthPayrollExpense : null,
+      latestBatchLopAmount: canSeePayroll ? Number(latestBatchLopAmount.toFixed(2)) : null,
       pendingApprovals: {
         leaves: pendingLeaves,
         exits: pendingExits,
@@ -383,6 +512,68 @@ export class ReportsService {
         totalActive > 0 ? Number(((g._count / totalActive) * 100).toFixed(1)) : 0,
     }));
 
+    // Average Employee Tenure and Tenure Bands
+    const activeStaff = await this.prisma.employee.findMany({
+      where: activeWhere,
+      select: { dateOfJoining: true },
+    });
+
+    let totalTenureDays = 0;
+    const tenureBands: Record<string, number> = {
+      '< 1 Year': 0,
+      '1 - 2 Years': 0,
+      '2 - 5 Years': 0,
+      '5+ Years': 0,
+    };
+
+    const now = new Date();
+    for (const emp of activeStaff) {
+      const joining = new Date(emp.dateOfJoining);
+      if (!isNaN(joining.getTime())) {
+        const days = Math.max(0, (now.getTime() - joining.getTime()) / (1000 * 60 * 60 * 24));
+        totalTenureDays += days;
+        const years = days / 365.25;
+        if (years < 1) tenureBands['< 1 Year']++;
+        else if (years < 2) tenureBands['1 - 2 Years']++;
+        else if (years < 5) tenureBands['2 - 5 Years']++;
+        else tenureBands['5+ Years']++;
+      }
+    }
+
+    const averageTenureYears =
+      activeStaff.length > 0
+        ? Number((totalTenureDays / activeStaff.length / 365.25).toFixed(1))
+        : 0;
+
+    // 90-Day New-Hire Retention Rate (mature cohort who joined between 90 days and 365 days ago)
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+
+    const [matureCohortHires, matureCohortExits] = await Promise.all([
+      this.prisma.employee.count({
+        where: {
+          organizationId,
+          dateOfJoining: { gte: oneYearAgo, lte: ninetyDaysAgo },
+          ...(currentUser?.role === Role.MANAGER ? activeWhere : {}),
+        },
+      }),
+      this.prisma.employee.count({
+        where: {
+          organizationId,
+          dateOfJoining: { gte: oneYearAgo, lte: ninetyDaysAgo },
+          dateOfExit: { not: null },
+          employmentStatus: { in: [EmploymentStatus.RESIGNED, EmploymentStatus.TERMINATED] },
+          ...(currentUser?.role === Role.MANAGER ? activeWhere : {}),
+        },
+      }),
+    ]);
+
+    const matureCohortRetained = Math.max(0, matureCohortHires - matureCohortExits);
+    const newHireRetention90Days =
+      matureCohortHires > 0
+        ? Number(((matureCohortRetained / matureCohortHires) * 100).toFixed(1))
+        : 100;
+
     return {
       totalActive,
       byDepartment,
@@ -390,6 +581,15 @@ export class ReportsService {
       byGrade,
       byGender,
       byEmploymentType,
+      averageTenureYears,
+      tenureBands: Object.entries(tenureBands).map(([band, count]) => ({
+        band,
+        count,
+        percentage: totalActive > 0 ? Number(((count / totalActive) * 100).toFixed(1)) : 0,
+      })),
+      newHireRetention90Days,
+      matureCohortHires,
+      matureCohortRetained,
     };
   }
 
@@ -488,16 +688,58 @@ export class ReportsService {
         ...counts,
       }));
 
+    const totalCheckins = statusCounts.PRESENT + statusCounts.HALF_DAY;
+    const lateCheckins = latenessStats._count.id;
+    const onTimeCheckins = Math.max(0, totalCheckins - lateCheckins);
+    const onTimeArrivalRate =
+      totalCheckins > 0 ? Number(((onTimeCheckins / totalCheckins) * 100).toFixed(1)) : 100;
+
+    // Verify LOP financial impact if payroll batch exists for this period
+    let lopFinancialImpact: {
+      deductionAmount: number;
+      totalLopDays: number;
+      isFinalized: boolean;
+      batchStatus: string;
+    } | null = null;
+
+    const payrollBatch = await this.prisma.payrollBatch.findFirst({
+      where: { organizationId, year, month },
+      include: {
+        payslips: {
+          select: { nominalGross: true, earnedGross: true, lwpDays: true, unexcusedAbsenceDays: true },
+        },
+      },
+    });
+
+    if (payrollBatch) {
+      let lopDeductionAmount = 0;
+      let totalLopDays = 0;
+      for (const slip of payrollBatch.payslips) {
+        lopDeductionAmount += Math.max(0, Number(slip.nominalGross) - Number(slip.earnedGross));
+        totalLopDays += Number(slip.lwpDays) + Number(slip.unexcusedAbsenceDays);
+      }
+      lopFinancialImpact = {
+        deductionAmount: Number(lopDeductionAmount.toFixed(2)),
+        totalLopDays: Number(totalLopDays.toFixed(1)),
+        isFinalized: payrollBatch.status === 'DISBURSED',
+        batchStatus: payrollBatch.status,
+      };
+    }
+
     return {
       year,
       month,
       totalRecords,
       statusCounts,
       overallPresenceRate,
+      onTimeArrivalRate,
+      onTimeCheckins,
+      totalCheckins,
       lateness: {
         lateCount: latenessStats._count.id,
         totalLateMinutes: latenessStats._sum.lateMinutes || 0,
       },
+      lopFinancialImpact,
       dailyTimeline,
     };
   }
@@ -621,6 +863,7 @@ export class ReportsService {
       include: {
         payslips: {
           select: {
+            employeeId: true,
             nominalGross: true,
             earnedGross: true,
             earnedBasic: true,
@@ -652,7 +895,10 @@ export class ReportsService {
       employeeCount: number;
     }> = [];
 
-    const departmentCostMap = new Map<string, number>();
+    const departmentCostMap = new Map<
+      string,
+      { totalNet: number; totalGross: number; employees: Set<string> }
+    >();
 
     for (const batch of batches) {
       const gross = Number(batch.totalGrossPay);
@@ -679,22 +925,36 @@ export class ReportsService {
         totalProfessionalTax += Number(slip.professionalTax);
 
         const deptName = slip.employee?.department?.name || 'General';
-        departmentCostMap.set(
-          deptName,
-          (departmentCostMap.get(deptName) || 0) + Number(slip.netPay),
-        );
+        if (!departmentCostMap.has(deptName)) {
+          departmentCostMap.set(deptName, {
+            totalNet: 0,
+            totalGross: 0,
+            employees: new Set<string>(),
+          });
+        }
+        const deptEntry = departmentCostMap.get(deptName)!;
+        deptEntry.totalNet += Number(slip.netPay);
+        deptEntry.totalGross += Number(slip.earnedGross);
+        deptEntry.employees.add(slip.employeeId || `emp-${deptEntry.employees.size}`);
       }
     }
 
     const departmentDistribution = Array.from(departmentCostMap.entries()).map(
-      ([department, totalNet]) => ({
-        department,
-        totalNet: Number(totalNet.toFixed(2)),
-        percentage:
-          totalYearNet > 0
-            ? Number(((totalNet / totalYearNet) * 100).toFixed(1))
-            : 0,
-      }),
+      ([department, cost]) => {
+        const headcount = Math.max(1, cost.employees.size);
+        return {
+          department,
+          headcount,
+          totalGross: Number(cost.totalGross.toFixed(2)),
+          totalNet: Number(cost.totalNet.toFixed(2)),
+          avgGrossPerHead: Math.round(cost.totalGross / headcount),
+          avgNetPerHead: Math.round(cost.totalNet / headcount),
+          percentage:
+            totalYearNet > 0
+              ? Number(((cost.totalNet / totalYearNet) * 100).toFixed(1))
+              : 0,
+        };
+      },
     );
 
     return {

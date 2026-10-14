@@ -469,7 +469,19 @@ export function EssDashboardPage() {
     );
   }
 
-  const { profile, shift, todayAttendance, leaveBalances, recentLeaveRequests, latestPayslip, managerOverview, upcomingHolidays } = data;
+  const {
+    profile,
+    shift,
+    todayAttendance,
+    leaveBalances,
+    recentLeaveRequests,
+    latestPayslip,
+    managerOverview,
+    upcomingHolidays,
+    whosOutToday = [],
+    upcomingCelebrations = [],
+    punctualityStreak = 0,
+  } = data;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -652,6 +664,112 @@ export function EssDashboardPage() {
         </div>
       )}
 
+      {/* 2b. Team Availability & Upcoming Celebrations Strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+        {/* Who's Out Today in My Department */}
+        <div className="card" style={{ padding: '16px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icons.Users size={18} color="#2563eb" />
+              <h3 style={{ fontSize: '15px', fontWeight: 600, margin: 0 }}>Who's Out Today</h3>
+              <span style={{ fontSize: '11px', color: '#64748b' }}>({profile.department})</span>
+            </div>
+            <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>
+              {whosOutToday.length > 0 ? `${whosOutToday.length} Away` : 'Full Attendance'}
+            </span>
+          </div>
+
+          {whosOutToday.length === 0 ? (
+            <div style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#059669', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🎉</span>
+              <span>All colleagues in {profile.department} are scheduled to be present today!</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              {whosOutToday.map((member: any) => (
+                <div
+                  key={member.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    background: '#fff7ed',
+                    border: '1px solid #fed7aa',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      background: '#ea580c',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {member.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#1e293b' }}>{member.name}</div>
+                    <div style={{ fontSize: '11px', color: '#c2410c' }}>{member.details}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Upcoming Celebrations (BambooHR Style) */}
+        <div className="card" style={{ padding: '16px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px' }}>🎉</span>
+              <h3 style={{ fontSize: '15px', fontWeight: 600, margin: 0 }}>Upcoming Celebrations</h3>
+            </div>
+            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Next 14 Days</span>
+          </div>
+
+          {upcomingCelebrations.length === 0 ? (
+            <div style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '12px' }}>
+              No birthdays or work anniversaries in the next 14 days.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              {upcomingCelebrations.map((cel: any, idx: number) => (
+                <div
+                  key={`${cel.id}-${idx}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: cel.type === 'BIRTHDAY' ? '#fdf2f8' : '#eff6ff',
+                    border: `1px solid ${cel.type === 'BIRTHDAY' ? '#fbcfe8' : '#bfdbfe'}`,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                  }}
+                >
+                  <span style={{ fontSize: '18px' }}>{cel.type === 'BIRTHDAY' ? '🎂' : '🌟'}</span>
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#1e293b' }}>{cel.name}</div>
+                    <div style={{ fontSize: '11px', color: cel.type === 'BIRTHDAY' ? '#be185d' : '#1d4ed8' }}>
+                      {cel.type === 'BIRTHDAY' ? `Birthday • ${cel.date}` : `${cel.years}yr Anniversary • ${cel.date}`}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* 3. Grid: Today Attendance & Shift info */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(270px, 1fr))', gap: '20px' }}>
         {/* Attendance Card */}
@@ -660,6 +778,25 @@ export function EssDashboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Icons.Clock size={18} color="#2563eb" />
               <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Today's Attendance</h3>
+              {punctualityStreak > 0 && (
+                <span
+                  title={`${punctualityStreak} consecutive on-time check-in${punctualityStreak > 1 ? 's' : ''} this month`}
+                  style={{
+                    background: '#fef3c7',
+                    color: '#b45309',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    border: '1px solid #fde68a',
+                  }}
+                >
+                  🔥 {punctualityStreak}-day streak
+                </span>
+              )}
             </div>
             <span
               className={`badge ${
@@ -936,11 +1073,16 @@ export function EssDashboardPage() {
               }}
             >
               <div style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>{b.name} ({b.code})</div>
-              <div style={{ fontSize: '26px', fontWeight: 800, color: b.isPaid ? '#2563eb' : '#dc2626', margin: '6px 0' }}>
-                {b.availableBalance}
+              <div style={{ fontSize: '26px', fontWeight: 800, color: b.isPaid ? '#2563eb' : '#dc2626', margin: '4px 0' }}>
+                {b.availableBalance} <span style={{ fontSize: '13px', fontWeight: 500, color: '#64748b' }}>days</span>
               </div>
-              <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                Allowed: {b.daysAllowedPerYear} / yr
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b', borderTop: '1px solid #e2e8f0', paddingTop: '6px', marginTop: '6px' }}>
+                <span>Allowed: {b.daysAllowedPerYear}/yr</span>
+                {b.projectedYearEndBalance !== undefined && (
+                  <span style={{ color: '#059669', fontWeight: 600 }} title="Estimated year-end balance runway at current monthly accrual">
+                    ~{b.projectedYearEndBalance} by Dec
+                  </span>
+                )}
               </div>
             </div>
           ))}

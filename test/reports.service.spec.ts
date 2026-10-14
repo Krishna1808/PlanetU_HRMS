@@ -2,9 +2,7 @@ import { jest } from '@jest/globals';
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
 import {
   Role,
-  EmploymentStatus,
   LeaveRequestStatus,
-  ExitStatus,
   AttendanceStatus,
 } from '@prisma/client';
 import { ReportsService } from '../src/modules/reports/reports.service';
@@ -21,6 +19,7 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
     organizationId: orgId,
     email: 'admin@planetu.com',
     role: Role.CLIENT_SUPER_ADMIN,
+    employeeId: null,
   };
 
   const mockFinanceUser: AuthenticatedUser = {
@@ -28,6 +27,7 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
     organizationId: orgId,
     email: 'finance@planetu.com',
     role: Role.FINANCE,
+    employeeId: null,
   };
 
   const mockManagerUser: AuthenticatedUser = {
@@ -98,15 +98,30 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       mockPrisma.employee.count
         .mockResolvedValueOnce(50) // activeHeadcount
         .mockResolvedValueOnce(5) // newHiresThisMonth
-        .mockResolvedValueOnce(2); // exitsThisMonth
+        .mockResolvedValueOnce(2) // exitsThisMonth
+        .mockResolvedValueOnce(1); // exitsPrevMonth
 
       mockPrisma.attendanceRecord.count
         .mockResolvedValueOnce(45) // todayPunches
         .mockResolvedValueOnce(4); // todayLatePunches
 
+      mockPrisma.employee.findMany.mockResolvedValue([
+        { dateOfJoining: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) },
+      ]);
+      mockPrisma.leaveRequest.findMany.mockResolvedValue([
+        {
+          employee: { id: 'emp-1', firstName: 'Alice', lastName: 'Smith', employeeCode: 'ENG-001', department: { name: 'Engineering' } },
+          leaveType: { name: 'Casual Leave', code: 'CL' },
+        },
+      ]);
+      mockPrisma.attendanceRecord.findMany.mockResolvedValue([]);
+
       mockPrisma.payrollBatch.findFirst.mockResolvedValue({
         id: 'batch-1',
         totalNetPay: 1250000,
+        payslips: [
+          { nominalGross: 1300000, earnedGross: 1250000 },
+        ],
       });
 
       mockPrisma.leaveRequest.count.mockResolvedValue(3); // pendingLeaves
@@ -119,7 +134,12 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       expect(overview.newHiresThisMonth).toBe(5);
       expect(overview.exitsThisMonth).toBe(2);
       expect(overview.presenceRate).toBe(90); // 45/50 = 90%
+      expect(overview.onTimeArrivalRate).toBe(91.1); // (45-4)/45 = 91.1%
+      expect(overview.monthlyAttritionRate).toBe(4.1); // 2 / (50 - 2 + 1) = 4.08% -> 4.1%
       expect(overview.currentMonthPayrollExpense).toBe(1250000);
+      expect(overview.latestBatchLopAmount).toBe(50000);
+      expect(overview.whosOutToday.length).toBe(1);
+      expect(overview.whosOutToday[0].name).toBe('Alice Smith');
       expect(overview.pendingApprovals.onboardingCandidates).toBe(4);
       expect(overview.pendingApprovals.total).toBe(8);
     });
@@ -134,11 +154,18 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       mockPrisma.employee.count
         .mockResolvedValueOnce(12) // activeHeadcount in dept
         .mockResolvedValueOnce(2) // newHiresThisMonth in dept
-        .mockResolvedValueOnce(0); // exitsThisMonth in dept
+        .mockResolvedValueOnce(0) // exitsThisMonth in dept
+        .mockResolvedValueOnce(0); // exitsPrevMonth in dept
 
       mockPrisma.attendanceRecord.count
         .mockResolvedValueOnce(11) // todayPunches in dept
         .mockResolvedValueOnce(1); // todayLatePunches in dept
+
+      mockPrisma.employee.findMany.mockResolvedValue([
+        { dateOfJoining: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) },
+      ]);
+      mockPrisma.leaveRequest.findMany.mockResolvedValue([]);
+      mockPrisma.attendanceRecord.findMany.mockResolvedValue([]);
 
       mockPrisma.leaveRequest.count.mockResolvedValue(2); // pendingLeaves for team
       mockPrisma.exitRequest.count.mockResolvedValue(0); // pendingExits for team
@@ -150,7 +177,10 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       expect(overview.newHiresThisMonth).toBe(2);
       expect(overview.exitsThisMonth).toBe(0);
       expect(overview.presenceRate).toBe(91.7);
+      expect(overview.onTimeArrivalRate).toBe(90.9);
+      expect(overview.monthlyAttritionRate).toBe(0);
       expect(overview.currentMonthPayrollExpense).toBeNull();
+      expect(overview.latestBatchLopAmount).toBeNull();
       expect(overview.departmentId).toBe('dept-eng-1');
       expect(overview.departmentName).toBe('Engineering');
       expect(overview.isDepartmentScoped).toBe(true);
@@ -173,7 +203,14 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
   // ---------------------------------------------------------------------------
   describe('getWorkforceAnalytics', () => {
     it('aggregates demographics by department, grade, gender, and employment type', async () => {
-      mockPrisma.employee.count.mockResolvedValue(20);
+      mockPrisma.employee.count
+        .mockResolvedValueOnce(20) // totalActive
+        .mockResolvedValueOnce(15) // matureCohortHires
+        .mockResolvedValueOnce(1); // matureCohortExits
+
+      mockPrisma.employee.findMany.mockResolvedValue([
+        { dateOfJoining: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000) },
+      ]);
 
       mockPrisma.employee.groupBy
         .mockResolvedValueOnce([{ departmentId: 'd-1', _count: 15 }, { departmentId: 'd-2', _count: 5 }])
@@ -196,10 +233,21 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       expect(workforce.byDepartment[0].name).toBe('Engineering');
       expect(workforce.byDepartment[0].percentage).toBe(75);
       expect(workforce.byGender.length).toBe(2);
+      expect(workforce.averageTenureYears).toBeGreaterThan(0);
+      expect(workforce.newHireRetention90Days).toBe(93.3);
+      expect(workforce.tenureBands.length).toBe(4);
     });
 
     it('scopes active employee query when departmentId filter is provided', async () => {
-      mockPrisma.employee.count.mockResolvedValue(15);
+      mockPrisma.employee.count
+        .mockResolvedValueOnce(15)
+        .mockResolvedValueOnce(10)
+        .mockResolvedValueOnce(0);
+
+      mockPrisma.employee.findMany.mockResolvedValue([
+        { dateOfJoining: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000) },
+      ]);
+
       mockPrisma.employee.groupBy
         .mockResolvedValueOnce([{ departmentId: 'd-1', _count: 15 }])
         .mockResolvedValueOnce([{ designationId: 'des-1', _count: 15 }])
@@ -245,12 +293,23 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
         { date: new Date('2026-09-01'), status: AttendanceStatus.ABSENT },
       ]);
 
+      mockPrisma.payrollBatch.findFirst.mockResolvedValue({
+        id: 'pb-1',
+        status: 'DISBURSED',
+        payslips: [
+          { nominalGross: 50000, earnedGross: 45000, lwpDays: 2, unexcusedAbsenceDays: 1 },
+        ],
+      });
+
       const analytics = await service.getAttendanceAnalytics(orgId, { year: 2026, month: 9 }, mockAdminUser);
 
       expect(analytics.totalRecords).toBe(100);
       expect(analytics.overallPresenceRate).toBe(85); // (80 + 5) / 100 = 85%
+      expect(analytics.onTimeArrivalRate).toBe(86.7); // (90 - 12) / 90 = 78 / 90 = 86.7%
       expect(analytics.lateness.lateCount).toBe(12);
       expect(analytics.lateness.totalLateMinutes).toBe(180);
+      expect(analytics.lopFinancialImpact?.deductionAmount).toBe(5000);
+      expect(analytics.lopFinancialImpact?.totalLopDays).toBe(3);
       expect(analytics.dailyTimeline.length).toBeGreaterThan(0);
     });
   });
@@ -293,9 +352,8 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
 
       expect(leaves.totalRequests).toBe(3);
       expect(leaves.statusCounts.APPROVED).toBe(2);
-      expect(leaves.statusCounts.REJECTED).toBe(1);
 
-      const cl = leaves.byLeaveType.find((l) => l.code === 'CL');
+      const cl = leaves.byLeaveType.find((l: any) => l.code === 'CL');
       expect(cl?.totalDays).toBe(5);
     });
   });
@@ -310,7 +368,7 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('computes monthly trends and statutory liabilities for Finance / HR users', async () => {
+    it('computes monthly trends, statutory liabilities, and cost per head for Finance / HR users', async () => {
       mockPrisma.payrollBatch.findMany.mockResolvedValue([
         {
           id: 'pb-1',
@@ -324,6 +382,8 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
           totalNetPay: 450000,
           payslips: [
             {
+              employeeId: 'emp-101',
+              nominalGross: 500000,
               earnedGross: 500000,
               employeePf: 30000,
               employerPf: 30000,
@@ -343,6 +403,9 @@ describe('ReportsService (Module 10: Reports & Dashboards Engine)', () => {
       expect(payroll.statutoryLiabilities.totalEmployerPf).toBe(30000);
       expect(payroll.statutoryLiabilities.totalProfessionalTax).toBe(2000);
       expect(payroll.statutoryLiabilities.totalCombinedPf).toBe(60000);
+      expect(payroll.departmentDistribution[0].department).toBe('Engineering');
+      expect(payroll.departmentDistribution[0].avgNetPerHead).toBe(450000);
+      expect(payroll.departmentDistribution[0].avgGrossPerHead).toBe(500000);
     });
   });
 

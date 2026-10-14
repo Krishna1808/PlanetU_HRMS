@@ -390,30 +390,25 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                   </div>
                 )}
 
-                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                    {overviewData.isDepartmentScoped ? 'Team Pending Approvals' : 'Pending Approvals'}
-                  </div>
-                  <div style={{ fontSize: '32px', fontWeight: 900, color: '#f59e0b', margin: '6px 0' }}>
-                    {overviewData.pendingApprovals.total}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {overviewData.pendingApprovals.leaves} leaves • {overviewData.pendingApprovals.exits} resignations
+                  <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                      {overviewData.isDepartmentScoped ? 'Team Pending Approvals' : 'Pending Approvals'}
+                    </div>
+                    <div style={{ fontSize: '32px', fontWeight: 900, color: '#f59e0b', margin: '6px 0' }}>
+                      {overviewData.pendingApprovals.total}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      {overviewData.pendingApprovals.leaves} leaves • {overviewData.pendingApprovals.exits} exits • {overviewData.pendingApprovals.onboardingCandidates || 0} onboarding
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Real-time telemetry summary */}
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '16px' }}>
-                <h4 style={{ margin: '0 0 6px', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                  Cross-Module Telemetry Engine
-                </h4>
-                <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>
-                  Live cross-module aggregations reflect instant database commits across Attendance (M4), Leaves (M5), Payroll (M6), Onboarding (M8), and Offboarding (M9).
-                </p>
+                {/* Data freshness indicator */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8' }}>
+                  <span>● Live multi-module data as of {new Date(overviewData.updatedAt || Date.now()).toLocaleTimeString()}</span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* TAB 2: Workforce Demographics */}
           {activeTab === 'workforce' && workforceData && (
@@ -423,6 +418,51 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                   Filtering demographics specifically for <strong>{selectedDepartmentName}</strong> ({workforceData.totalActive} active members).
                 </div>
               )}
+
+              {/* Top Workforce Metrics */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+                  gap: '16px',
+                }}
+              >
+                <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Average Employee Tenure
+                  </div>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#2563eb', margin: '4px 0' }}>
+                    {workforceData.averageTenureYears ?? 0} Years
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    Verified from employee joining dates
+                  </div>
+                </div>
+
+                <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                    90-Day New-Hire Retention
+                  </div>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#10b981', margin: '4px 0' }}>
+                    {workforceData.newHireRetention90Days ?? 100}%
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    {workforceData.matureCohortRetained ?? 0} of {workforceData.matureCohortHires ?? 0} mature hires retained
+                  </div>
+                </div>
+
+                <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Active Headcount
+                  </div>
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#0f172a', margin: '4px 0' }}>
+                    {workforceData.totalActive}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    Across {workforceData.byDepartment.length} departments
+                  </div>
+                </div>
+              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
                 {/* Department Distribution (Donut Chart) */}
@@ -439,6 +479,30 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                     centerValue={workforceData.totalActive}
                     size={180}
                   />
+                </div>
+
+                {/* Tenure Distribution Bands (Replaces sparse grade chart as primary) */}
+                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                    Tenure Distribution Bands
+                  </h3>
+                  {workforceData.tenureBands && workforceData.tenureBands.length > 0 ? (
+                    <SvgBarChart
+                      data={workforceData.tenureBands.map((tb: any) => ({
+                        label: tb.band,
+                        value: tb.count,
+                        color: '#2563eb',
+                        sublabel: `${tb.count} employees (${tb.percentage}%)`,
+                      }))}
+                      defaultColor="#2563eb"
+                      height={200}
+                      yAxisFormatter={(v) => `${v}`}
+                    />
+                  ) : (
+                    <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                      No tenure data available
+                    </div>
+                  )}
                 </div>
 
                 {/* Gender Diversity (Donut Chart) */}
@@ -458,23 +522,6 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                   />
                 </div>
 
-                {/* Grade Distribution (Bar Chart) */}
-                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
-                    Grade Level Distribution
-                  </h3>
-                  <SvgBarChart
-                    data={workforceData.byGrade.map((gr: any) => ({
-                      label: gr.name,
-                      value: gr.count,
-                      color: '#8b5cf6',
-                    }))}
-                    defaultColor="#8b5cf6"
-                    height={200}
-                    yAxisFormatter={(v) => `${v}`}
-                  />
-                </div>
-
                 {/* Employment Types */}
                 <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
@@ -491,6 +538,38 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                   />
                 </div>
               </div>
+
+              {/* Secondary Detail Section: Grade Breakdown */}
+              {workforceData.byGrade && workforceData.byGrade.length > 0 && (
+                <div style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                      Detailed Grade Level Breakdown
+                    </h4>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      {workforceData.byGrade.length} configured compensation tiers
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    {workforceData.byGrade.map((gr: any) => (
+                      <div
+                        key={gr.name}
+                        style={{
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '6px',
+                          padding: '8px 14px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, color: '#1e293b' }}>{gr.name}: </span>
+                        <span style={{ color: '#2563eb', fontWeight: 600 }}>{gr.count} staff</span>
+                        <span style={{ color: '#64748b', marginLeft: '4px' }}>({gr.percentage}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -533,25 +612,27 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
 
                 <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
-                    Late Arrivals
+                    On-Time Arrival Rate
                   </div>
-                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#f59e0b', margin: '4px 0' }}>
-                    {attendanceData.lateness.lateCount}
+                  <div style={{ fontSize: '26px', fontWeight: 900, color: '#10b981', margin: '4px 0' }}>
+                    {attendanceData.onTimeArrivalRate ?? 100}%
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {attendanceData.lateness.totalLateMinutes} total late minutes
+                    {attendanceData.onTimeCheckins ?? Math.max(0, (attendanceData.totalCheckins || 0) - (attendanceData.lateness?.lateCount || 0))} on-time • {attendanceData.lateness?.lateCount || 0} late ({attendanceData.lateness?.totalLateMinutes || 0} late mins)
                   </div>
                 </div>
 
                 <div style={{ background: '#ffffff', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>
-                    Unexcused Absences
+                    Unexcused Absences & LOP
                   </div>
                   <div style={{ fontSize: '26px', fontWeight: 900, color: '#ef4444', margin: '4px 0' }}>
-                    {attendanceData.statusCounts.ABSENT || 0}
+                    {attendanceData.statusCounts.ABSENT || 0} Days
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    LOP payroll deductions
+                    {attendanceData.lopFinancialImpact
+                      ? `₹${attendanceData.lopFinancialImpact.deductionAmount.toLocaleString()} LOP (${attendanceData.lopFinancialImpact.isFinalized ? 'Disbursed' : 'Calculated'})`
+                      : 'Unexcused LOP deductions'}
                   </div>
                 </div>
 
@@ -560,7 +641,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                     Authorized Leaves
                   </div>
                   <div style={{ fontSize: '26px', fontWeight: 900, color: '#8b5cf6', margin: '4px 0' }}>
-                    {attendanceData.statusCounts.ON_LEAVE || 0}
+                    {attendanceData.statusCounts.ON_LEAVE || 0} Days
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>
                     Approved applications
@@ -719,21 +800,73 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({ user }) => {
                 )}
               </div>
 
-              {/* Department Cost Distribution */}
+              {/* Department Cost Distribution & Cost-per-Head Breakdown */}
               {payrollData.departmentDistribution && payrollData.departmentDistribution.length > 0 && (
-                <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
-                    Department Payroll Cost Distribution ({payrollData.year})
-                  </h3>
-                  <DonutChart
-                    data={payrollData.departmentDistribution.map((d: any) => ({
-                      label: d.department,
-                      value: d.totalNet,
-                    }))}
-                    centerTitle="Net Payroll"
-                    centerValue={`₹${(payrollData.summary.totalYearNet / 1000).toFixed(0)}k`}
-                    size={200}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+                  <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                      Department Payroll Cost Distribution ({payrollData.year})
+                    </h3>
+                    <DonutChart
+                      data={payrollData.departmentDistribution.map((d: any) => ({
+                        label: d.department,
+                        value: d.totalNet,
+                      }))}
+                      centerTitle="Net Payroll"
+                      centerValue={`₹${(payrollData.summary.totalYearNet / 1000).toFixed(0)}k`}
+                      size={200}
+                    />
+                  </div>
+
+                  <div style={{ background: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                      <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#0f172a' }}>
+                        Cost per Head by Department
+                      </h3>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, background: '#f1f5f9', padding: '4px 8px', borderRadius: '4px' }}>
+                        {payrollData.departmentDistribution.length} Departments
+                      </span>
+                    </div>
+
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '11px', textTransform: 'uppercase' }}>
+                            <th style={{ padding: '8px 10px' }}>Department</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'center' }}>Staff</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>Total Gross</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>Avg Gross/Head</th>
+                            <th style={{ padding: '8px 10px', textAlign: 'right' }}>Avg Net/Head</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {payrollData.departmentDistribution.map((dept: any) => (
+                            <tr key={dept.department} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                              <td style={{ padding: '10px', fontWeight: 700, color: '#0f172a' }}>
+                                {dept.department}
+                              </td>
+                              <td style={{ padding: '10px', textAlign: 'center', color: '#64748b' }}>
+                                {dept.headcount}
+                              </td>
+                              <td style={{ padding: '10px', textAlign: 'right', color: '#475569' }}>
+                                ₹{dept.totalGross.toLocaleString()}
+                              </td>
+                              <td style={{ padding: '10px', textAlign: 'right', fontWeight: 600, color: '#2563eb' }}>
+                                ₹{dept.avgGrossPerHead.toLocaleString()}
+                              </td>
+                              <td style={{ padding: '10px', textAlign: 'right', fontWeight: 700, color: '#059669' }}>
+                                ₹{dept.avgNetPerHead.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div style={{ marginTop: '14px', padding: '10px 12px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '11px', color: '#64748b', lineHeight: 1.5 }}>
+                      <strong>Gross vs Net:</strong> Gross pay reflects earned compensation before EPF & PT withholdings. Net pay indicates take-home disbursement. Average cost per head is calculated using unique payroll recipients in this period.
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

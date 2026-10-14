@@ -269,7 +269,7 @@ export const ExecutiveDashboardPage: React.FC<Props> = ({ user, onNavigateTab })
             </div>
           </div>
 
-          {/* Tile 2: Today's Presence Rate */}
+          {/* Tile 2: On-Time Arrival Rate */}
           <div
             onClick={() => onNavigateTab('attendance')}
             style={{
@@ -287,110 +287,66 @@ export const ExecutiveDashboardPage: React.FC<Props> = ({ user, onNavigateTab })
           >
             <div>
               <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                {isManager ? 'Department Presence Rate' : "Today's Presence Rate"}
+                {isManager ? 'Department Punctuality' : "Today's On-Time Rate"}
               </div>
               <div style={{ fontSize: '30px', fontWeight: 900, color: '#2563eb', margin: '4px 0 2px' }}>
-                {overview?.presenceRate ?? 0}%
+                {overview?.onTimeArrivalRate ?? 100}%
               </div>
               <div style={{ fontSize: '12px', color: '#64748b' }}>
-                {overview?.todayPunches ?? 0} clocked in ({overview?.todayLatePunches ?? 0} late)
+                {overview?.todayOnTimePunches ?? Math.max(0, (overview?.todayPunches || 0) - (overview?.todayLatePunches || 0))} on-time • {overview?.todayLatePunches ?? 0} late ({overview?.todayPunches ?? 0} clocked in)
               </div>
             </div>
             <CircularGauge
-              value={overview?.presenceRate ?? 0}
+              value={overview?.onTimeArrivalRate ?? 100}
               label=""
               size={68}
               strokeWidth={7}
             />
           </div>
 
-          {/* Tile 3: Pending Approvals Action Hub */}
+          {/* Tile 3: Monthly Attrition Rate */}
           <div
+            onClick={() => onNavigateTab('reports')}
             style={{
               background: '#ffffff',
               borderRadius: '10px',
               border: '1px solid #e2e8f0',
               padding: '18px 20px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              cursor: 'pointer',
             }}
+            title="Click to view Workforce & Retention Reports"
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                {isManager ? 'Team Pending Actions' : 'Pending Actions'}
+                Monthly Attrition Rate
               </span>
               <span
                 style={{
-                  background: (overview?.pendingApprovals?.total || 0) > 0 ? '#fff7ed' : '#ecfdf5',
-                  color: (overview?.pendingApprovals?.total || 0) > 0 ? '#ea580c' : '#059669',
+                  background: (overview?.monthlyAttritionRate || 0) > 3 ? '#fef2f2' : '#f0fdf4',
+                  color: (overview?.monthlyAttritionRate || 0) > 3 ? '#ef4444' : '#16a34a',
                   padding: '4px',
                   borderRadius: '6px',
                   display: 'flex',
                 }}
               >
-                <Icons.AlertTriangle size={16} />
+                <Icons.DoorExit size={16} />
               </span>
             </div>
-            <div style={{ fontSize: '32px', fontWeight: 900, color: '#0f172a', margin: '6px 0 2px' }}>
-              {overview?.pendingApprovals?.total ?? 0}
+            <div style={{ fontSize: '30px', fontWeight: 900, color: '#0f172a', margin: '4px 0 2px' }}>
+              {overview?.monthlyAttritionRate ?? 0}%
             </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-              <button
-                type="button"
-                onClick={() => onNavigateTab('leaves')}
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '2px 6px',
-                  fontSize: '11px',
-                  color: '#1e293b',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-                title="Review pending leaves"
-              >
-                Leaves: <strong>{overview?.pendingApprovals?.leaves ?? 0}</strong>
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigateTab('offboarding')}
-                style={{
-                  background: '#f1f5f9',
-                  border: 'none',
-                  borderRadius: '4px',
-                  padding: '2px 6px',
-                  fontSize: '11px',
-                  color: '#1e293b',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-                title="Review exit requests"
-              >
-                Exits: <strong>{overview?.pendingApprovals?.exits ?? 0}</strong>
-              </button>
-              {!isManager && (
-                <button
-                  type="button"
-                  onClick={() => onNavigateTab('onboarding')}
-                  style={{
-                    background: '#f1f5f9',
-                    border: 'none',
-                    borderRadius: '4px',
-                    padding: '2px 6px',
-                    fontSize: '11px',
-                    color: '#1e293b',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                  title="Review onboarding candidates"
-                >
-                  Onboarding: <strong>{overview?.pendingApprovals?.onboardingCandidates ?? 0}</strong>
-                </button>
+            <div style={{ fontSize: '12px', color: '#64748b' }}>
+              {overview?.exitsThisMonth ?? 0} exits in month
+              {overview?.prevMonthAttritionRate !== undefined && (
+                <span style={{ color: '#475569', marginLeft: '4px' }}>
+                  (vs {overview.prevMonthAttritionRate}% last mo)
+                </span>
               )}
             </div>
           </div>
 
-          {/* Tile 4: Monthly Net Payroll Expense (Authorized Roles) or Shift Coverage */}
+          {/* Tile 4: Monthly Net Payroll Expense (Authorized Roles) or Average Team Tenure (Manager) */}
           {canSeePayroll && overview?.currentMonthPayrollExpense !== null ? (
             <div
               onClick={() => onNavigateTab('payroll')}
@@ -406,7 +362,7 @@ export const ExecutiveDashboardPage: React.FC<Props> = ({ user, onNavigateTab })
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                  Payroll Net Expense
+                  Disbursed Net Payroll
                 </span>
                 <span
                   style={{
@@ -424,12 +380,14 @@ export const ExecutiveDashboardPage: React.FC<Props> = ({ user, onNavigateTab })
                 {formatCurrency(overview?.currentMonthPayrollExpense)}
               </div>
               <div style={{ fontSize: '12px', color: '#64748b' }}>
-                Current month processed disbursements
+                {overview?.latestBatchLopAmount
+                  ? `₹${overview.latestBatchLopAmount.toLocaleString()} verified LOP deductions`
+                  : 'Current month processed payroll'}
               </div>
             </div>
           ) : (
             <div
-              onClick={() => onNavigateTab('shifts')}
+              onClick={() => onNavigateTab('reports')}
               style={{
                 background: '#ffffff',
                 borderRadius: '10px',
@@ -438,10 +396,11 @@ export const ExecutiveDashboardPage: React.FC<Props> = ({ user, onNavigateTab })
                 boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 cursor: 'pointer',
               }}
+              title="Average tenure across active team members"
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
-                  {isManager ? 'Department Shift Coverage' : 'Shift Roster Operations'}
+                  {isManager ? `${departmentName} Avg Tenure` : 'Average Tenure'}
                 </span>
                 <span
                   style={{
@@ -455,16 +414,181 @@ export const ExecutiveDashboardPage: React.FC<Props> = ({ user, onNavigateTab })
                   <Icons.Clock size={16} />
                 </span>
               </div>
-              <div style={{ fontSize: '26px', fontWeight: 900, color: '#0f172a', margin: '8px 0 2px' }}>
-                Active Shifts
+              <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', margin: '6px 0 2px' }}>
+                {overview?.averageTenureYears ?? 0} Years
               </div>
-              <div style={{ fontSize: '12px', color: '#2563eb' }}>
-                {isManager ? `Review ${departmentName} schedule & coverage ↗` : 'Review rotational & standard coverage ↗'}
+              <div style={{ fontSize: '12px', color: '#64748b' }}>
+                Calculated from verified joining dates
               </div>
             </div>
           )}
         </div>
       )}
+
+      {/* 2.5 Actionable Pending Approvals Strip */}
+      {overview && (
+        <div
+          style={{
+            background: (overview.pendingApprovals?.total || 0) > 0 ? '#fffbeb' : '#f8fafc',
+            border: `1px solid ${(overview.pendingApprovals?.total || 0) > 0 ? '#fde68a' : '#e2e8f0'}`,
+            borderRadius: '10px',
+            padding: '14px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span
+              style={{
+                background: (overview.pendingApprovals?.total || 0) > 0 ? '#f59e0b' : '#10b981',
+                color: '#ffffff',
+                borderRadius: '999px',
+                padding: '3px 8px',
+                fontSize: '11px',
+                fontWeight: 800,
+              }}
+            >
+              {(overview.pendingApprovals?.total || 0) > 0 ? `${overview.pendingApprovals.total} ACTION REQUIRED` : 'ALL CLEAR'}
+            </span>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+              Pending Approvals Assigned to You
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => onNavigateTab('leaves')}
+              style={{
+                fontSize: '12px',
+                padding: '5px 12px',
+                background: '#ffffff',
+                fontWeight: 600,
+              }}
+            >
+              Leaves: <strong>{overview.pendingApprovals?.leaves ?? 0}</strong> ↗
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => onNavigateTab('offboarding')}
+              style={{
+                fontSize: '12px',
+                padding: '5px 12px',
+                background: '#ffffff',
+                fontWeight: 600,
+              }}
+            >
+              Exit Clearances: <strong>{overview.pendingApprovals?.exits ?? 0}</strong> ↗
+            </button>
+            {!isManager && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => onNavigateTab('onboarding')}
+                style={{
+                  fontSize: '12px',
+                  padding: '5px 12px',
+                  background: '#ffffff',
+                  fontWeight: 600,
+                }}
+              >
+                Onboarding: <strong>{overview.pendingApprovals?.onboardingCandidates ?? 0}</strong> ↗
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 2.6 Who's Out Today (Real-time Team Availability) */}
+      <div
+        style={{
+          background: '#ffffff',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0',
+          padding: '16px 20px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+              Who's Out Today • Real-time Availability
+            </h3>
+            <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#64748b' }}>
+              Team members on approved leave or unexcused absence today
+            </p>
+          </div>
+          <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 600 }}>
+            {overview?.whosOutToday?.length ? `${overview.whosOutToday.length} Out Today` : 'Full Attendance'}
+          </span>
+        </div>
+
+        {overview?.whosOutToday && overview.whosOutToday.length > 0 ? (
+          <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
+            {overview.whosOutToday.map((person: any) => (
+              <div
+                key={person.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: person.status === 'ON_LEAVE' ? '#f5f3ff' : '#fef2f2',
+                  border: `1px solid ${person.status === 'ON_LEAVE' ? '#ddd6fe' : '#fecaca'}`,
+                  borderRadius: '20px',
+                  padding: '5px 12px',
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: person.status === 'ON_LEAVE' ? '#8b5cf6' : '#ef4444',
+                    color: '#ffffff',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {person.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                </span>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#1e293b' }}>
+                    {person.name}
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#64748b' }}>
+                    {person.department} • <span style={{ fontWeight: 600 }}>{person.details}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: '6px',
+              background: '#f8fafc',
+              color: '#059669',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontWeight: 500,
+            }}
+          >
+            <span>✨</span> 100% Team Availability — No scheduled leaves or unexcused absences recorded today.
+          </div>
+        )}
+      </div>
 
       {/* 3. Visual Charts Grid (Department Donut & 7-Day Attendance Trend) */}
       <div

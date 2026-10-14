@@ -234,19 +234,28 @@ export class EssService {
       isWeeklyOff: Boolean(todayAttendanceTyped.isWeeklyOff),
     };
 
-    // 4. Leave Balances
+    // 4. Leave Balances with Year-End Forecasting
+    const todayDate = new Date();
+    const monthsRemainingInYear = Math.max(0, 11 - todayDate.getUTCMonth());
     const leaveBalances: EssLeaveBalanceItem[] = (
       leaveBalancesData.balances || []
-    ).map((b: any) => ({
-      leaveTypeId: b.leaveTypeId,
-      name: b.leaveTypeName,
-      code: b.leaveTypeCode,
-      isPaid: b.isPaid,
-      daysAllowedPerYear: b.daysAllowedPerYear,
-      accruedDays: b.currentBalance,
-      usedDays: b.daysAllowedPerYear - b.availableBalance,
-      availableBalance: b.availableBalance,
-    }));
+    ).map((b: any) => {
+      const monthlyAccrual = b.daysAllowedPerYear ? Number((b.daysAllowedPerYear / 12).toFixed(1)) : 0;
+      const projectedBalance = Number(
+        (b.availableBalance + monthsRemainingInYear * monthlyAccrual).toFixed(1),
+      );
+      return {
+        leaveTypeId: b.leaveTypeId,
+        name: b.leaveTypeName,
+        code: b.leaveTypeCode,
+        isPaid: b.isPaid,
+        daysAllowedPerYear: b.daysAllowedPerYear,
+        accruedDays: b.currentBalance,
+        usedDays: b.daysAllowedPerYear - b.availableBalance,
+        availableBalance: b.availableBalance,
+        projectedYearEndBalance: projectedBalance,
+      };
+    });
 
     // 5. Recent Leave Requests (Last 3)
     const recentLeaveRequests: EssRecentLeaveItem[] = (leaveRequests || [])
@@ -314,6 +323,126 @@ export class EssService {
       locationName: h.location?.name || 'All Locations',
     }));
 
+    // 9. Team Availability (Who's Out Today in my department)
+    const startOfDay = new Date(today);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const activeLeavesToday = await this.prisma.leaveRequest.findMany({
+      where: {
+        organizationId,
+        status: 'APPROVED',
+        startDate: { lte: endOfDay },
+        endDate: { gte: startOfDay },
+        employee: {
+          departmentId: employeeProfile.departmentId,
+          id: { not: employeeId },
+        },
+      },
+      select: {
+        employee: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            employeeCode: true,
+          },
+        },
+        leaveType: { select: { name: true } },
+      },
+      take: 6,
+    });
+
+    const whosOutToday = activeLeavesToday.map((l) => ({
+      id: l.employee.id,
+      name: `${l.employee.firstName} ${l.employee.lastName}`.trim(),
+      employeeCode: l.employee.employeeCode,
+      status: 'ON_LEAVE',
+      details: l.leaveType.name,
+    }));
+
+    // 10. Upcoming Celebrations (Birthdays & Work Anniversaries in next 14 days)
+    const activeColleagues = await this.prisma.employee.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        employmentStatus: 'ACTIVE',
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        dateOfBirth: true,
+        dateOfJoining: true,
+        department: { select: { name: true } },
+      },
+    });
+
+    const upcomingCelebrations: Array<{
+      id: string;
+      name: string;
+      department: string;
+      type: 'BIRTHDAY' | 'WORK_ANNIVERSARY';
+      date: string;
+      years?: number;
+    }> = [];
+
+    const currentMonthNum = todayDate.getUTCMonth();
+    const currentDayNum = todayDate.getUTCDate();
+
+    for (const c of activeColleagues) {
+      if (c.dateOfBirth) {
+        const dob = new Date(c.dateOfBirth);
+        const bMonth = dob.getUTCMonth();
+        const bDay = dob.getUTCDate();
+        if (bMonth === currentMonthNum && bDay >= currentDayNum && bDay <= currentDayNum + 14) {
+          upcomingCelebrations.push({
+            id: c.id,
+            name: `${c.firstName} ${c.lastName}`.trim(),
+            department: c.department?.name || 'Team',
+            type: 'BIRTHDAY',
+            date: `${dob.toLocaleString('en-US', { month: 'short' })} ${bDay}`,
+          });
+        }
+      }
+      if (c.dateOfJoining) {
+        const doj = new Date(c.dateOfJoining);
+        const jMonth = doj.getUTCMonth();
+        const jDay = doj.getUTCDate();
+        const yearsCount = todayDate.getUTCFullYear() - doj.getUTCFullYear();
+        if (yearsCount > 0 && jMonth === currentMonthNum && jDay >= currentDayNum && jDay <= currentDayNum + 14) {
+          upcomingCelebrations.push({
+            id: c.id,
+            name: `${c.firstName} ${c.lastName}`.trim(),
+            department: c.department?.name || 'Team',
+            type: 'WORK_ANNIVERSARY',
+            date: `${doj.toLocaleString('en-US', { month: 'short' })} ${jDay}`,
+            years: yearsCount,
+          });
+        }
+      }
+    }
+
+    // 11. Punctuality Streak (consecutive on-time punches in the current month)
+    const monthStart = new Date(Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1));
+    const recentPunches = await this.prisma.attendanceRecord.findMany({
+      where: {
+        organizationId,
+        employeeId,
+        date: { gte: monthStart },
+        checkInTime: { not: null },
+      },
+      orderBy: { date: 'desc' },
+      select: { isLate: true },
+    });
+
+    let punctualityStreak = 0;
+    for (const p of recentPunches) {
+      if (!p.isLate) punctualityStreak++;
+      else break;
+    }
+
     return {
       profile,
       shift,
@@ -322,6 +451,9 @@ export class EssService {
       recentLeaveRequests,
       latestPayslip,
       upcomingHolidays,
+      whosOutToday,
+      upcomingCelebrations,
+      punctualityStreak,
       ...(managerOverview && { managerOverview }),
     };
   }
