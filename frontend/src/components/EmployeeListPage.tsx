@@ -594,7 +594,7 @@ export const EmployeeListPage: React.FC<Props> = ({
             margin: '12px 0',
           }}
         >
-          {employees.length === 0 ? (
+          {employees.length === 0 && !searchQuery && !selectedDeptFilter && !selectedStatusFilter ? (
             <div>
               <strong style={{ fontSize: '15px', color: '#1e293b' }}>No employees found in the directory</strong>
               <p style={{ fontSize: '13px', marginTop: '4px' }}>
