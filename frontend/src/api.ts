@@ -210,6 +210,16 @@ export const api = {
   getPayableDays: (employeeId: string, year: number, month: number) =>
     fetchJson<any>(`/attendance/payable-days/${employeeId}?year=${year}&month=${month}`),
   getAttendanceSummary: () => fetchJson<any>('/attendance/summary'),
+  getAttendanceRecords: (params?: { startDate?: string; endDate?: string; employeeId?: string; departmentId?: string; status?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.startDate) q.append('startDate', params.startDate);
+    if (params?.endDate) q.append('endDate', params.endDate);
+    if (params?.employeeId) q.append('employeeId', params.employeeId);
+    if (params?.departmentId) q.append('departmentId', params.departmentId);
+    if (params?.status) q.append('status', params.status);
+    const query = q.toString() ? `?${q.toString()}` : '';
+    return fetchJson<any[]>(`/attendance/records${query}`);
+  },
 
   // 6. Module 5: Leaves
   getLeaveTypes: () => fetchJson<any[]>('/leaves/types'),
