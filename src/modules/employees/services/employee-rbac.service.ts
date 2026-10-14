@@ -29,6 +29,16 @@ const SENSITIVE_FINANCIAL_FIELDS = [
   'uanNumber',
 ];
 
+const SENSITIVE_PERSONAL_FIELDS = [
+  'dateOfBirth',
+  'gender',
+  'currentAddress',
+  'permanentAddress',
+  'emergencyContactName',
+  'emergencyContactPhone',
+  'emergencyContactRelation',
+];
+
 @Injectable()
 export class EmployeeRbacService {
   /**
@@ -123,6 +133,9 @@ export class EmployeeRbacService {
     if (viewer.role === Role.MANAGER && isDirectReport) {
       // Strip financial/bank data
       for (const field of SENSITIVE_FINANCIAL_FIELDS) {
+        delete sanitized[field];
+      }
+      for (const field of SENSITIVE_PERSONAL_FIELDS) {
         delete sanitized[field];
       }
       return sanitized;
