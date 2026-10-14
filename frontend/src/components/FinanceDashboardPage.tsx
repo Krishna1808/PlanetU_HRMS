@@ -69,7 +69,7 @@ export const FinanceDashboardPage: React.FC<Props> = ({ user, onNavigateTab }) =
       label: 'Net payroll this year',
       value: loading ? '…' : money(report?.summary?.totalYearNet),
       helper: 'Across available payroll batches',
-      icon: Icons.Wallet,
+      icon: Icons.Dollar,
       tone: '#2563eb',
     },
     {
@@ -207,7 +207,7 @@ export const FinanceDashboardPage: React.FC<Props> = ({ user, onNavigateTab }) =
                     {monthName(Number(batch.month))} {batch.year}
                   </span>
                   <span style={{ color: batch.status === 'DRAFT' ? '#b45309' : '#1d4ed8', fontSize: 11, fontWeight: 700 }}>
-                    {String(batch.status || 'Unknown').replaceAll('_', ' ')}
+                    {String(batch.status || 'Unknown').replace(/_/g, ' ')}
                   </span>
                 </button>
               ))}
