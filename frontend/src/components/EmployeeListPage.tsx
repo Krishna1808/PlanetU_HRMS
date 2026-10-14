@@ -624,6 +624,7 @@ export const EmployeeListPage: React.FC<Props> = ({
                   setSearchQuery('');
                   setSelectedDeptFilter('');
                   setSelectedStatusFilter('');
+                  setCurrentPage(1);
                 }}
                 style={{ marginTop: '12px' }}
               >
