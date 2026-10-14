@@ -70,12 +70,20 @@ export const EmployeeListPage: React.FC<Props> = ({
       });
       const empList = empRes.data || [];
       setEmployees(empList);
-      setPagination(empRes.pagination || {
+      const nextPagination = empRes.pagination || {
         page: currentPage,
         limit: 50,
         total: empList.length,
         totalPages: empList.length ? 1 : 0,
-      });
+      };
+      setPagination(nextPagination);
+      const safePage = nextPagination.totalPages > 0
+        ? Math.min(currentPage, nextPagination.totalPages)
+        : 1;
+      if (safePage !== currentPage) {
+        setCurrentPage(safePage);
+        return;
+      }
       if (empRes.summary) {
         setSummary(empRes.summary);
       } else {
