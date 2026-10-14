@@ -32,6 +32,10 @@ export class ReportsService {
     departmentName: string | null;
     employeeFilter: Prisma.EmployeeWhereInput;
   }> {
+    if (!currentUser.employeeId) {
+      throw new ForbiddenException('Manager account is not linked to an employee record');
+    }
+
     let departmentId: string | null = null;
     let departmentName: string | null = null;
 
@@ -193,29 +197,40 @@ export class ReportsService {
       }
     }
 
-    // 4. Pending approvals count
+    // 4. Pending actions. Managers can act only on direct-report approvals,
+    // even though they can read department-wide workforce and exit information.
+    const managerApprovalFilter: Prisma.EmployeeWhereInput | null =
+      currentUser.role === Role.MANAGER && currentUser.employeeId
+        ? { reportingManagerId: currentUser.employeeId }
+        : null;
+
     const [pendingLeaves, pendingExits, pendingOnboarding] = await Promise.all([
       this.prisma.leaveRequest.count({
         where: {
           organizationId,
           status: LeaveRequestStatus.PENDING,
-          ...(managerScope ? { employee: managerScope.employeeFilter } : {}),
+          ...(managerScope
+            ? { employee: managerApprovalFilter || managerScope.employeeFilter }
+            : {}),
         },
       }),
       this.prisma.exitRequest.count({
         where: {
           organizationId,
           status: ExitStatus.PENDING_APPROVAL,
-          ...(managerScope ? { employee: managerScope.employeeFilter } : {}),
+          ...(managerScope
+            ? { employee: managerApprovalFilter || managerScope.employeeFilter }
+            : {}),
         },
       }),
-      this.prisma.onboardingCandidate.count({
-        where: {
-          organizationId,
-          status: { in: [OnboardingStatus.INVITED, OnboardingStatus.IN_PROGRESS, OnboardingStatus.SUBMITTED] },
-          ...(managerScope?.departmentId ? { departmentId: managerScope.departmentId } : {}),
-        },
-      }),
+      currentUser.role === Role.MANAGER
+        ? Promise.resolve(0)
+        : this.prisma.onboardingCandidate.count({
+            where: {
+              organizationId,
+              status: { in: [OnboardingStatus.INVITED, OnboardingStatus.IN_PROGRESS, OnboardingStatus.SUBMITTED] },
+            },
+          }),
     ]);
 
     return {
@@ -230,7 +245,7 @@ export class ReportsService {
         leaves: pendingLeaves,
         exits: pendingExits,
         onboardingCandidates: pendingOnboarding,
-        total: pendingLeaves + pendingExits,
+        total: pendingLeaves + pendingExits + pendingOnboarding,
       },
       departmentId: managerScope?.departmentId || null,
       departmentName: managerScope?.departmentName || null,
