@@ -763,12 +763,29 @@ export class EmployeeService {
   /**
    * FR-EMP-004: Org Chart view derived from reportingManagerId
    */
-  async getOrgChart(organizationId: string) {
+  async getOrgChart(organizationId: string, viewer: AuthenticatedUser) {
+    const where: Prisma.EmployeeWhereInput = {
+      organizationId,
+      deletedAt: null,
+    };
+
+    if (viewer.role === Role.MANAGER) {
+      if (!viewer.employeeId) {
+        throw new ForbiddenException('Manager account is not linked to an employee record');
+      }
+      const managerEmployee = await this.prisma.employee.findFirst({
+        where: { id: viewer.employeeId, organizationId, deletedAt: null },
+        select: { departmentId: true },
+      });
+      where.OR = [
+        ...(managerEmployee?.departmentId ? [{ departmentId: managerEmployee.departmentId }] : []),
+        { reportingManagerId: viewer.employeeId },
+        { id: viewer.employeeId },
+      ];
+    }
+
     const employees = await this.prisma.employee.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-      },
+      where,
       select: {
         id: true,
         employeeCode: true,
