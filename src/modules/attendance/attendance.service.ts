@@ -293,11 +293,24 @@ export class AttendanceService {
   ) {
     const whereClause: any = { organizationId };
 
-    // Manager scoping: only view direct reports
-    if (currentUser.role === Role.MANAGER && currentUser.employeeId) {
-      whereClause.employee = {
-        reportingManagerId: currentUser.employeeId,
-      };
+    // Managers can view their department plus direct reports in other departments.
+    // This is read-only scope; regularization remains separately restricted to direct reports.
+    if (currentUser.role === Role.MANAGER) {
+      if (!currentUser.employeeId) {
+        throw new ForbiddenException('Manager account is not linked to an employee record');
+      }
+      const managerEmployee = await this.prisma.employee.findFirst({
+        where: { id: currentUser.employeeId, organizationId, deletedAt: null },
+        select: { departmentId: true },
+      });
+      whereClause.AND = [{
+        OR: [
+          ...(managerEmployee?.departmentId
+            ? [{ employee: { departmentId: managerEmployee.departmentId } }]
+            : []),
+          { employee: { reportingManagerId: currentUser.employeeId } },
+        ],
+      }];
     }
 
     if (query.employeeId) {
