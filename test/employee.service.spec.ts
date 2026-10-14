@@ -617,6 +617,39 @@ describe('EmployeeService (Module 3: Employee Lifecycle)', () => {
       }
     });
 
+    it('scopes the manager organization chart to their department and direct reports', async () => {
+      const manager: AuthenticatedUser = {
+        id: 'user-mgr-chart',
+        organizationId: orgId,
+        email: 'manager@planetu.com',
+        role: Role.MANAGER,
+        employeeId: 'emp-manager-chart',
+      };
+      mockPrisma.employee.findFirst.mockResolvedValue({
+        id: manager.employeeId,
+        organizationId: orgId,
+        departmentId: deptId,
+        deletedAt: null,
+      });
+      mockPrisma.employee.findMany.mockResolvedValue([mockEmployee]);
+
+      await service.getOrgChart(orgId, manager);
+
+      expect(mockPrisma.employee.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: orgId,
+            deletedAt: null,
+            OR: expect.arrayContaining([
+              { departmentId: deptId },
+              { reportingManagerId: manager.employeeId },
+              { id: manager.employeeId },
+            ]),
+          }),
+        }),
+      );
+    });
+
     it('returns aggregate summary metrics alongside paginated results', async () => {
       mockPrisma.employee.count
         .mockResolvedValueOnce(25) // query total
