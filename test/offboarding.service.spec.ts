@@ -426,6 +426,92 @@ describe('OffboardingService (Module 9: Offboarding & Exit Management)', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Role-scoped exit visibility and finance data minimization
+  // ---------------------------------------------------------------------------
+  describe('role-scoped exit request access', () => {
+    it('scopes manager exit-request lists to their department and direct reports', async () => {
+      mockPrisma.employee.findFirst.mockResolvedValue({
+        id: managerEmpId,
+        organizationId: orgId,
+        departmentId: 'dept-eng',
+        deletedAt: null,
+      });
+      mockPrisma.exitRequest.count.mockResolvedValue(0);
+      mockPrisma.exitRequest.findMany.mockResolvedValue([]);
+
+      await service.listExitRequests(orgId, {}, mockManagerUser);
+
+      expect(mockPrisma.exitRequest.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: orgId,
+            AND: [
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  { employeeId: managerEmpId },
+                  { employee: { departmentId: 'dept-eng' } },
+                  { employee: { reportingManagerId: managerEmpId } },
+                ]),
+              }),
+            ],
+          }),
+        }),
+      );
+    });
+
+    it('removes exit interview and personal email from finance list responses', async () => {
+      const financeUser: AuthenticatedUser = {
+        id: 'user-finance-1',
+        organizationId: orgId,
+        email: 'finance@alpha.com',
+        role: Role.FINANCE,
+        employeeId: null,
+      };
+      mockPrisma.exitRequest.count.mockResolvedValue(1);
+      mockPrisma.exitRequest.findMany.mockResolvedValue([{
+        id: exitReqId,
+        employeeId: empId,
+        employee: { id: empId, firstName: 'Rohan', personalEmail: 'personal@example.com' },
+        exitInterview: { feedback: 'confidential feedback' },
+        fnfSettlement: { id: 'fnf-1', status: FnFStatus.DRAFT },
+        clearanceTasks: [],
+      }]);
+
+      const result = await service.listExitRequests(orgId, {}, financeUser);
+
+      expect(result.data[0].employee.personalEmail).toBeUndefined();
+      expect(result.data[0].exitInterview).toBeNull();
+      expect(result.data[0].fnfSettlement).toEqual({ id: 'fnf-1', status: FnFStatus.DRAFT });
+    });
+
+    it('blocks managers from opening exit requests outside their department and direct reports', async () => {
+      mockPrisma.exitRequest.findFirst.mockResolvedValue({
+        id: exitReqId,
+        organizationId: orgId,
+        employeeId: empId,
+        employee: {
+          id: empId,
+          department: { id: 'dept-other' },
+          reportingManager: { id: 'manager-other' },
+        },
+        clearanceTasks: [],
+        exitInterview: null,
+        fnfSettlement: null,
+      });
+      mockPrisma.employee.findFirst.mockResolvedValue({
+        id: managerEmpId,
+        organizationId: orgId,
+        departmentId: 'dept-eng',
+        deletedAt: null,
+      });
+
+      await expect(
+        service.getExitRequestById(orgId, exitReqId, mockManagerUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // 6. Atomic Exit Finalization & Soft Deletion
   // ---------------------------------------------------------------------------
   describe('finalizeExit', () => {
