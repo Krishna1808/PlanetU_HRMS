@@ -350,7 +350,7 @@ export const BarChart: React.FC<BarChartProps> = ({
                     }}
                   >
                     <div>{item.label}</div>
-                    <div style={{ color: '#93c5fd' }}>{item.value.toLocaleString()} days</div>
+                    <div style={{ color: '#93c5fd' }}>{yAxisFormatter(item.value)}</div>
                     {item.sublabel && <div style={{ fontSize: '10px', color: '#94a3b8' }}>{item.sublabel}</div>}
                   </div>
                 )}
