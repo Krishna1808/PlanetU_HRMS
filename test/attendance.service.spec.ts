@@ -345,6 +345,39 @@ describe('AttendanceService (Module 4: Attendance & Single Source of Truth for P
   // ---------------------------------------------------------------------------
 
   describe('getRollCallSummary', () => {
+    it('scopes manager roll-call KPIs to their department and direct reports', async () => {
+      mockPrisma.employee.count = jest.fn().mockResolvedValue(12);
+      mockPrisma.employee.findFirst.mockResolvedValue({
+        id: 'manager-1',
+        organizationId: orgId,
+        departmentId: 'dept-eng',
+        deletedAt: null,
+      });
+      mockPrisma.attendanceRecord.findMany.mockResolvedValue([]);
+      mockPrisma.leaveRequest.count = jest.fn().mockResolvedValue(0);
+      const manager = {
+        id: 'user-manager-1',
+        role: Role.MANAGER,
+        organizationId: orgId,
+        employeeId: 'manager-1',
+      };
+
+      await service.getRollCallSummary(orgId, manager as any);
+
+      expect(mockPrisma.employee.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: orgId,
+            OR: expect.arrayContaining([
+              { departmentId: 'dept-eng' },
+              { reportingManagerId: 'manager-1' },
+              { id: 'manager-1' },
+            ]),
+          }),
+        }),
+      );
+    });
+
     it('aggregates organization roll-call statistics for today', async () => {
       mockPrisma.employee.count = jest.fn().mockResolvedValue(50);
       mockPrisma.attendanceRecord.findMany.mockResolvedValue([
