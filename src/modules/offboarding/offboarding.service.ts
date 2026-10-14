@@ -1046,7 +1046,7 @@ export class OffboardingService {
         ? {
             ...exitRequest.employee,
             personalEmail: undefined,
-            ...(currentUser.role === Role.FINANCE ? { phone: undefined } : {}),
+            phone: undefined,
           }
         : exitRequest.employee;
       return { ...exitRequest, employee: safeEmployee, exitInterview: null };
